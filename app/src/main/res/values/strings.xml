@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">VitalSense</string>
+    <!--
+        CONFIGURACIÓN REQUERIDA:
+        1. Firebase Console → Authentication → Sign-in method → Habilitar Google
+        2. Descarga el nuevo google-services.json (ya tendrá default_web_client_id)
+        3. Reemplaza este valor con el Web Client ID de tu proyecto Firebase
+           (Firebase Console → Project Settings → General → Web API key → OAuth 2.0 Client IDs)
+    -->
+    <string name="default_web_client_id">TU_WEB_CLIENT_ID_AQUI</string>
+</resources>
