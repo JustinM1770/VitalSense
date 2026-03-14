@@ -1,4 +1,4 @@
-package mx.ita.vitalsense.ui.register
+package mx.ita.vitalsense.ui.login
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,20 +15,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -63,28 +64,27 @@ import mx.ita.vitalsense.ui.theme.Manrope
 private val TextDark   = Color(0xFF221F1F)
 private val InputBg    = Color(0xFFF9F9FB)
 private val PrimaryBtn = Color(0xFF1169FF)
+private val DividerClr = Color(0xFFE5E5E5)
 
 @Composable
-fun RegisterScreen(
+fun LoginScreen(
     onBack: () -> Unit,
-    onRegisterSuccess: () -> Unit,
-    onLoginClick: () -> Unit,
-    vm: RegisterViewModel = viewModel(),
+    onLoginSuccess: () -> Unit,
+    onRegisterClick: () -> Unit,
+    vm: LoginViewModel = viewModel(),
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    var name            by remember { mutableStateOf("") }
     var email           by remember { mutableStateOf("") }
     var password        by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var termsAccepted   by remember { mutableStateOf(false) }
-
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState) {
         when (val s = uiState) {
-            is RegisterUiState.Success -> onRegisterSuccess()
-            is RegisterUiState.Error   -> snackbar.showSnackbar(s.message)
+            is LoginUiState.Success -> onLoginSuccess()
+            is LoginUiState.Error   -> snackbar.showSnackbar(s.message)
             else -> Unit
         }
     }
@@ -115,7 +115,7 @@ fun RegisterScreen(
                         .clickable(onClick = onBack),
                 )
                 Text(
-                    text = "Registrate",
+                    text = "Iniciar Sesión",
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
@@ -133,20 +133,14 @@ fun RegisterScreen(
                     .padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                RegField(
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = "Nombre",
-                    leadingIcon = Icons.Outlined.Person,
-                )
-                RegField(
+                LoginField(
                     value = email,
                     onValueChange = { email = it },
                     placeholder = "Email",
                     leadingIcon = Icons.Outlined.Email,
                     keyboardType = KeyboardType.Email,
                 )
-                RegField(
+                LoginField(
                     value = password,
                     onValueChange = { password = it },
                     placeholder = "Contraseña",
@@ -158,56 +152,28 @@ fun RegisterScreen(
                 )
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(10.dp))
 
-            // ── Terms ─────────────────────────────────────────────────────────
-            Row(
+            // ── Olvidaste contraseña ───────────────────────────────────────────
+            Text(
+                text = "Olvidaste tu contraseña?",
+                fontFamily = Manrope,
+                fontWeight = FontWeight.Normal,
+                fontSize = 13.sp,
+                color = PrimaryBtn,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .clickable { termsAccepted = !termsAccepted },
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .border(
-                            width = 1.5.dp,
-                            color = if (termsAccepted) PrimaryBtn else Color(0xFFB0B0B0),
-                            shape = RoundedCornerShape(4.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (termsAccepted) {
-                        Icon(
-                            imageVector = Icons.Outlined.Check,
-                            contentDescription = null,
-                            tint = PrimaryBtn,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                }
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(SpanStyle(color = TextDark)) { append("Acepto los ") }
-                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Terminos de Servicio") }
-                        withStyle(SpanStyle(color = TextDark)) { append(" y ") }
-                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Politicas de Privacidad") }
-                    },
-                    fontFamily = Manrope,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                )
-            }
+                    .align(Alignment.End)
+                    .padding(end = 24.dp)
+                    .clickable { },
+            )
 
             Spacer(Modifier.weight(1f))
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(28.dp))
 
-            // ── Botón Registrate ──────────────────────────────────────────────
+            // ── Botón Iniciar Sesión ───────────────────────────────────────────
             Button(
-                onClick = { vm.registerWithEmail(email, password) },
-                enabled = uiState !is RegisterUiState.Loading && termsAccepted,
+                onClick = { vm.signInWithEmail(email, password) },
+                enabled = uiState !is LoginUiState.Loading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
@@ -219,27 +185,99 @@ fun RegisterScreen(
                     disabledContainerColor = PrimaryBtn.copy(alpha = 0.4f),
                 ),
             ) {
-                if (uiState is RegisterUiState.Loading) {
+                if (uiState is LoginUiState.Loading) {
                     CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
                 } else {
-                    Text(text = "Registrate", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text("Iniciar Sesión", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
-            // ── "Ya tienes cuenta?" ───────────────────────────────────────────
+            // ── "No tienes cuenta?" ───────────────────────────────────────────
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = TextDark)) { append("Ya tienes cuenta?  ") }
-                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Inicia Sesión") }
+                    withStyle(SpanStyle(color = TextDark)) { append("No tienes cuenta?  ") }
+                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Registrate") }
                 },
                 fontFamily = Manrope,
                 fontSize = 14.sp,
-                modifier = Modifier
-                    .clickable(onClick = onLoginClick)
-                    .padding(bottom = 40.dp),
+                modifier = Modifier.clickable(onClick = onRegisterClick),
             )
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── Divisor con círculo ───────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f), color = DividerClr)
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp)
+                        .size(20.dp)
+                        .border(1.dp, DividerClr, CircleShape),
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f), color = DividerClr)
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── Botón Google ──────────────────────────────────────────────────
+            SocialButton(
+                onClick = { vm.signInWithGoogle(context) },
+                enabled = uiState !is LoginUiState.Loading,
+            ) {
+                // Google G icon (multicolor text)
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 18.sp)) { append("G") }
+                    },
+                    fontFamily = Manrope,
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "Inicia Sesion con Google",
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = TextDark,
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── Botón Facebook ────────────────────────────────────────────────
+            SocialButton(onClick = {}, enabled = true) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1877F2)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "f",
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color.White,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "Inicia Sesion con Facebook",
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = TextDark,
+                )
+            }
+
+            Spacer(Modifier.height(40.dp))
         }
 
         SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter))
@@ -247,7 +285,31 @@ fun RegisterScreen(
 }
 
 @Composable
-private fun RegField(
+private fun SocialButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .height(52.dp)
+            .border(1.dp, DividerClr, RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun LoginField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
@@ -277,8 +339,8 @@ private fun RegField(
         singleLine = true,
         shape = RoundedCornerShape(10.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor   = Color.Transparent,
-            unfocusedBorderColor = Color.Transparent,
+            focusedBorderColor      = Color.Transparent,
+            unfocusedBorderColor    = Color.Transparent,
             focusedContainerColor   = InputBg,
             unfocusedContainerColor = InputBg,
             focusedTextColor   = TextDark,

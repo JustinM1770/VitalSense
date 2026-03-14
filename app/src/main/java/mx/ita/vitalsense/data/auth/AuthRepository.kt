@@ -63,5 +63,11 @@ class AuthRepository {
         }
     }
 
+    // ── Modo Demo: acceso anónimo sin registro ────────────────────────────────
+    suspend fun signInAnonymously(): Result<FirebaseUser> =
+        runCatching { auth.signInAnonymously().await().user!! }
+
+    val isAnonymous: Boolean get() = auth.currentUser?.isAnonymous == true
+
     fun signOut() = auth.signOut()
 }
