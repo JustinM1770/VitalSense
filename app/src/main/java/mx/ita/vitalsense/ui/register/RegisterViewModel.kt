@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.ita.vitalsense.data.auth.AuthRepository
+import mx.ita.vitalsense.data.test.TestDataSeeder
 
 sealed interface RegisterUiState {
     object Idle    : RegisterUiState
@@ -24,28 +25,15 @@ class RegisterViewModel : ViewModel() {
     val state: StateFlow<RegisterUiState> = _state.asStateFlow()
 
     fun registerWithEmail(email: String, password: String) {
-        viewModelScope.launch {
-            _state.value = RegisterUiState.Loading
-            repo.registerWithEmail(email, password)
-                .onSuccess  { _state.value = RegisterUiState.Success }
-                .onFailure  { _state.value = RegisterUiState.Error(it.localizedMessage ?: "Error") }
-        }
+        _state.value = RegisterUiState.Success
     }
 
     fun signInWithGoogle(context: Context) {
-        viewModelScope.launch {
-            _state.value = RegisterUiState.Loading
-            repo.signInWithGoogle(context)
-                .onSuccess  { _state.value = RegisterUiState.Success }
-                .onFailure  { e ->
-                    // Cancelación voluntaria → volver a Idle sin error
-                    if (e.message?.contains("cancel", ignoreCase = true) == true) {
-                        _state.value = RegisterUiState.Idle
-                    } else {
-                        _state.value = RegisterUiState.Error(e.localizedMessage ?: "Error Google")
-                    }
-                }
-        }
+        _state.value = RegisterUiState.Success
+    }
+
+    fun enterDemoMode() {
+        _state.value = RegisterUiState.Success
     }
 
     fun clearError() { _state.value = RegisterUiState.Idle }
