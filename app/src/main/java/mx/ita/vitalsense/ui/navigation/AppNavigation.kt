@@ -16,6 +16,9 @@ import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
 import mx.ita.vitalsense.ui.dashboard.DashboardScreen
 import mx.ita.vitalsense.ui.device.DeviceScanScreen
+import mx.ita.vitalsense.ui.documentos.DocumentosScreen
+import mx.ita.vitalsense.ui.login.LoginScreen
+import mx.ita.vitalsense.ui.notifications.NotificacionesScreen
 import mx.ita.vitalsense.ui.onboarding.OnboardingScreen
 import mx.ita.vitalsense.ui.reports.DailyReportScreen
 import mx.ita.vitalsense.ui.patient.PatientDetailScreen
