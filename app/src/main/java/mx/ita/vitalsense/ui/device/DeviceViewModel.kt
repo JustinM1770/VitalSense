@@ -23,6 +23,8 @@ import mx.ita.vitalsense.data.healthconnect.HealthConnectRepository
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import mx.ita.vitalsense.data.model.SleepData
+import mx.ita.vitalsense.data.model.VitalsData
+import mx.ita.vitalsense.data.repository.VitalsRepository
 
 class DeviceViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -36,6 +38,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
     val repo = BleRepository(app.applicationContext)
     private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val db = FirebaseDatabase.getInstance()
+    private val vitalsRepo = VitalsRepository()
 
     private val _devices = MutableStateFlow<List<BleDevice>>(emptyList())
     val devices: StateFlow<List<BleDevice>> = _devices.asStateFlow()
@@ -52,8 +55,13 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
     private val _codeError = MutableStateFlow<String?>(null)
     val codeError: StateFlow<String?> = _codeError.asStateFlow()
 
+    // ID del paciente al que se asocian las lecturas BLE
+    private val _selectedPatientId = MutableStateFlow("")
+    val selectedPatientId: StateFlow<String> = _selectedPatientId.asStateFlow()
+
     private var scanJob: Job? = null
     private var vitalsJob: Job? = null
+    private var snapshotJob: Job? = null
 
     // Health Connect para datos reales
     private var healthConnectRepo: HealthConnectRepository? = null
@@ -97,6 +105,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
     fun connect(device: BleDevice) {
         stopScan()
         repo.connect(device)
+        startSnapshotSaving()
     }
 
     fun connectWithCode(code: String) {
@@ -304,13 +313,39 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
 
     fun disconnect() {
         vitalsJob?.cancel()
+        snapshotJob?.cancel()
         repo.disconnect()
+    }
+
+    fun setPatientId(patientId: String) {
+        _selectedPatientId.value = patientId
+    }
+
+    /** Guarda cada lectura BLE como snapshot histórico en Firebase. */
+    private fun startSnapshotSaving() {
+        snapshotJob?.cancel()
+        snapshotJob = viewModelScope.launch {
+            vitals.collect { ble ->
+                val patientId = _selectedPatientId.value
+                if (patientId.isNotEmpty() && (ble.heartRate != null || ble.glucose != null || ble.spo2 != null)) {
+                    val vitalsData = VitalsData(
+                        patientId = patientId,
+                        heartRate = ble.heartRate ?: 0,
+                        glucose   = ble.glucose   ?: 0.0,
+                        spo2      = ble.spo2       ?: 0,
+                        timestamp = System.currentTimeMillis(),
+                    )
+                    vitalsRepo.saveSnapshot(patientId, vitalsData)
+                }
+            }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         stopScan()
         vitalsJob?.cancel()
+        snapshotJob?.cancel()
         if (!_isCodePaired.value) {
             repo.disconnect()
         }

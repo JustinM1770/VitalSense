@@ -23,6 +23,7 @@ class LoginViewModel : ViewModel() {
     private val _state = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
+<<<<<<< HEAD
     fun loginWithEmail(email: String, password: String) {
         viewModelScope.launch {
             _state.value = LoginUiState.Loading
@@ -46,6 +47,14 @@ class LoginViewModel : ViewModel() {
                     }
                 }
         }
+=======
+    fun signInWithEmail(email: String, password: String) {
+        _state.value = LoginUiState.Success
+    }
+
+    fun signInWithGoogle(context: Context) {
+        _state.value = LoginUiState.Success
+>>>>>>> 5b14bb15ac5277f3be8467bf84e007c83ca41308
     }
 
     fun clearError() { _state.value = LoginUiState.Idle }

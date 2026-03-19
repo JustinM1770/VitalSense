@@ -29,10 +29,8 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHost
@@ -49,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -63,15 +60,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.ita.vitalsense.ui.theme.Manrope
 
-// ─── Figma design tokens ──────────────────────────────────────────────────────
-private val RegBg      = Color(0xFFFFFFFF)
 private val TextDark   = Color(0xFF221F1F)
 private val InputBg    = Color(0xFFF9F9FB)
 private val PrimaryBtn = Color(0xFF1169FF)
-private val CheckBlue  = Color(0xFF3B82F6)
-private val Divider    = Color(0xFFE5E5E5)
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun RegisterScreen(
@@ -81,7 +72,6 @@ fun RegisterScreen(
     vm: RegisterViewModel = viewModel(),
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     var name            by remember { mutableStateOf("") }
     var email           by remember { mutableStateOf("") }
@@ -91,7 +81,6 @@ fun RegisterScreen(
 
     val snackbar = remember { SnackbarHostState() }
 
-    // Navegar al éxito o mostrar error
     LaunchedEffect(uiState) {
         when (val s = uiState) {
             is RegisterUiState.Success -> onRegisterSuccess()
@@ -104,12 +93,11 @@ fun RegisterScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(RegBg)
+                .background(Color.White)
                 .padding(top = 52.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             // ── Header ────────────────────────────────────────────────────────
             Box(
                 modifier = Modifier
@@ -144,56 +132,52 @@ fun RegisterScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(27.dp),
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                RegFormField(
+                RegField(
                     value = name,
                     onValueChange = { name = it },
                     placeholder = "Nombre",
                     leadingIcon = Icons.Outlined.Person,
                 )
-                RegFormField(
+                RegField(
                     value = email,
                     onValueChange = { email = it },
                     placeholder = "Email",
                     leadingIcon = Icons.Outlined.Email,
                     keyboardType = KeyboardType.Email,
                 )
-                RegFormField(
+                RegField(
                     value = password,
                     onValueChange = { password = it },
                     placeholder = "Contraseña",
                     leadingIcon = Icons.Outlined.Lock,
-                    trailingIcon = if (passwordVisible) Icons.Outlined.Visibility
-                                   else Icons.Outlined.VisibilityOff,
+                    trailingIcon = if (passwordVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                     onTrailingClick = { passwordVisible = !passwordVisible },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None
-                                           else PasswordVisualTransformation(),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardType = KeyboardType.Password,
                 )
             }
 
-            Spacer(Modifier.height(19.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // ── Términos ──────────────────────────────────────────────────────
+            // ── Terms ─────────────────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
+                    .padding(horizontal = 24.dp)
                     .clickable { termsAccepted = !termsAccepted },
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White)
+                        .size(22.dp)
                         .border(
                             width = 1.5.dp,
-                            color = if (termsAccepted) CheckBlue else TextDark,
-                            shape = RoundedCornerShape(8.dp),
+                            color = if (termsAccepted) PrimaryBtn else Color(0xFFB0B0B0),
+                            shape = RoundedCornerShape(4.dp),
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -201,30 +185,34 @@ fun RegisterScreen(
                         Icon(
                             imageVector = Icons.Outlined.Check,
                             contentDescription = null,
-                            tint = CheckBlue,
-                            modifier = Modifier.size(16.dp),
+                            tint = PrimaryBtn,
+                            modifier = Modifier.size(14.dp),
                         )
                     }
                 }
                 Text(
-                    text = "Acepto los Terminos de Servicio y Politicas de Privacidad",
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = TextDark)) { append("Acepto los ") }
+                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Terminos de Servicio") }
+                        withStyle(SpanStyle(color = TextDark)) { append(" y ") }
+                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Politicas de Privacidad") }
+                    },
                     fontFamily = Manrope,
-                    fontWeight = FontWeight.Normal,
                     fontSize = 13.sp,
-                    color = TextDark,
                     lineHeight = 18.sp,
                 )
             }
 
             Spacer(Modifier.weight(1f))
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(40.dp))
 
             // ── Botón Registrate ──────────────────────────────────────────────
             Button(
                 onClick = { vm.registerWithEmail(name, email, password) },
                 enabled = uiState !is RegisterUiState.Loading && termsAccepted,
                 modifier = Modifier
-                    .width(325.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
                     .height(59.dp),
                 shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -234,108 +222,34 @@ fun RegisterScreen(
                 ),
             ) {
                 if (uiState is RegisterUiState.Loading) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(22.dp),
-                    )
+                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
                 } else {
-                    Text(
-                        text = "Registrate",
-                        fontFamily = Manrope,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                    )
+                    Text(text = "Registrate", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Divisor "o continúa con" ──────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .width(325.dp)
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Divider)
-                Text(
-                    text = "  o continúa con  ",
-                    fontFamily = Manrope,
-                    fontSize = 12.sp,
-                    color = TextDark.copy(alpha = 0.45f),
-                )
-                HorizontalDivider(modifier = Modifier.weight(1f), color = Divider)
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // ── Botón Google ──────────────────────────────────────────────────
-            OutlinedButton(
-                onClick = { vm.signInWithGoogle(context) },
-                enabled = uiState !is RegisterUiState.Loading,
-                modifier = Modifier
-                    .width(325.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(32.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Divider),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextDark),
-            ) {
-                // "G" con colores de Google como texto estilizado
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(SpanStyle(color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)) { append("G") }
-                        withStyle(SpanStyle(color = Color(0xFFEA4335), fontWeight = FontWeight.Bold)) { append("o") }
-                        withStyle(SpanStyle(color = Color(0xFFFBBC05), fontWeight = FontWeight.Bold)) { append("o") }
-                        withStyle(SpanStyle(color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)) { append("g") }
-                        withStyle(SpanStyle(color = Color(0xFF34A853), fontWeight = FontWeight.Bold)) { append("l") }
-                        withStyle(SpanStyle(color = Color(0xFFEA4335), fontWeight = FontWeight.Bold)) { append("e") }
-                    },
-                    fontSize = 16.sp,
-                    fontFamily = Manrope,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = "Continuar con Google",
-                    fontFamily = Manrope,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = TextDark,
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // ── Link "Ya tienes cuenta?" ──────────────────────────────────────
+            // ── "Ya tienes cuenta?" ───────────────────────────────────────────
             Text(
                 text = buildAnnotatedString {
-                    append("Ya tienes cuenta?  ")
-                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) {
-                        append("Inicia Sesión")
-                    }
+                    withStyle(SpanStyle(color = TextDark)) { append("Ya tienes cuenta?  ") }
+                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Inicia Sesión") }
                 },
                 fontFamily = Manrope,
-                fontWeight = FontWeight.Normal,
                 fontSize = 14.sp,
-                color = TextDark,
                 modifier = Modifier
                     .clickable(onClick = onLoginClick)
-                    .padding(bottom = 32.dp),
+                    .padding(bottom = 40.dp),
             )
         }
 
-        // Snackbar para errores
-        SnackbarHost(
-            hostState = snackbar,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 
-// ─── Campo de formulario ──────────────────────────────────────────────────────
-
 @Composable
-private fun RegFormField(
+private fun RegField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
@@ -348,50 +262,30 @@ private fun RegFormField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(59.dp),
+        modifier = Modifier.fillMaxWidth().height(59.dp),
         placeholder = {
-            Text(
-                text = placeholder,
-                fontFamily = Manrope,
-                fontWeight = FontWeight.Normal,
-                fontSize = 14.sp,
-                color = TextDark.copy(alpha = 0.45f),
-            )
+            Text(placeholder, fontFamily = Manrope, fontSize = 14.sp, color = TextDark.copy(alpha = 0.4f))
         },
         leadingIcon = {
-            Icon(
-                imageVector = leadingIcon,
-                contentDescription = null,
-                tint = TextDark,
-                modifier = Modifier.size(24.dp),
-            )
+            Icon(leadingIcon, contentDescription = null, tint = TextDark.copy(alpha = 0.5f), modifier = Modifier.size(22.dp))
         },
         trailingIcon = if (trailingIcon != null) {
-            {
-                IconButton(onClick = { onTrailingClick?.invoke() }) {
-                    Icon(
-                        imageVector = trailingIcon,
-                        contentDescription = null,
-                        tint = TextDark,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
+            { IconButton(onClick = { onTrailingClick?.invoke() }) {
+                Icon(trailingIcon, contentDescription = null, tint = TextDark.copy(alpha = 0.5f), modifier = Modifier.size(22.dp))
+            } }
         } else null,
         visualTransformation = visualTransformation,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         singleLine = true,
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = TextDark,
-            unfocusedBorderColor = TextDark,
-            focusedContainerColor = InputBg,
+            focusedBorderColor   = Color.Transparent,
+            unfocusedBorderColor = Color.Transparent,
+            focusedContainerColor   = InputBg,
             unfocusedContainerColor = InputBg,
-            focusedTextColor = TextDark,
+            focusedTextColor   = TextDark,
             unfocusedTextColor = TextDark,
-            cursorColor = TextDark,
+            cursorColor = PrimaryBtn,
         ),
     )
 }

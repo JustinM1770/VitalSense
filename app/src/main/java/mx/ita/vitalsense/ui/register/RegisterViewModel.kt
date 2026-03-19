@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.ita.vitalsense.data.auth.AuthRepository
+import mx.ita.vitalsense.data.test.TestDataSeeder
 
 sealed interface RegisterUiState {
     object Idle    : RegisterUiState
