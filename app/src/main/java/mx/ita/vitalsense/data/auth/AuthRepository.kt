@@ -1,6 +1,8 @@
 package mx.ita.vitalsense.data.auth
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -12,6 +14,12 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.R
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 class AuthRepository {
 
@@ -39,11 +47,14 @@ class AuthRepository {
     // ── Google Sign-In (Credential Manager API) ───────────────────────────────
 
     suspend fun signInWithGoogle(activityContext: Context): Result<FirebaseUser> {
-        val credentialManager = CredentialManager.create(activityContext)
+        val activity = activityContext.findActivity()
+            ?: throw IllegalStateException("Contexto no es una Activity")
+            
+        val credentialManager = CredentialManager.create(activity)
 
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(activityContext.getString(R.string.default_web_client_id))
+            .setServerClientId(activity.getString(R.string.default_web_client_id))
             .setAutoSelectEnabled(false)
             .build()
 
@@ -52,7 +63,7 @@ class AuthRepository {
             .build()
 
         return runCatching {
-            val result = credentialManager.getCredential(activityContext, request)
+            val result = credentialManager.getCredential(activity, request)
             val googleIdToken = GoogleIdTokenCredential
                 .createFrom(result.credential.data)
                 .idToken
