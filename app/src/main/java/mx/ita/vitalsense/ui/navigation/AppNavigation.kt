@@ -16,7 +16,7 @@ import mx.ita.vitalsense.ui.dashboard.DashboardScreen
 import mx.ita.vitalsense.ui.device.DeviceScanScreen
 import mx.ita.vitalsense.ui.onboarding.OnboardingScreen
 import mx.ita.vitalsense.ui.reports.DailyReportScreen
-import mx.ita.vitalsense.ui.reports.DetailedReportScreen
+import mx.ita.vitalsense.ui.patient.PatientDetailScreen
 import mx.ita.vitalsense.ui.register.RegisterScreen
 import mx.ita.vitalsense.ui.login.LoginScreen
 import mx.ita.vitalsense.ui.splash.SplashScreen
@@ -105,7 +105,7 @@ fun AppNavigation() {
             )
         }
         composable(Route.DETAILED_REPORT) {
-            DetailedReportScreen(
+            PatientDetailScreen(
                 onBack = { navController.popBackStack() }
             )
         }
