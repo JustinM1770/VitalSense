@@ -19,7 +19,6 @@ import mx.ita.vitalsense.ui.onboarding.OnboardingScreen
 import mx.ita.vitalsense.ui.reports.DailyReportScreen
 import mx.ita.vitalsense.ui.patient.PatientDetailScreen
 import mx.ita.vitalsense.ui.register.RegisterScreen
-import mx.ita.vitalsense.ui.login.LoginScreen
 import mx.ita.vitalsense.ui.splash.SplashScreen
 import mx.ita.vitalsense.ui.chat.ChatBotScreen
 import mx.ita.vitalsense.ui.components.GlobalBottomNavigationBar
@@ -165,7 +164,7 @@ fun AppNavigation() {
                     mx.ita.vitalsense.ui.profile.ProfileScreen(
                         onDeviceClick = { navController.navigate(Route.DEVICE) },
                         onBack = { navController.navigateUp() },
-                        onLogout = {
+                        onSignOut = {
                             FirebaseAuth.getInstance().signOut()
                             navController.navigate(Route.LOGIN) {
                                 popUpTo(0) { inclusive = true }
