@@ -111,10 +111,10 @@ fun DashboardScreen(
                 // Sleep Card
                 SectionHeader(title = "Esta semana", showArrow = true)
                 Spacer(Modifier.height(16.dp))
-                SleepMetricCard(sleepData = uiState.sleepData)
-
-                Spacer(Modifier.height(16.dp))
-                DotsIndicator(selected = 0)
+                SleepMetricCard(
+                    sleepData = uiState.sleepData,
+                    onClick = onNavigateToReports
+                )
 
                 Spacer(Modifier.height(24.dp))
 
@@ -124,9 +124,6 @@ fun DashboardScreen(
                     onSeeAllClick = onNavigateToDetailed
                 )
                 
-                Spacer(Modifier.height(16.dp))
-                DotsIndicator(selected = 0)
-
                 Spacer(Modifier.height(24.dp))
 
                 // Medications Card
@@ -244,12 +241,15 @@ private fun SectionHeader(title: String, showArrow: Boolean = false) {
 }
 
 @Composable
-private fun SleepMetricCard(sleepData: mx.ita.vitalsense.data.model.SleepData?) {
+private fun SleepMetricCard(
+    sleepData: mx.ita.vitalsense.data.model.SleepData?,
+    onClick: () -> Unit
+) {
     val progress = (sleepData?.score ?: 0) / 100f
     val scoreText = sleepData?.score?.toString() ?: "0"
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         color = Color.White
     ) {
