@@ -236,7 +236,7 @@ private fun SleepMetricCard() {
             // Circular progress
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
-                    progress = { 0.7f },
+                    progress = 0.7f,
                     modifier = Modifier.size(60.dp),
                     color = SuccessGreen,
                     strokeWidth = 6.dp,
@@ -393,7 +393,11 @@ private fun BottomNavigationBar(
             icons.forEachIndexed { index, (icon, onClick) ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { onClick() }
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onClick() }
                 ) {
                     Icon(icon, null, tint = Color.White, modifier = Modifier.size(28.dp))
                     if (index == 0) {

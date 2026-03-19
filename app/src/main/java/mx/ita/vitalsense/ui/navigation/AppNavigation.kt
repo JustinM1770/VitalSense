@@ -61,7 +61,7 @@ fun AppNavigation() {
         }
         composable(Route.LOGIN) {
             LoginScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.navigateUp() },
                 onLoginSuccess = {
                     navController.navigate(Route.DASHBOARD) {
                         popUpTo(0) { inclusive = true }
@@ -72,7 +72,7 @@ fun AppNavigation() {
         }
         composable(Route.REGISTER) {
             RegisterScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.navigateUp() },
                 onRegisterSuccess = {
                     navController.navigate(Route.DASHBOARD) {
                         popUpTo(0) { inclusive = true }
@@ -95,25 +95,25 @@ fun AppNavigation() {
         }
         composable(Route.DEVICE) {
             DeviceScanScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.navigateUp() }
             )
         }
         composable(Route.DAILY_REPORT) {
             DailyReportScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.navigateUp() },
                 onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) }
             )
         }
         composable(Route.DETAILED_REPORT) {
             PatientDetailScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.navigateUp() }
             )
         }
         composable(Route.NOTIFICATIONS) {
             // Placeholder for Notifications
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Pantalla de Notificaciones")
-                Button(onClick = { navController.popBackStack() }, modifier = Modifier.align(Alignment.BottomCenter)) {
+                Button(onClick = { navController.navigateUp() }, modifier = Modifier.align(Alignment.BottomCenter)) {
                     Text("Volver")
                 }
             }
@@ -131,7 +131,7 @@ fun AppNavigation() {
                     }) {
                         Text("Cerrar Sesión")
                     }
-                    Button(onClick = { navController.popBackStack() }) {
+                    Button(onClick = { navController.navigateUp() }) {
                         Text("Volver")
                     }
                 }

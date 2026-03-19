@@ -117,13 +117,9 @@ fun RegisterScreen(
                     .padding(horizontal = 20.dp)
                     .height(40.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable(onClick = onBack)
-                        .align(Alignment.CenterStart),
-                    contentAlignment = Alignment.Center,
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
