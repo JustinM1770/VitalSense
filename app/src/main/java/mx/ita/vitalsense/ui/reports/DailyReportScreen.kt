@@ -152,7 +152,7 @@ private fun DateStrip(
             val dayName = if (isToday) "Hoy, " else ""
             val monthName = if (isToday) " " + date.format(DateTimeFormatter.ofPattern("MMM")) else ""
             
-            val displayText = if (isToday) "Hoy, ${date.dayOfMonth} ${date.format(DateTimeFormatter.ofPattern("Feb"))}" 
+            val displayText = if (isToday) "Hoy, ${date.dayOfMonth} ${date.format(DateTimeFormatter.ofPattern("MMM"))}" 
                               else date.format(formatter)
 
             Box(
@@ -164,7 +164,7 @@ private fun DateStrip(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (isToday) "Hoy, ${date.dayOfMonth} Feb" else date.dayOfMonth.toString(),
+                    text = if (isToday) "Hoy, ${date.dayOfMonth} ${date.format(DateTimeFormatter.ofPattern("MMM"))}" else date.dayOfMonth.toString(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     color = if (isSelected) Color.White else TextSecondary
