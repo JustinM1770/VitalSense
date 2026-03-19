@@ -32,8 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import mx.ita.vitalsense.ui.register.RegisterUiState
-import mx.ita.vitalsense.ui.register.RegisterViewModel
+import mx.ita.vitalsense.ui.login.LoginUiState
+import mx.ita.vitalsense.ui.login.LoginViewModel
 import mx.ita.vitalsense.ui.theme.Manrope
 
 private val BgColor    = Color(0xFFFFFFFF)
@@ -47,7 +47,7 @@ fun LoginScreen(
     onBack: () -> Unit,
     onLoginSuccess: () -> Unit,
     onRegisterClick: () -> Unit,
-    vm: RegisterViewModel = viewModel()
+    vm: LoginViewModel = viewModel()
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -59,9 +59,9 @@ fun LoginScreen(
 
     LaunchedEffect(uiState) {
         when (uiState) {
-            is RegisterUiState.Success -> onLoginSuccess()
-            is RegisterUiState.Error -> {
-                snackbarHostState.showSnackbar((uiState as RegisterUiState.Error).message)
+            is LoginUiState.Success -> onLoginSuccess()
+            is LoginUiState.Error -> {
+                snackbarHostState.showSnackbar((uiState as LoginUiState.Error).message)
                 vm.clearError()
             }
             else -> {}
@@ -121,7 +121,7 @@ fun LoginScreen(
                         placeholder = "Email",
                         leadingIcon = Icons.Outlined.Email,
                         keyboardType = KeyboardType.Email,
-                        enabled = uiState !is RegisterUiState.Loading
+                        enabled = uiState !is LoginUiState.Loading
                     )
                     LoginField(
                         value = password,
@@ -132,7 +132,7 @@ fun LoginScreen(
                         onTrailingClick = { passwordVisible = !passwordVisible },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardType = KeyboardType.Password,
-                        enabled = uiState !is RegisterUiState.Loading
+                        enabled = uiState !is LoginUiState.Loading
                     )
                 }
 
@@ -147,9 +147,9 @@ fun LoginScreen(
                     modifier = Modifier.width(325.dp).height(59.dp),
                     shape = RoundedCornerShape(32.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryBtn),
-                    enabled = uiState !is RegisterUiState.Loading
+                    enabled = uiState !is LoginUiState.Loading
                 ) {
-                    if (uiState is RegisterUiState.Loading) {
+                    if (uiState is LoginUiState.Loading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
                         Text("Entrar", fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
@@ -164,7 +164,7 @@ fun LoginScreen(
                     modifier = Modifier.width(325.dp).height(52.dp),
                     shape = RoundedCornerShape(32.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Divider),
-                    enabled = uiState !is RegisterUiState.Loading
+                    enabled = uiState !is LoginUiState.Loading
                 ) {
                     Text(
                         text = buildAnnotatedString {

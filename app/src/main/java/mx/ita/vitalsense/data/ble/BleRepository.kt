@@ -18,6 +18,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 // ─── UUIDs del dispositivo VitalSense (ESP32) ────────────────────────────────
@@ -115,6 +119,30 @@ class BleRepository(private val context: Context) {
         gatt = null
         _connectionState.value = BleConnectionState.Disconnected
         _vitals.value = BleVitals()
+    }
+
+    // ── Métodos de control de estado (para ViewModel) ────────────────────────
+
+    fun setConnecting() {
+        _connectionState.value = BleConnectionState.Connecting
+    }
+
+    fun setDisconnected() {
+        _connectionState.value = BleConnectionState.Disconnected
+    }
+
+    fun setConnected(deviceName: String) {
+        _connectionState.value = BleConnectionState.Connected(deviceName)
+    }
+
+    fun updateVitals(newVitals: BleVitals) {
+        _vitals.value = newVitals
+    }
+
+    // ── Conexión por Código (ahora validada por Firebase en ViewModel) ───────
+
+    fun connectWithCode(code: String) {
+        _connectionState.value = BleConnectionState.Connected("Galaxy Watch 4")
     }
 
     // ── GATT Callbacks ────────────────────────────────────────────────────────

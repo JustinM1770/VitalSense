@@ -11,10 +11,12 @@ import mx.ita.vitalsense.data.model.VitalsData
 
 class VitalsRepository {
 
-    private val vitalsRef = FirebaseDatabase.getInstance()
-        .getReference("vitals/current")
+    private val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+    private fun getVitalsRef() = FirebaseDatabase.getInstance()
+        .getReference("vitals/current/${auth.currentUser?.uid ?: "global"}")
 
     fun observeVitals(): Flow<Result<VitalsData>> = callbackFlow {
+        val ref = getVitalsRef()
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
@@ -30,7 +32,7 @@ class VitalsRepository {
             }
         }
 
-        vitalsRef.addValueEventListener(listener)
-        awaitClose { vitalsRef.removeEventListener(listener) }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
     }
 }

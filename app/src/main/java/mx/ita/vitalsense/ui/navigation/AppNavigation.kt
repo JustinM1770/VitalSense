@@ -1,15 +1,11 @@
 package mx.ita.vitalsense.ui.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -133,7 +129,7 @@ fun AppNavigation() {
                     )
                 }
                 composable(Route.DETAILED_REPORT) {
-                    PatientDetailScreen(
+                    mx.ita.vitalsense.ui.reports.DetailedReportScreen(
                         onBack = { navController.navigateUp() }
                     )
                 }
@@ -143,30 +139,36 @@ fun AppNavigation() {
                     )
                 }
                 composable(Route.NOTIFICATIONS) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Pantalla de Notificaciones")
-                        Button(onClick = { navController.navigateUp() }, modifier = Modifier.align(Alignment.BottomCenter)) {
-                            Text("Volver")
+                    Scaffold(
+                        bottomBar = { Spacer(Modifier.height(80.dp)) } // Reservar espacio para la barra global
+                    ) { innerPadding ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Pantalla de Notificaciones", style = MaterialTheme.typography.titleLarge)
+                                Spacer(Modifier.height(20.dp))
+                                Button(onClick = { navController.navigateUp() }) {
+                                    Text("Volver")
+                                }
+                            }
                         }
                     }
                 }
                 composable(Route.PROFILE) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Pantalla de Perfil")
-                            Button(onClick = { 
-                                FirebaseAuth.getInstance().signOut()
-                                navController.navigate(Route.LOGIN) {
-                                    popUpTo(0) { inclusive = true }
-                                }
-                            }) {
-                                Text("Cerrar Sesión")
-                            }
-                            Button(onClick = { navController.navigateUp() }) {
-                                Text("Volver")
+                    mx.ita.vitalsense.ui.profile.ProfileScreen(
+                        onDeviceClick = { navController.navigate(Route.DEVICE) },
+                        onBack = { navController.navigateUp() },
+                        onLogout = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate(Route.LOGIN) {
+                                popUpTo(0) { inclusive = true }
                             }
                         }
-                    }
+                    )
                 }
             }
             

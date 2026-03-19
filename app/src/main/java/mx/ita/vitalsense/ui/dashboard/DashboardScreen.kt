@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -58,8 +59,9 @@ fun DashboardScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
+
     Scaffold(
-        containerColor = Color(0xFFF7F9FC), // Background neutro claro
+        containerColor = Color(0xFFF7F9FC),
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
@@ -69,7 +71,7 @@ fun DashboardScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(24.dp))
-            
+
             // 1. User Header
             UserHeader(
                 name = userName,
@@ -79,16 +81,20 @@ fun DashboardScreen(
             Spacer(Modifier.height(24.dp))
 
             // 2. Search Bar
-            
             SearchBar(
                 onSearchClick = {
                     coroutineScope.launch { snackbarHostState.showSnackbar("Función de búsqueda en desarrollo") }
                 },
                 onSettingsClick = onNavigateToProfile
             )
-            
-            Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                // SnackbarHost is now in Scaffold
+
+            Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp))
+
+            Spacer(Modifier.height(24.dp))
+
+            // Mostrar botón de vincular solo si NO está emparejado
+            if (!uiState.isWatchPaired) {
+                DeviceConnectionCard(onClick = onConnectDevice)
             }
 
             Spacer(Modifier.height(24.dp))
@@ -116,7 +122,7 @@ fun DashboardScreen(
                     history = uiState.vitalsHistory,
                     onSeeAllClick = onNavigateToDetailed
                 )
-                
+
                 Spacer(Modifier.height(24.dp))
 
                 // Medications Card
@@ -124,7 +130,7 @@ fun DashboardScreen(
                     medications = uiState.medications,
                     onSeeAllClick = onNavigateToDetailed
                 )
-                
+
                 Spacer(Modifier.height(40.dp))
             }
         }
@@ -141,7 +147,7 @@ private fun UserHeader(name: String, onNotificationClick: () -> Unit) {
     ) {
         // Avatar
         Image(
-            painter = painterResource(R.drawable.ic_launcher_foreground), // Sustituir por avatar real
+            painter = painterResource(R.drawable.ic_launcher_foreground),
             contentDescription = null,
             modifier = Modifier
                 .size(56.dp)
@@ -297,9 +303,9 @@ private fun HealthMetricsGraphCard(
                     Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Color.White, modifier = Modifier.size(12.dp))
                 }
             }
-            
+
             Spacer(Modifier.height(20.dp))
-            
+
             // Gráfico de Ritmo Cardíaco
             Box(
                 modifier = Modifier
@@ -318,7 +324,7 @@ private fun HealthMetricsGraphCard(
                 } else {
                     Text("No hay datos de ritmo cardíaco", color = HeartRateCurve.copy(0.5f))
                 }
-                
+
                 // Tooltip
                 Surface(
                     modifier = Modifier.align(Alignment.TopEnd).padding(end = 10.dp, top = 10.dp),
@@ -365,7 +371,7 @@ private fun MedicationsCard(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            
+
             if (medications.isEmpty()) {
                 Text("No hay medicamentos activos", color = TextGray, fontSize = 14.sp)
             } else {
@@ -399,4 +405,100 @@ private fun DotsIndicator(selected: Int) {
         }
     }
 }
-// Removido BottomNavigationBar para uso global
+
+@Composable
+private fun DeviceConnectionCard(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        color = PrimaryBlue,
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.Bluetooth, contentDescription = null, tint = Color.White)
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Vincular Reloj / Sensor", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Sincroniza tus signos vitales", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+            }
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun WatchStatusCard(
+    onDisconnect: () -> Unit,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header: Galaxy Watch vinculado
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(SuccessGreen, CircleShape)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Galaxy Watch 4 vinculado",
+                    color = SuccessGreen,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "Sincronizado",
+                    color = SuccessGreen,
+                    fontSize = 11.sp
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "El reloj está enviando datos en tiempo real.",
+                    fontSize = 12.sp,
+                    color = TextGray,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                TextButton(
+                    onClick = onDisconnect,
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("Desvincular", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}

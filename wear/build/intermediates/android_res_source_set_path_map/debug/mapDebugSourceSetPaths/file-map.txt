@@ -1,0 +1,8 @@
+mx.ita.vitalsense.wear-pngs-0 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\build\generated\res\pngs\debug
+mx.ita.vitalsense.wear-res-1 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\build\generated\res\processDebugGoogleServices
+mx.ita.vitalsense.wear-updated_navigation_xml-2 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\build\generated\updated_navigation_xml\debug
+mx.ita.vitalsense.wear-packageDebugResources-3 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+mx.ita.vitalsense.wear-packageDebugResources-4 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+mx.ita.vitalsense.wear-debug-5 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\build\intermediates\merged_res\debug\mergeDebugResources
+mx.ita.vitalsense.wear-debug-6 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\src\debug\res
+mx.ita.vitalsense.wear-main-7 C:\Users\jonny\AndroidStudioProjects\VitalSense\wear\src\main\res
