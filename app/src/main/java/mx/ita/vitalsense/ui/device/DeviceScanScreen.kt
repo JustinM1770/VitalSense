@@ -1,9 +1,5 @@
 package mx.ita.vitalsense.ui.device
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,30 +15,24 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Bluetooth
-import androidx.compose.material.icons.outlined.BluetoothConnected
-import androidx.compose.material.icons.outlined.BluetoothSearching
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material.icons.rounded.NightsStay
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,11 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.ita.vitalsense.data.ble.BleConnectionState
-import mx.ita.vitalsense.data.ble.BleDevice
 import mx.ita.vitalsense.data.ble.BleVitals
-import mx.ita.vitalsense.data.healthconnect.HealthConnectRepository
-import mx.ita.vitalsense.data.healthconnect.HealthConnectVitals
-import mx.ita.vitalsense.ui.device.HealthConnectState
 import mx.ita.vitalsense.ui.theme.HeartRateRed
 import mx.ita.vitalsense.ui.theme.Manrope
 import mx.ita.vitalsense.ui.theme.NeomorphicBackground
@@ -73,65 +59,22 @@ private val TextDark  = Color(0xFF221F1F)
 private val TextGray  = Color(0xFF6B7280)
 private val BorderCol = Color(0xFFE5E7EB)
 
-// ─── Permisos BLE requeridos por versión ──────────────────────────────────────
-
-private val BLE_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-    arrayOf(
-        Manifest.permission.BLUETOOTH_SCAN,
-        Manifest.permission.BLUETOOTH_CONNECT,
-    )
-} else {
-    arrayOf(
-        Manifest.permission.BLUETOOTH,
-        Manifest.permission.BLUETOOTH_ADMIN,
-        Manifest.permission.ACCESS_FINE_LOCATION,
-    )
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun DeviceScanScreen(
     onBack: () -> Unit,
     vm: DeviceViewModel = viewModel(),
-    hcVm: HealthConnectViewModel = viewModel()
 ) {
-    val devices       by vm.devices.collectAsStateWithLifecycle()
-    val isScanning    by vm.isScanning.collectAsStateWithLifecycle()
     val connState     by vm.connectionState.collectAsStateWithLifecycle()
     val vitals        by vm.vitals.collectAsStateWithLifecycle()
-    val hcVitals      by hcVm.vitals.collectAsStateWithLifecycle()
-    val hcState       by hcVm.state.collectAsStateWithLifecycle()
-    val hcError       by hcVm.errorMessage.collectAsStateWithLifecycle()
-    val isHcPaired    by hcVm.isPaired.collectAsStateWithLifecycle()
     val isCodePaired  by vm.isCodePaired.collectAsStateWithLifecycle()
     val codeError     by vm.codeError.collectAsStateWithLifecycle()
-
-    // Cualquier método de emparejamiento cuenta
-    val isAnyPaired = isHcPaired || isCodePaired
+    val deviceName    by vm.pairedDeviceName.collectAsStateWithLifecycle()
 
     // Limpiar al salir
     DisposableEffect(Unit) {
         onDispose { vm.stopScan() }
-    }
-
-    // Si el reloj ya está emparejado, forzar tab Galaxy Watch
-    var selectedTab by remember { mutableIntStateOf(if (isAnyPaired) 2 else 0) }
-
-    // Launcher de permisos BLE
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { granted ->
-        if (granted.values.all { it }) vm.startScan()
-    }
-
-    // Launcher de permisos de Health Connect
-    val healthConnectLauncher = rememberLauncherForActivityResult(
-        contract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
-    ) { granted ->
-        if (granted.containsAll(HealthConnectRepository.PERMISSIONS)) {
-            hcVm.loadHealthConnectData()
-        }
     }
 
     Column(
@@ -171,348 +114,20 @@ fun DeviceScanScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // Si ya está emparejado (por código o Health Connect), mostrar panel permanente
-        if (isAnyPaired) {
+        // Si el reloj ya está emparejado por código, mostrar panel permanente
+        if (isCodePaired) {
             PairedWatchPanel(
-                vitals = if (isCodePaired) vitals else null,
-                bleVitals = if (isCodePaired) vitals else null,
-                hcVitals = if (isHcPaired) hcVitals else null,
-                isCodePaired = isCodePaired,
-                hcState = hcState,
+                deviceName = deviceName,
+                vitals = vitals,
                 onDisconnect = { vm.disconnectWatch() }
             )
-        } else if (connState !is BleConnectionState.Connected) {
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.Transparent,
-                contentColor = OnboardingBlue,
-                modifier = Modifier.padding(horizontal = 20.dp)
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Escanear", fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Código", fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("Galaxy Watch", fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-
-        if (!isAnyPaired && selectedTab == 2) {
-            HealthConnectPanel(
-                vitals = hcVitals,
-                state = hcState,
-                errorMessage = hcError,
-                onLoadData = { hcVm.checkAndRequestPermissions(healthConnectLauncher) }
+        } else {
+            // Solo mostrar la opción de vincular por código
+            CodePanel(
+                isConnecting = connState is BleConnectionState.Connecting,
+                errorMessage = codeError,
+                onConnectWithCode = { vm.connectWithCode(it) }
             )
-        } else if (!isAnyPaired) {
-            when (val state = connState) {
-                is BleConnectionState.Connected -> ConnectedPanel(
-                    deviceName = state.deviceName,
-                    vitals = vitals,
-                    onDisconnect = { vm.disconnect() },
-                )
-                else -> {
-                    if (selectedTab == 0) {
-                        ScanPanel(
-                            devices = devices,
-                            isScanning = isScanning,
-                            isConnecting = connState is BleConnectionState.Connecting,
-                            onStartScan = { permLauncher.launch(BLE_PERMISSIONS) },
-                            onStopScan = { vm.stopScan() },
-                            onConnect = { vm.connect(it) },
-                        )
-                    } else {
-                        CodePanel(
-                            isConnecting = connState is BleConnectionState.Connecting,
-                            errorMessage = codeError,
-                            onConnectWithCode = { vm.connectWithCode(it) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─── Panel de escaneo ─────────────────────────────────────────────────────────
-
-@Composable
-private fun ScanPanel(
-    devices: List<BleDevice>,
-    isScanning: Boolean,
-    isConnecting: Boolean,
-    onStartScan: () -> Unit,
-    onStopScan: () -> Unit,
-    onConnect: (BleDevice) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Icono central animado
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(CircleShape)
-                .background(OnboardingBlue.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = if (isScanning) Icons.Outlined.BluetoothSearching
-                              else Icons.Outlined.Bluetooth,
-                contentDescription = null,
-                tint = OnboardingBlue,
-                modifier = Modifier.size(40.dp),
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Text(
-            text = if (isScanning) "Buscando dispositivos…"
-                   else "Busca tu sensor VitalSense o wearable compatible",
-            fontFamily = Manrope,
-            fontSize = 14.sp,
-            color = TextGray,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-
-        Spacer(Modifier.height(20.dp))
-
-        // Botón Escanear / Detener
-        Button(
-            onClick = if (isScanning) onStopScan else onStartScan,
-            modifier = Modifier
-                .width(240.dp)
-                .height(50.dp),
-            shape = RoundedCornerShape(32.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isScanning) Color(0xFFEF4444) else OnboardingBlue,
-            ),
-        ) {
-            if (isScanning) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Detener", fontFamily = Manrope, fontWeight = FontWeight.SemiBold,
-                    color = Color.White)
-            } else {
-                Text("Buscar dispositivos", fontFamily = Manrope,
-                    fontWeight = FontWeight.SemiBold, color = Color.White)
-            }
-        }
-
-        if (isConnecting) {
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(
-                    color = OnboardingBlue,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Conectando…", fontFamily = Manrope, fontSize = 13.sp, color = TextGray)
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        // Lista de dispositivos encontrados
-        if (devices.isNotEmpty()) {
-            Text(
-                text = "Dispositivos encontrados",
-                fontFamily = Manrope,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                color = TextGray,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(devices, key = { it.address }) { device ->
-                    DeviceRow(device = device, onConnect = { onConnect(device) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeviceRow(device: BleDevice, onConnect: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(CardBg)
-            .border(1.dp, BorderCol, RoundedCornerShape(12.dp))
-            .clickable(onClick = onConnect)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(OnboardingBlue.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Outlined.BluetoothConnected, null,
-                tint = OnboardingBlue, modifier = Modifier.size(20.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(device.name, fontFamily = Manrope, fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp, color = TextDark)
-            Text(device.address, fontFamily = Manrope, fontSize = 11.sp, color = TextGray)
-        }
-        // RSSI como barras de señal (texto)
-        val signal = when {
-            device.rssi > -60 -> "●●●"
-            device.rssi > -75 -> "●●○"
-            else              -> "●○○"
-        }
-        Text(signal, fontSize = 12.sp, color = OnboardingBlue.copy(alpha = 0.7f))
-    }
-}
-
-// ─── Panel conectado ──────────────────────────────────────────────────────────
-
-@Composable
-private fun ConnectedPanel(
-    deviceName: String,
-    vitals: BleVitals,
-    onDisconnect: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Badge conectado
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(32.dp))
-                .background(SpO2Green.copy(alpha = 0.12f))
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(SpO2Green),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "Conectado a $deviceName",
-                fontFamily = Manrope,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                color = SpO2Green,
-            )
-        }
-
-        Spacer(Modifier.height(28.dp))
-
-        // Tarjetas de vitales en tiempo real
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            BleVitalCard(
-                modifier = Modifier.weight(1f),
-                icon = { Icon(Icons.Outlined.FavoriteBorder, null,
-                    tint = HeartRateRed, modifier = Modifier.size(22.dp)) },
-                label = "Ritmo cardíaco",
-                value = vitals.heartRate?.toString() ?: "—",
-                unit = "BPM",
-                color = HeartRateRed,
-            )
-            BleVitalCard(
-                modifier = Modifier.weight(1f),
-                icon = { Icon(Icons.Outlined.WaterDrop, null,
-                    tint = Color(0xFFFF9800), modifier = Modifier.size(22.dp)) },
-                label = "Glucosa",
-                value = vitals.glucose?.let { "%.0f".format(it) } ?: "—",
-                unit = "mg/dL",
-                color = Color(0xFFFF9800),
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        BleVitalCard(
-            modifier = Modifier.fillMaxWidth(),
-            icon = { Icon(Icons.Outlined.FavoriteBorder, null,
-                tint = SpO2Green, modifier = Modifier.size(22.dp)) },
-            label = "SpO₂",
-            value = vitals.spo2?.toString() ?: "—",
-            unit = "%",
-            color = SpO2Green,
-        )
-
-        Spacer(Modifier.height(28.dp))
-
-        // Botón desconectar
-        Button(
-            onClick = onDisconnect,
-            modifier = Modifier
-                .width(240.dp)
-                .height(50.dp),
-            shape = RoundedCornerShape(32.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-        ) {
-            Icon(Icons.Outlined.Close, null, tint = Color.White,
-                modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Desconectar", fontFamily = Manrope, fontWeight = FontWeight.SemiBold,
-                color = Color.White)
-        }
-    }
-}
-
-@Composable
-private fun BleVitalCard(
-    modifier: Modifier = Modifier,
-    icon: @Composable () -> Unit,
-    label: String,
-    value: String,
-    unit: String,
-    color: Color,
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardBg)
-            .border(1.dp, BorderCol, RoundedCornerShape(16.dp))
-            .padding(16.dp),
-    ) {
-        icon()
-        Spacer(Modifier.height(8.dp))
-        Text(label, fontFamily = Manrope, fontSize = 11.sp, color = TextGray)
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, fontFamily = Manrope, fontWeight = FontWeight.Bold,
-                fontSize = 28.sp, color = TextDark, lineHeight = 28.sp)
-            Spacer(Modifier.width(4.dp))
-            Text(unit, fontSize = 12.sp, color = TextGray,
-                modifier = Modifier.padding(bottom = 3.dp))
         }
     }
 }
@@ -551,11 +166,22 @@ private fun CodePanel(
         Spacer(Modifier.height(16.dp))
 
         Text(
-            text = "Ingresa el código de 8 caracteres que aparece en tu wearable",
+            text = "Para ver datos en tiempo real, abre VitalSense en tu reloj e ingresa el código de 8 caracteres que aparecerá allí.",
             fontFamily = Manrope,
             fontSize = 14.sp,
             color = TextGray,
             modifier = Modifier.padding(horizontal = 16.dp),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = "Si ya vinculaste por Bluetooth, recuerda que aún debes ingresar el código para sincronizar con esta app.",
+            fontFamily = Manrope,
+            fontSize = 12.sp,
+            color = OnboardingBlue.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = 24.dp),
             textAlign = TextAlign.Center
         )
 
@@ -617,179 +243,17 @@ private fun CodePanel(
     }
 }
 
-// ─── Panel de Health Connect ──────────────────────────────────────────────────
-
-@Composable
-private fun HealthConnectPanel(
-    vitals: HealthConnectVitals?,
-    state: HealthConnectState,
-    errorMessage: String?,
-    onLoadData: () -> Unit
-) {
-    if (state == HealthConnectState.SUCCESS && vitals != null) {
-        ConnectedPanel(
-            deviceName = "Galaxy Watch (Health Connect)",
-            vitals = BleVitals(vitals.heartRate, vitals.glucose, vitals.spo2),
-            onDisconnect = { /* El panel desaparece si cambias de tab */ }
-        )
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE8F0FE)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (state == HealthConnectState.LOADING) {
-                    CircularProgressIndicator(
-                        color = Color(0xFF1967D2),
-                        strokeWidth = 3.dp,
-                        modifier = Modifier.size(40.dp),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.FavoriteBorder,
-                        contentDescription = null,
-                        tint = Color(0xFF1967D2),
-                        modifier = Modifier.size(40.dp),
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            Text(
-                text = when (state) {
-                    HealthConnectState.LOADING -> "Sincronizando datos de Health Connect…"
-                    HealthConnectState.SDK_NOT_AVAILABLE -> "Health Connect no está disponible en este dispositivo."
-                    HealthConnectState.NO_DATA -> "No se encontraron datos recientes."
-                    HealthConnectState.ERROR -> "Ocurrió un error al sincronizar."
-                    else -> "Health Connect extrae automáticamente las métricas de tu Galaxy Watch vía Samsung Health."
-                },
-                fontFamily = Manrope,
-                fontSize = 14.sp,
-                color = if (state == HealthConnectState.ERROR || state == HealthConnectState.SDK_NOT_AVAILABLE)
-                    Color(0xFFEF4444) else TextGray,
-                modifier = Modifier.padding(horizontal = 16.dp),
-                textAlign = TextAlign.Center
-            )
-
-            // Mensaje de error detallado
-            if (errorMessage != null && state != HealthConnectState.IDLE && state != HealthConnectState.LOADING) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = errorMessage,
-                    fontFamily = Manrope,
-                    fontSize = 12.sp,
-                    color = TextGray,
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // Instrucciones de configuración
-            if (state == HealthConnectState.NO_DATA || state == HealthConnectState.SDK_NOT_AVAILABLE) {
-                Spacer(Modifier.height(16.dp))
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFFFF3E0))
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Pasos para configurar:",
-                        fontFamily = Manrope,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color(0xFFE65100)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    val steps = if (state == HealthConnectState.SDK_NOT_AVAILABLE) {
-                        listOf(
-                            "1. Instala 'Health Connect' de Google Play",
-                            "2. Abre Samsung Health \u2192 Ajustes",
-                            "3. Activa sincronizaci\u00f3n con Health Connect",
-                            "4. Regresa aqu\u00ed y presiona Sincronizar"
-                        )
-                    } else {
-                        listOf(
-                            "1. Abre Samsung Health en tu tel\u00e9fono",
-                            "2. Ve a Ajustes \u2192 Health Connect",
-                            "3. Permite compartir datos con Health Connect",
-                            "4. Espera unos minutos a que se sincronicen",
-                            "5. Regresa aqu\u00ed y presiona Sincronizar"
-                        )
-                    }
-                    steps.forEach { step ->
-                        Text(
-                            text = step,
-                            fontFamily = Manrope,
-                            fontSize = 12.sp,
-                            color = Color(0xFF5D4037)
-                        )
-                        Spacer(Modifier.height(2.dp))
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            Button(
-                onClick = onLoadData,
-                enabled = state != HealthConnectState.LOADING,
-                modifier = Modifier
-                    .width(240.dp)
-                    .height(50.dp),
-                shape = RoundedCornerShape(32.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1967D2),
-                    disabledContainerColor = Color(0xFF1967D2).copy(alpha = 0.5f)
-                ),
-            ) {
-                if (state == HealthConnectState.LOADING) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Sincronizando\u2026", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
-                } else {
-                    Text(
-                        text = if (state == HealthConnectState.NO_DATA || state == HealthConnectState.ERROR)
-                            "Reintentar" else "Sincronizar y Leer",
-                        fontFamily = Manrope,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-    }
-}
-
 // ─── Panel Permanente del Reloj Emparejado ────────────────────────────────────────
 
 @Composable
 private fun PairedWatchPanel(
-    vitals: BleVitals?,
-    bleVitals: BleVitals?,
-    hcVitals: HealthConnectVitals?,
-    isCodePaired: Boolean,
-    hcState: HealthConnectState,
+    deviceName: String,
+    vitals: BleVitals,
     onDisconnect: () -> Unit
 ) {
-    // Usar datos de BLE si emparejado por código, o de HC si es por Health Connect
-    val hrValue = if (isCodePaired) bleVitals?.heartRate?.toString() else hcVitals?.heartRate?.toString()
-    val glucoseValue = if (isCodePaired) bleVitals?.glucose?.let { "%.0f".format(it) } else hcVitals?.glucose?.let { "%.0f".format(it) }
-    val spo2Value = if (isCodePaired) bleVitals?.spo2?.toString() else hcVitals?.spo2?.toString()
+    val hrValue = vitals.heartRate?.toString()
+    val glucoseValue = vitals.glucose?.let { "%.0f".format(it) }
+    val spo2Value = vitals.spo2?.toString()
 
     Column(
         modifier = Modifier
@@ -813,7 +277,7 @@ private fun PairedWatchPanel(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Galaxy Watch 4 vinculado",
+                text = "$deviceName vinculado",
                 fontFamily = Manrope,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
@@ -859,20 +323,36 @@ private fun PairedWatchPanel(
 
         Spacer(Modifier.height(12.dp))
 
-        BleVitalCard(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            icon = { Icon(Icons.Outlined.FavoriteBorder, null,
-                tint = SpO2Green, modifier = Modifier.size(22.dp)) },
-            label = "SpO₂",
-            value = spo2Value ?: "—",
-            unit = "%",
-            color = SpO2Green,
-        )
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            BleVitalCard(
+                modifier = Modifier.weight(1f),
+                icon = { Icon(Icons.Outlined.FavoriteBorder, null,
+                    tint = SpO2Green, modifier = Modifier.size(22.dp)) },
+                label = "SpO₂",
+                value = spo2Value ?: "—",
+                unit = "%",
+                color = SpO2Green,
+            )
+            // CARD DE SUEÑO
+            val sleepValue = vitals.sleep?.score?.toString()
+            BleVitalCard(
+                modifier = Modifier.weight(1f),
+                icon = { Icon(Icons.Rounded.NightsStay, null,
+                    tint = Color(0xFF10B981), modifier = Modifier.size(22.dp)) },
+                label = "Sueño",
+                value = sleepValue ?: "—",
+                unit = "%",
+                color = Color(0xFF10B981),
+            )
+        }
 
         Spacer(Modifier.height(16.dp))
 
         Text(
-            text = "Los datos se actualizan automáticamente cada 3 segundos.",
+            text = "Los datos se actualizan automáticamente cada 5 segundos.",
             fontFamily = Manrope,
             fontSize = 12.sp,
             color = TextGray,
@@ -893,6 +373,38 @@ private fun PairedWatchPanel(
             Icon(Icons.Outlined.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text("Desvincular Reloj", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
+        }
+    }
+}
+
+// ─── Tarjeta de vital ─────────────────────────────────────────────────────────
+
+@Composable
+private fun BleVitalCard(
+    modifier: Modifier = Modifier,
+    icon: @Composable () -> Unit,
+    label: String,
+    value: String,
+    unit: String,
+    color: Color,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardBg)
+            .border(1.dp, BorderCol, RoundedCornerShape(16.dp))
+            .padding(16.dp),
+    ) {
+        icon()
+        Spacer(Modifier.height(8.dp))
+        Text(label, fontFamily = Manrope, fontSize = 11.sp, color = TextGray)
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(value, fontFamily = Manrope, fontWeight = FontWeight.Bold,
+                fontSize = 28.sp, color = TextDark, lineHeight = 28.sp)
+            Spacer(Modifier.width(4.dp))
+            Text(unit, fontSize = 12.sp, color = TextGray,
+                modifier = Modifier.padding(bottom = 3.dp))
         }
     }
 }

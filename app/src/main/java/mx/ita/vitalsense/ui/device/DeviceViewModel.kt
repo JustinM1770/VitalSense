@@ -32,12 +32,13 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         private const val PREFS_NAME = "vitalsense_watch_prefs"
         private const val KEY_CODE_PAIRED = "code_paired"
         private const val KEY_PAIRED_CODE = "paired_code"
+        private const val KEY_PAIRED_DEVICE_NAME = "paired_device_name"
         private const val TAG = "DeviceVM"
     }
 
     val repo = BleRepository(app.applicationContext)
     private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val db = FirebaseDatabase.getInstance()
+    private val db = FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com")
     private val vitalsRepo = VitalsRepository()
 
     private val _devices = MutableStateFlow<List<BleDevice>>(emptyList())
@@ -55,7 +56,9 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
     private val _codeError = MutableStateFlow<String?>(null)
     val codeError: StateFlow<String?> = _codeError.asStateFlow()
 
-    // ID del paciente al que se asocian las lecturas BLE
+    private val _pairedDeviceName = MutableStateFlow("Wearable")
+    val pairedDeviceName: StateFlow<String> = _pairedDeviceName.asStateFlow()
+
     private val _selectedPatientId = MutableStateFlow("")
     val selectedPatientId: StateFlow<String> = _selectedPatientId.asStateFlow()
 
@@ -63,18 +66,16 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
     private var vitalsJob: Job? = null
     private var snapshotJob: Job? = null
 
-    // Health Connect para datos reales
     private var healthConnectRepo: HealthConnectRepository? = null
+    private var lastHistoryTimestamp: Long = 0L
 
     init {
         _isCodePaired.value = prefs.getBoolean(KEY_CODE_PAIRED, false)
-        Log.d(TAG, "init: isCodePaired = ${_isCodePaired.value}")
-
-        // Inicializar Health Connect si está disponible
+        _pairedDeviceName.value = prefs.getString(KEY_PAIRED_DEVICE_NAME, "Wearable") ?: "Wearable"
+        
         try {
             if (HealthConnectRepository.isAvailable(app)) {
                 healthConnectRepo = HealthConnectRepository(app)
-                Log.d(TAG, "Health Connect disponible")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Health Connect no disponible", e)
@@ -117,63 +118,54 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val upperCode = code.uppercase().trim()
                 val ref = db.getReference("pairing_codes").child(upperCode)
-
-                Log.d(TAG, "Checking Firebase for code: $upperCode")
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
                 val snapshot = ref.get().await()
 
                 if (snapshot.exists()) {
-                    Log.d(TAG, "Code FOUND in Firebase")
-                    pairSuccessfully(upperCode)
+                    val deviceName = snapshot.child("deviceName").getValue(String::class.java) ?: "Wearable"
+                    val finalUid = userId ?: "global"
+                    ref.updateChildren(mapOf("paired" to true, "userId" to finalUid)).await()
+                    pairSuccessfully(upperCode, deviceName)
                 } else {
-                    Log.d(TAG, "Code NOT in Firebase, registering from phone")
-                    ref.setValue(
-                        mapOf(
-                            "code" to upperCode,
-                            "timestamp" to System.currentTimeMillis(),
-                            "source" to "phone",
-                            "paired" to true
-                        )
-                    ).await()
-                    pairSuccessfully(upperCode)
+                    _codeError.value = "Código inválido. Verifica el código en tu reloj e inténtalo de nuevo."
+                    repo.setDisconnected()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Firebase error, pairing anyway", e)
-                pairSuccessfully(code.uppercase().trim())
+                val upperCode = code.uppercase().trim()
+                pairSuccessfully(upperCode, "Wearable")
             }
         }
     }
 
-    private fun pairSuccessfully(code: String) {
+    private fun pairSuccessfully(code: String, deviceName: String) {
         prefs.edit()
             .putBoolean(KEY_CODE_PAIRED, true)
             .putString(KEY_PAIRED_CODE, code)
+            .putString(KEY_PAIRED_DEVICE_NAME, deviceName)
             .apply()
         _isCodePaired.value = true
-        repo.connectWithCode(code)
+        _pairedDeviceName.value = deviceName
+        repo.connectWithCode(code, deviceName)
         startWatchDataReading()
-        Log.d(TAG, "Paired successfully with code: $code")
     }
 
-    /** Desvincula el reloj, limpia SharedPreferences y detiene la sincronización */
     fun disconnectWatch() {
         vitalsJob?.cancel()
         vitalsJob = null
         viewModelScope.launch {
             try {
-                // 1. Limpiar SharedPreferences
-                val context = getApplication<android.app.Application>().applicationContext
-                val prefs = context.getSharedPreferences("vitalsense_watch_prefs", android.content.Context.MODE_PRIVATE)
-                prefs.edit().putBoolean("code_paired", false).apply()
-                prefs.edit().remove("paired_device_name").apply()
-                
-                // 2. Limpiar Firebase vitals/current
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
-                if (userId != null) {
-                    db.getReference("vitals/current/$userId").removeValue()
+                val pairedCode = prefs.getString(KEY_PAIRED_CODE, null)
+                if (pairedCode != null) {
+                    db.getReference("pairing_codes").child(pairedCode)
+                        .updateChildren(mapOf("paired" to false))
+                        .await()
                 }
-
-                // 3. Resetear estados locales
+                prefs.edit().putBoolean(KEY_CODE_PAIRED, false).remove(KEY_PAIRED_CODE).remove(KEY_PAIRED_DEVICE_NAME).apply()
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId != null) db.getReference("vitals/current/$userId").removeValue()
                 _isCodePaired.value = false
+                _pairedDeviceName.value = "Wearable"
                 repo.disconnect()
             } catch (e: Exception) {
                 Log.e(TAG, "Error disconnecting watch", e)
@@ -181,40 +173,33 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-
-    /**
-     * Lee datos reales del reloj via Health Connect y los escribe en Firebase
-     * para que el Dashboard los muestre. Si Health Connect no está disponible,
-     * usa datos simulados.
-     */
     private fun startWatchDataReading() {
         vitalsJob?.cancel()
+        val deviceName = _pairedDeviceName.value
         vitalsJob = viewModelScope.launch {
-            repo.setConnected("Galaxy Watch 4")
-
-            var lastSleepCheck = 0L
-            val sleepCheckInterval = 30 * 60 * 1000 // Cada 30 minutos
-
-            while (isActive) {
-                val watchVitals = readRealWatchData()
-
-                // Actualizar vitals locales (para DeviceScanScreen)
-                repo.updateVitals(watchVitals)
-
-                // Escribir a Firebase vitals/current (para DashboardScreen)
-                writeVitalsToFirebase(watchVitals)
-
-                // Escribir al historial (para las gráficas del Dashboard)
-                writeVitalsToHistory(watchVitals)
-
-                // Sincronizar Sueño periódicamente
-                val now = System.currentTimeMillis()
-                if (now - lastSleepCheck > sleepCheckInterval) {
-                    readAndSyncSleepData()
-                    lastSleepCheck = now
+            repo.setConnected(deviceName)
+            
+            // 1. OBSERVAR FIREBASE (Signos Vitales en Tiempo Real)
+            launch {
+                vitalsRepo.observeVitals().collect { result: Result<VitalsData> ->
+                    result.onSuccess { vitals: VitalsData ->
+                        val ble = BleVitals(
+                            heartRate = vitals.heartRate,
+                            glucose = vitals.glucose,
+                            spo2 = vitals.spo2,
+                            timestamp = vitals.timestamp
+                        )
+                        repo.updateVitals(ble)
+                    }
                 }
+            }
 
-                delay(5000) // Cada 5 segundos para vitals
+            // 2. POLLING HEALTH CONNECT (Datos de Sueño cada 30 min)
+            launch {
+                while (isActive) {
+                    readAndSyncSleepData()
+                    delay(30 * 60 * 1000)
+                }
             }
         }
     }
@@ -225,13 +210,32 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
             if (hcRepo.hasPermissions()) {
                 val sleep = hcRepo.readSleepData()
                 if (sleep != null) {
-                    Log.d(TAG, "Sleep synced from Watch: ${sleep.horas} hrs, score: ${sleep.score}")
                     writeSleepToFirebase(sleep)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing sleep data", e)
         }
+    }
+
+    private suspend fun readRealWatchData(): BleVitals? {
+        val hcRepo = healthConnectRepo ?: return null
+        try {
+            if (hcRepo.hasPermissions()) {
+                val data = hcRepo.readLatestVitals()
+                if (data != null) {
+                    return BleVitals(
+                        heartRate = data.heartRate,
+                        glucose = data.glucose,
+                        spo2 = data.spo2,
+                        timestamp = data.timestamp?.toEpochMilli()
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading HC data", e)
+        }
+        return null
     }
 
     private fun writeSleepToFirebase(sleep: SleepData) {
@@ -245,37 +249,6 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Lee datos reales de Health Connect, o genera simulados si no está disponible */
-    private suspend fun readRealWatchData(): BleVitals {
-        val hcRepo = healthConnectRepo
-        if (hcRepo != null) {
-            try {
-                val hasPerms = hcRepo.hasPermissions()
-                if (hasPerms) {
-                    val data = hcRepo.readLatestVitals()
-                    if (data != null && (data.heartRate != null || data.glucose != null || data.spo2 != null)) {
-                        Log.d(TAG, "Real HC data: HR=${data.heartRate}, SpO2=${data.spo2}, Glucose=${data.glucose}")
-                        return BleVitals(
-                            heartRate = data.heartRate,
-                            glucose = data.glucose,
-                            spo2 = data.spo2
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "HC read failed, using simulated", e)
-            }
-        }
-
-        // Datos simulados si Health Connect no funciona
-        return BleVitals(
-            heartRate = (65..95).random(),
-            glucose = (85..115).random().toDouble(),
-            spo2 = (96..99).random()
-        )
-    }
-
-    /** Escribe los vitals al path vitals/current para que el Dashboard los muestre en tiempo real */
     private fun writeVitalsToFirebase(vitals: BleVitals) {
         try {
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "global"
@@ -284,8 +257,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                 "heartRate" to (vitals.heartRate ?: 0),
                 "spo2" to (vitals.spo2 ?: 0),
                 "glucose" to (vitals.glucose ?: 0.0),
-                "timestamp" to System.currentTimeMillis(),
-                "patientName" to (FirebaseAuth.getInstance().currentUser?.displayName ?: "Paciente")
+                "timestamp" to System.currentTimeMillis()
             )
             ref.setValue(data)
         } catch (e: Exception) {
@@ -293,7 +265,6 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Escribe al historial para que la gráfica del Dashboard tenga datos */
     private fun writeVitalsToHistory(vitals: BleVitals) {
         try {
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
@@ -302,8 +273,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                 "heartRate" to (vitals.heartRate ?: 0),
                 "spo2" to (vitals.spo2 ?: 0),
                 "glucose" to (vitals.glucose ?: 0.0),
-                "timestamp" to System.currentTimeMillis(),
-                "patientName" to (FirebaseAuth.getInstance().currentUser?.displayName ?: "Paciente")
+                "timestamp" to System.currentTimeMillis()
             )
             ref.setValue(data)
         } catch (e: Exception) {
@@ -321,7 +291,6 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         _selectedPatientId.value = patientId
     }
 
-    /** Guarda cada lectura BLE como snapshot histórico en Firebase. */
     private fun startSnapshotSaving() {
         snapshotJob?.cancel()
         snapshotJob = viewModelScope.launch {
@@ -346,8 +315,5 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         stopScan()
         vitalsJob?.cancel()
         snapshotJob?.cancel()
-        if (!_isCodePaired.value) {
-            repo.disconnect()
-        }
     }
 }
