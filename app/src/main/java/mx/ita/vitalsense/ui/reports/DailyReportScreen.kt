@@ -45,7 +45,7 @@ fun DailyReportScreen(
     val state by vm.uiState.collectAsState()
 
     Scaffold(
-        containerColor = NeomorphicBackground,
+        containerColor = Color.White,
         topBar = {
             DailyReportTopBar(onBack = onBack)
         }
@@ -185,10 +185,12 @@ private fun HealthRadarCard(
     oxigenoPct: Float,
     onNavigate: () -> Unit
 ) {
-    NeuCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onNavigate() }
+            .clickable { onNavigate() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFBDD9F2)) // DashBg
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -255,11 +257,23 @@ private fun HealthRadarChart(
         val radius = size.minDimension / 2 * 0.8f
         val angles = listOf(270f, 0f, 90f, 180f) // arriba, der, abajo, izq
         
-        // Background lines
+        // Fondo gris (Polígono base 100%)
+        val bgPath = Path()
+        angles.forEachIndexed { index, angleDeg ->
+            val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
+            val x = centerX + radius * cos(angleRad)
+            val y = centerY + radius * sin(angleRad)
+            if (index == 0) bgPath.moveTo(x, y) else bgPath.lineTo(x, y)
+        }
+        bgPath.close()
+        drawPath(bgPath, color = Color(0xFFF0F2F5), style = Fill) // InputBg gris claro
+        drawPath(bgPath, color = Color.Gray.copy(alpha = 0.3f), style = Stroke(width = 1.dp.toPx()))
+
+        // Ejes (Background lines)
         angles.forEach { angleDeg ->
             val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
             drawLine(
-                color = TextMuted.copy(alpha = 0.2f),
+                color = Color.Gray.copy(alpha = 0.3f),
                 start = Offset(centerX, centerY),
                 end = Offset(
                     centerX + radius * cos(angleRad),
@@ -269,7 +283,7 @@ private fun HealthRadarChart(
             )
         }
 
-        // Data polygon
+        // Data polygon verde teal
         val path = Path()
         values.forEachIndexed { index, pct ->
             val angleRad = Math.toRadians(angles[index].toDouble()).toFloat()
@@ -279,14 +293,14 @@ private fun HealthRadarChart(
         }
         path.close()
         
-        drawPath(path, color = LogoTeal.copy(alpha = 0.3f), style = Fill)
-        drawPath(path, color = LogoTeal, style = Stroke(width = 2.dp.toPx()))
+        drawPath(path, color = Color(0xFF00C48C).copy(alpha = 0.3f), style = Fill) // SleepGreen area
+        drawPath(path, color = Color(0xFF00C48C), style = Stroke(width = 2.dp.toPx())) // Verde teal borde
         
         // Data points
         values.forEachIndexed { index, pct ->
             val angleRad = Math.toRadians(angles[index].toDouble()).toFloat()
             drawCircle(
-                color = LogoTeal,
+                color = Color(0xFF00C48C),
                 radius = 4.dp.toPx(),
                 center = Offset(
                     centerX + radius * pct * cos(angleRad),
