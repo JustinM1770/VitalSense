@@ -23,10 +23,19 @@ class RegisterViewModel : ViewModel() {
     private val _state = MutableStateFlow<RegisterUiState>(RegisterUiState.Idle)
     val state: StateFlow<RegisterUiState> = _state.asStateFlow()
 
-    fun registerWithEmail(email: String, password: String) {
+    fun registerWithEmail(name: String, email: String, password: String) {
         viewModelScope.launch {
             _state.value = RegisterUiState.Loading
-            repo.registerWithEmail(email, password)
+            repo.registerWithEmail(name, email, password)
+                .onSuccess  { _state.value = RegisterUiState.Success }
+                .onFailure  { _state.value = RegisterUiState.Error(it.localizedMessage ?: "Error") }
+        }
+    }
+
+    fun loginWithEmail(email: String, password: String) {
+        viewModelScope.launch {
+            _state.value = RegisterUiState.Loading
+            repo.signInWithEmail(email, password)
                 .onSuccess  { _state.value = RegisterUiState.Success }
                 .onFailure  { _state.value = RegisterUiState.Error(it.localizedMessage ?: "Error") }
         }
@@ -42,7 +51,7 @@ class RegisterViewModel : ViewModel() {
                     if (e.message?.contains("cancel", ignoreCase = true) == true) {
                         _state.value = RegisterUiState.Idle
                     } else {
-                        _state.value = RegisterUiState.Error(e.localizedMessage ?: "Error Google")
+                        _state.value = RegisterUiState.Error(e.localizedMessage ?: "Error Google: ${e.message}")
                     }
                 }
         }

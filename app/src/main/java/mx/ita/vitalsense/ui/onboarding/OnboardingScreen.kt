@@ -97,7 +97,16 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(background),
     ) {
+        // ── Pages ────────────────────────────────────────────────────────────
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+        ) { index ->
+            PageContent(page = pages[index])
+        }
+
         // ── Skip button ──────────────────────────────────────────────────────
+        // Moved here to be on top of the pager
         TextButton(
             onClick = onSkip,
             modifier = Modifier
@@ -109,14 +118,6 @@ fun OnboardingScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Black,
             )
-        }
-
-        // ── Pages ────────────────────────────────────────────────────────────
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { index ->
-            PageContent(page = pages[index])
         }
 
         // ── Dots + Button ────────────────────────────────────────────────────

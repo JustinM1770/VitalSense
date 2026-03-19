@@ -1,436 +1,407 @@
 package mx.ita.vitalsense.ui.dashboard
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BluetoothSearching
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.MonitorHeart
-import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material.icons.rounded.WaterDrop
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.firebase.auth.FirebaseAuth
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.model.VitalsData
-import mx.ita.vitalsense.ui.components.NeuCard
-import mx.ita.vitalsense.ui.theme.AlertBackground
-import mx.ita.vitalsense.ui.theme.AlertBorder
-import mx.ita.vitalsense.ui.theme.AlertText
-import mx.ita.vitalsense.ui.theme.GlucoseOrange
-import mx.ita.vitalsense.ui.theme.GlucoseSoft
-import mx.ita.vitalsense.ui.theme.HeartRateRed
-import mx.ita.vitalsense.ui.theme.HeartRateSoft
-import mx.ita.vitalsense.ui.theme.NeomorphicBackground
-import mx.ita.vitalsense.ui.theme.PrimaryBlue
-import mx.ita.vitalsense.ui.theme.SpO2Green
-import mx.ita.vitalsense.ui.theme.SpO2Soft
-import mx.ita.vitalsense.ui.theme.TextMuted
-import mx.ita.vitalsense.ui.theme.TextPrimary
-import mx.ita.vitalsense.ui.theme.TextSecondary
 
-private const val GLUCOSE_ALERT_THRESHOLD = 150.0
+// ─── Figma / Image design tokens ──────────────────────────────────────────────
+private val DashboardBg    = Color(0xFFF7F9FC)
+private val BlueCardBg     = Color(0xFF90C2F9)
+private val PrimaryBlue    = Color(0xFF1169FF)
+private val TextDark       = Color(0xFF221F1F)
+private val TextGray       = Color(0xFF7F8C8D)
+private val SuccessGreen   = Color(0xFF10B981)
+private val HeartRateCurve = Color(0xFFEF4444)
 
 @Composable
 fun DashboardScreen(
     onConnectDevice: () -> Unit = {},
+    onNavigateToReports: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {},
     vm: DashboardViewModel = viewModel(),
 ) {
     val uiState by vm.uiState.collectAsState()
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val userName = currentUser?.displayName ?: "Usuario"
 
     Scaffold(
-        containerColor = NeomorphicBackground,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onConnectDevice,
-                containerColor = PrimaryBlue,
-                contentColor = Color.White,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.BluetoothSearching,
-                    contentDescription = "Conectar wearable",
-                )
-            }
+        bottomBar = { 
+            BottomNavigationBar(
+                onHomeClick = onNavigateToHome,
+                onFavoriteClick = onNavigateToReports,
+                onChatClick = onNavigateToChat,
+                onProfileClick = onNavigateToProfile
+            ) 
         },
+        containerColor = DashboardBg
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
         ) {
-            when (val state = uiState) {
-                is DashboardUiState.Loading -> LoadingContent()
-                is DashboardUiState.Error   -> ErrorContent(state.message)
-                is DashboardUiState.Success -> DashboardContent(state.vitals)
-            }
-        }
-    }
-}
+            Spacer(Modifier.height(24.dp))
+            
+            // 1. User Header
+            UserHeader(
+                name = userName,
+                onNotificationClick = onNavigateToNotifications
+            )
 
-// ─── Loading ─────────────────────────────────────────────────────────────────
+            Spacer(Modifier.height(24.dp))
 
-@Composable
-private fun LoadingContent() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = PrimaryBlue, strokeWidth = 3.dp)
-            Spacer(Modifier.height(16.dp))
-            Text("Conectando con Firebase…", color = TextSecondary, fontSize = 14.sp)
-        }
-    }
-}
+            // 2. Search Bar
+            SearchBar()
 
-// ─── Error ───────────────────────────────────────────────────────────────────
+            Spacer(Modifier.height(24.dp))
 
-@Composable
-private fun ErrorContent(message: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        NeuCard(modifier = Modifier.padding(32.dp)) {
+            // 3. Blue Container with Cards
             Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
+                    .background(BlueCardBg)
+                    .padding(24.dp)
             ) {
-                Icon(Icons.Rounded.Warning, contentDescription = null, tint = HeartRateRed, modifier = Modifier.size(48.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("Sin conexión", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 18.sp)
-                Spacer(Modifier.height(6.dp))
-                Text(message, color = TextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+                // Sleep Card
+                SectionHeader(title = "Esta semana", showArrow = true)
+                Spacer(Modifier.height(16.dp))
+                SleepMetricCard()
+
+                Spacer(Modifier.height(16.dp))
+                DotsIndicator(selected = 0)
+
+                Spacer(Modifier.height(24.dp))
+
+                // Health Metrics Card (Graph)
+                HealthMetricsGraphCard(onSeeAllClick = onNavigateToReports)
+                
+                Spacer(Modifier.height(16.dp))
+                DotsIndicator(selected = 0)
+
+                Spacer(Modifier.height(24.dp))
+
+                // Medications Card
+                MedicationsCard()
+                
+                Spacer(Modifier.height(40.dp))
             }
         }
     }
 }
 
-// ─── Main dashboard ──────────────────────────────────────────────────────────
-
 @Composable
-private fun DashboardContent(vitals: VitalsData) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-    ) {
-        Spacer(Modifier.height(52.dp))
-
-        // ── Header ──────────────────────────────────────────────────────────
-        DashboardHeader(vitals.patientName)
-
-        Spacer(Modifier.height(28.dp))
-
-        // ── Glucose alert banner (AI layer) ─────────────────────────────────
-        AnimatedVisibility(
-            visible = vitals.glucose > GLUCOSE_ALERT_THRESHOLD,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            GlucoseAlertBanner()
-            Spacer(Modifier.height(20.dp))
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        // ── Metric cards ────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            VitalCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Rounded.Favorite,
-                label = "Ritmo Cardíaco",
-                value = "${vitals.heartRate}",
-                unit = "BPM",
-                accentColor = HeartRateRed,
-                softColor = HeartRateSoft,
-                status = heartRateStatus(vitals.heartRate),
-            )
-            VitalCard(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Rounded.WaterDrop,
-                label = "Glucosa",
-                value = "%.0f".format(vitals.glucose),
-                unit = "mg/dL",
-                accentColor = GlucoseOrange,
-                softColor = GlucoseSoft,
-                status = glucoseStatus(vitals.glucose),
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // SpO2 full-width card
-        SpO2Card(vitals.spo2)
-
-        Spacer(Modifier.height(32.dp))
-
-        // ── Footer ──────────────────────────────────────────────────────────
-        Text(
-            "Datos en tiempo real · Firebase",
-            color = TextMuted,
-            fontSize = 12.sp,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
-    }
-}
-
-// ─── Header ──────────────────────────────────────────────────────────────────
-
-@Composable
-private fun DashboardHeader(patientName: String) {
+private fun UserHeader(name: String, onNotificationClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Avatar
+        Image(
+            painter = painterResource(R.drawable.ic_launcher_foreground), // Sustituir por avatar real
+            contentDescription = null,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF1169FF)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "HealthSensor",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary,
-            )
-            Text(
-                text = patientName,
-                fontSize = 14.sp,
-                color = TextSecondary,
-            )
+            Text("Bienvenido", color = TextGray, fontSize = 14.sp)
+            Text(name, color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
-        // Live indicator
-        LiveIndicator()
-    }
-}
-
-@Composable
-private fun LiveIndicator() {
-    val pulse = rememberInfiniteTransition(label = "pulse")
-    val alpha by pulse.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.2f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
-        label = "alpha",
-    )
-    NeuCard(cornerRadius = 12.dp) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        // Notification bell with dot
+        Box(modifier = Modifier.clickable { onNotificationClick() }) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                shadowElevation = 2.dp
+            ) {
+                Icon(
+                    Icons.Default.Notifications,
+                    contentDescription = null,
+                    modifier = Modifier.padding(12.dp),
+                    tint = TextDark
+                )
+            }
+            // Red dot
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .clip(CircleShape)
-                    .background(SpO2Green.copy(alpha = alpha)),
+                    .background(Color.Red, CircleShape)
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-10).dp, y = 10.dp)
             )
-            Spacer(Modifier.width(6.dp))
-            Text("EN VIVO", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SpO2Green)
         }
     }
 }
 
-// ─── Glucose Alert Banner ────────────────────────────────────────────────────
-
 @Composable
-private fun GlucoseAlertBanner() {
-    val pulse = rememberInfiniteTransition(label = "banner_pulse")
-    val scale by pulse.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.015f,
-        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Reverse),
-        label = "scale",
-    )
-    Box(
+private fun SearchBar() {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(16.dp))
-            .background(AlertBackground),
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White.copy(alpha = 0.5f)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Icon(Icons.Default.Search, contentDescription = null, tint = TextGray)
+                Spacer(Modifier.width(8.dp))
+                Text("Buscar", color = TextGray)
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Surface(
+            modifier = Modifier.size(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = PrimaryBlue
+        ) {
+            Icon(
+                Icons.Default.Tune,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, showArrow: Boolean = false) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        if (showArrow) {
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp), tint = TextDark)
+        }
+    }
+}
+
+@Composable
+private fun SleepMetricCard() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(AlertBorder.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.Warning,
-                    contentDescription = "Alerta",
-                    tint = AlertBorder,
-                    modifier = Modifier.size(24.dp),
+            // Circular progress
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { 0.7f },
+                    modifier = Modifier.size(60.dp),
+                    color = SuccessGreen,
+                    strokeWidth = 6.dp,
+                    trackColor = SuccessGreen.copy(0.1f)
                 )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    "Pico de glucosa detectado",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = AlertBorder,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "Sugiere hidratación y una caminata ligera",
-                    fontSize = 12.sp,
-                    color = AlertText,
-                )
-            }
-        }
-    }
-}
-
-// ─── Vital Card ──────────────────────────────────────────────────────────────
-
-@Composable
-private fun VitalCard(
-    modifier: Modifier = Modifier,
-    icon: ImageVector,
-    label: String,
-    value: String,
-    unit: String,
-    accentColor: Color,
-    softColor: Color,
-    status: String,
-) {
-    NeuCard(modifier = modifier) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            // Icon badge
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(softColor),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(label, fontSize = 11.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    value,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    lineHeight = 32.sp,
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(unit, fontSize = 12.sp, color = TextSecondary, modifier = Modifier.padding(bottom = 4.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            // Status pill
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(softColor)
-                    .padding(horizontal = 10.dp, vertical = 3.dp),
-            ) {
-                Text(status, fontSize = 11.sp, color = accentColor, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-// ─── SpO2 full-width card ────────────────────────────────────────────────────
-
-@Composable
-private fun SpO2Card(spo2: Int) {
-    NeuCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(SpO2Soft),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = SpO2Green, modifier = Modifier.size(24.dp))
+                Text("70%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
             }
             Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Saturación de Oxígeno", fontSize = 11.sp, color = TextSecondary, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text("$spo2", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = TextPrimary, lineHeight = 32.sp)
-                    Spacer(Modifier.width(4.dp))
-                    Text("%", fontSize = 14.sp, color = TextSecondary, modifier = Modifier.padding(bottom = 4.dp))
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(SpO2Soft)
-                    .padding(horizontal = 10.dp, vertical = 3.dp),
-            ) {
-                Text(spo2Status(spo2), fontSize = 11.sp, color = SpO2Green, fontWeight = FontWeight.SemiBold)
+            Text("Sueño", color = SuccessGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Text("14 Febrero 2025", fontSize = 11.sp, color = TextGray)
+                Text("+10%", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
-// ─── Status helpers ──────────────────────────────────────────────────────────
-
-private fun heartRateStatus(bpm: Int): String = when {
-    bpm < 50 -> "⚠ Bradicardia"
-    bpm > 100 -> "⚠ Taquicardia"
-    else -> "✓ Normal"
+@Composable
+private fun HealthMetricsGraphCard(onSeeAllClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Metricas de Salud", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.weight(1f))
+                Text("Ver todo", color = TextGray, fontSize = 12.sp, modifier = Modifier.clickable { onSeeAllClick() })
+                Spacer(Modifier.width(4.dp))
+                IconButton(
+                    onClick = onSeeAllClick,
+                    modifier = Modifier.size(24.dp).background(PrimaryBlue, CircleShape)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                }
+            }
+            
+            Spacer(Modifier.height(20.dp))
+            
+            // Simulación de gráfico (Imagen o Canvas)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Aquí iría el dibujo del gráfico de ritmo cardíaco
+                // Por ahora usamos un placeholder estilizado
+                Text("Gráfico de Ritmo Cardíaco", color = HeartRateCurve.copy(0.5f))
+                
+                // Tooltip simulado
+                Surface(
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 40.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    shadowElevation = 4.dp
+                ) {
+                    Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Heart Rate", fontSize = 10.sp, color = TextGray)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Favorite, null, tint = HeartRateCurve, modifier = Modifier.size(12.dp))
+                            Text(" 118", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
-private fun glucoseStatus(mgDl: Double): String = when {
-    mgDl < 70 -> "⚠ Hipoglucemia"
-    mgDl > 150 -> "⚠ Elevada"
-    else -> "✓ Normal"
+@Composable
+private fun MedicationsCard() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Medicamentos", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.weight(1f))
+                Text("Ver todo", color = TextGray, fontSize = 12.sp)
+                Spacer(Modifier.width(4.dp))
+                IconButton(
+                    onClick = {},
+                    modifier = Modifier.size(24.dp).background(PrimaryBlue, CircleShape)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            // Calendario horizontal simulado
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(3) { Text("${11+it}", color = TextGray) }
+                Surface(color = Color(0xFFE3F2FD), shape = RoundedCornerShape(12.dp)) {
+                    Text("Today, 14 Feb", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), fontWeight = FontWeight.Bold)
+                }
+                repeat(2) { Text("${16+it}", color = TextGray) }
+            }
+        }
+    }
 }
 
-private fun spo2Status(pct: Int): String = when {
-    pct < 90 -> "⚠ Crítico"
-    pct < 95 -> "⚠ Bajo"
-    else -> "✓ Normal"
+@Composable
+private fun DotsIndicator(selected: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(3) { index ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(width = if (index == selected) 16.dp else 8.dp, height = 8.dp)
+                    .clip(CircleShape)
+                    .background(if (index == selected) PrimaryBlue else Color.White.copy(0.5f))
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomNavigationBar(
+    onHomeClick: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    onChatClick: () -> Unit,
+    onProfileClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .height(72.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = PrimaryBlue,
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val icons = listOf(
+                Icons.Rounded.Home to onHomeClick,
+                Icons.Rounded.Favorite to onFavoriteClick,
+                Icons.Rounded.ChatBubbleOutline to onChatClick,
+                Icons.Rounded.Person to onProfileClick
+            )
+            
+            icons.forEachIndexed { index, (icon, onClick) ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { onClick() }
+                ) {
+                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    if (index == 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Box(Modifier.size(width = 16.dp, height = 2.dp).background(Color.White))
+                    }
+                }
+            }
+        }
+    }
 }

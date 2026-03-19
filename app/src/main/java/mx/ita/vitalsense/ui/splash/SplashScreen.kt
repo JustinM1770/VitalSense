@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import mx.ita.vitalsense.R
 import mx.ita.vitalsense.ui.theme.GradientEnd
@@ -28,7 +29,7 @@ import mx.ita.vitalsense.ui.theme.GradientStart
 private val SplashEasing = Easing { it * it * (3f - 2f * it) } // smoothstep
 
 @Composable
-fun SplashScreen(onTimeout: () -> Unit) {
+fun SplashScreen(onNavigateToOnboarding: () -> Unit, onNavigateToDashboard: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
 
     val alpha by animateFloatAsState(
@@ -37,11 +38,16 @@ fun SplashScreen(onTimeout: () -> Unit) {
         label = "logo_alpha",
     )
 
-    // Fade in logo, wait, then navigate
+    // Check auth status and navigate
     LaunchedEffect(Unit) {
         visible = true
-        delay(1_500) // System splash already shows ~500ms, total ≈ 2s brand experience
-        onTimeout()
+        delay(2000)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            onNavigateToDashboard()
+        } else {
+            onNavigateToOnboarding()
+        }
     }
 
     Box(
@@ -59,10 +65,9 @@ fun SplashScreen(onTimeout: () -> Unit) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        // The PNG exported from Figma already includes the eye + "VitalSense" wordmark
         Image(
             painter = painterResource(R.drawable.ic_logo_eye),
-            contentDescription = "HealthSensor Logo",
+            contentDescription = "VitalSense Logo",
             modifier = Modifier
                 .size(width = 220.dp, height = 160.dp)
                 .alpha(alpha),

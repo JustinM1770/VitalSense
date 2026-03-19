@@ -225,7 +225,7 @@ fun RegisterScreen(
 
             // ── Botón Registrate ──────────────────────────────────────────────
             Button(
-                onClick = { vm.registerWithEmail(email, password) },
+                onClick = { vm.registerWithEmail(name, email, password) },
                 enabled = uiState !is RegisterUiState.Loading && termsAccepted,
                 modifier = Modifier
                     .width(325.dp)

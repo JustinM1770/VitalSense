@@ -9,6 +9,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.R
 
@@ -20,9 +21,14 @@ class AuthRepository {
 
     // ── Email / Password ──────────────────────────────────────────────────────
 
-    suspend fun registerWithEmail(email: String, password: String): Result<FirebaseUser> =
+    suspend fun registerWithEmail(name: String, email: String, password: String): Result<FirebaseUser> =
         runCatching {
-            auth.createUserWithEmailAndPassword(email, password).await().user!!
+            val user = auth.createUserWithEmailAndPassword(email, password).await().user!!
+            val profileUpdates = UserProfileChangeRequest.Builder()
+                .setDisplayName(name)
+                .build()
+            user.updateProfile(profileUpdates).await()
+            user
         }
 
     suspend fun signInWithEmail(email: String, password: String): Result<FirebaseUser> =
@@ -31,16 +37,12 @@ class AuthRepository {
         }
 
     // ── Google Sign-In (Credential Manager API) ───────────────────────────────
-    //
-    // REQUISITO:
-    //   Firebase Console → Authentication → Sign-in method → Habilitar Google
-    //   Luego actualiza R.string.default_web_client_id con el Web Client ID real.
 
     suspend fun signInWithGoogle(activityContext: Context): Result<FirebaseUser> {
         val credentialManager = CredentialManager.create(activityContext)
 
         val googleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)          // muestra todas las cuentas
+            .setFilterByAuthorizedAccounts(false)
             .setServerClientId(activityContext.getString(R.string.default_web_client_id))
             .setAutoSelectEnabled(false)
             .build()
@@ -57,7 +59,6 @@ class AuthRepository {
             val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
             auth.signInWithCredential(firebaseCredential).await().user!!
         }.recoverCatching { e ->
-            // El usuario canceló el selector → relanzamos con mensaje claro
             if (e is GetCredentialCancellationException) throw e
             throw e
         }

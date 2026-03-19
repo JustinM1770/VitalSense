@@ -6,9 +6,7 @@ plugins {
 
 android {
     namespace = "mx.ita.vitalsense"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "mx.ita.vitalsense"
@@ -52,8 +50,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.database)
     implementation(libs.firebase.auth)
-    implementation(libs.credentials)
-    implementation(libs.credentials.play.services.auth)
+    implementation(libs.auth.manager)
+    implementation(libs.auth.play.services)
     implementation(libs.googleid)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.navigation.compose)
