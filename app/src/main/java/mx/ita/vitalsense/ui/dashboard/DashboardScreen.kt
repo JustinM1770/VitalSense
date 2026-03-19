@@ -55,17 +55,12 @@ fun DashboardScreen(
     val uiState by vm.uiState.collectAsState()
     val currentUser = FirebaseAuth.getInstance().currentUser
     val userName = currentUser?.displayName ?: "Usuario"
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
-        bottomBar = { 
-            BottomNavigationBar(
-                onHomeClick = onNavigateToHome,
-                onFavoriteClick = onNavigateToReports,
-                onChatClick = onNavigateToChat,
-                onProfileClick = onNavigateToProfile
-            ) 
-        },
-        containerColor = DashboardBg
+        containerColor = Color(0xFFF7F9FC), // Background neutro claro
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -84,8 +79,6 @@ fun DashboardScreen(
             Spacer(Modifier.height(24.dp))
 
             // 2. Search Bar
-            val snackbarHostState = remember { SnackbarHostState() }
-            val coroutineScope = rememberCoroutineScope()
             
             SearchBar(
                 onSearchClick = {
@@ -95,7 +88,7 @@ fun DashboardScreen(
             )
             
             Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-                SnackbarHost(hostState = snackbarHostState)
+                // SnackbarHost is now in Scaffold
             }
 
             Spacer(Modifier.height(24.dp))
@@ -406,51 +399,4 @@ private fun DotsIndicator(selected: Int) {
         }
     }
 }
-
-@Composable
-private fun BottomNavigationBar(
-    onHomeClick: () -> Unit,
-    onFavoriteClick: () -> Unit,
-    onChatClick: () -> Unit,
-    onProfileClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .height(72.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = PrimaryBlue,
-        shadowElevation = 8.dp
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val icons = listOf(
-                Icons.Rounded.Home to onHomeClick,
-                Icons.Rounded.Favorite to onFavoriteClick,
-                Icons.Rounded.ChatBubbleOutline to onChatClick,
-                Icons.Rounded.Person to onProfileClick
-            )
-            
-            icons.forEachIndexed { index, (icon, onClick) ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable { onClick() }
-                ) {
-                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(28.dp))
-                    if (index == 0) {
-                        Spacer(Modifier.height(4.dp))
-                        Box(Modifier.size(width = 16.dp, height = 2.dp).background(Color.White))
-                    }
-                }
-            }
-        }
-    }
-}
+// Removido BottomNavigationBar para uso global
