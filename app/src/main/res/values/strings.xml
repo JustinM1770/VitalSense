@@ -7,5 +7,5 @@
         3. Reemplaza este valor con el Web Client ID de tu proyecto Firebase
            (Firebase Console → Project Settings → General → Web API key → OAuth 2.0 Client IDs)
     -->
-    <string name="default_web_client_id">TU_WEB_CLIENT_ID_AQUI</string>
+    <string name="default_web_client_id">576196499899-5gs5rfek5fnvoilukque3uqt5k84r30q.apps.googleusercontent.com</string>
 </resources>

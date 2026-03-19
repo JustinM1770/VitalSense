@@ -15,7 +15,7 @@ local.properties
 .cxx
 
 # Firebase - NO subir a GitHub público
-google-services.json
+app/google-services.json
 
 # Keystore files
 *.jks

@@ -68,7 +68,7 @@ private val pages = listOf(
     OnboardingPage(
         title = "Prevencion basada en datos.",
         body = "No necesitas estar pegado a la pantalla. Nuestra IA analiza el rito cardiaco y niveles de glucosa por ti, notificandote de inmediato solo si detecta un patron de riesgo.",
-        illustration = null,
+        illustration = R.drawable.corazon,
     ),
 )
 
@@ -97,7 +97,16 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(background),
     ) {
+        // ── Pages ────────────────────────────────────────────────────────────
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+        ) { index ->
+            PageContent(page = pages[index])
+        }
+
         // ── Skip button ──────────────────────────────────────────────────────
+        // Moved here to be on top of the pager
         TextButton(
             onClick = onSkip,
             modifier = Modifier
@@ -109,14 +118,6 @@ fun OnboardingScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Black,
             )
-        }
-
-        // ── Pages ────────────────────────────────────────────────────────────
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { index ->
-            PageContent(page = pages[index])
         }
 
         // ── Dots + Button ────────────────────────────────────────────────────

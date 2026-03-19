@@ -24,12 +24,38 @@ class RegisterViewModel : ViewModel() {
     private val _state = MutableStateFlow<RegisterUiState>(RegisterUiState.Idle)
     val state: StateFlow<RegisterUiState> = _state.asStateFlow()
 
-    fun registerWithEmail(email: String, password: String) {
-        _state.value = RegisterUiState.Success
+    fun registerWithEmail(name: String, email: String, password: String) {
+        viewModelScope.launch {
+            _state.value = RegisterUiState.Loading
+            repo.registerWithEmail(name, email, password)
+                .onSuccess  { _state.value = RegisterUiState.Success }
+                .onFailure  { _state.value = RegisterUiState.Error(it.localizedMessage ?: "Error") }
+        }
+    }
+
+    fun loginWithEmail(email: String, password: String) {
+        viewModelScope.launch {
+            _state.value = RegisterUiState.Loading
+            repo.signInWithEmail(email, password)
+                .onSuccess  { _state.value = RegisterUiState.Success }
+                .onFailure  { _state.value = RegisterUiState.Error(it.localizedMessage ?: "Error") }
+        }
     }
 
     fun signInWithGoogle(context: Context) {
-        _state.value = RegisterUiState.Success
+        viewModelScope.launch {
+            _state.value = RegisterUiState.Loading
+            repo.signInWithGoogle(context)
+                .onSuccess  { _state.value = RegisterUiState.Success }
+                .onFailure  { e ->
+                    // Cancelación voluntaria → volver a Idle sin error
+                    if (e.message?.contains("cancel", ignoreCase = true) == true) {
+                        _state.value = RegisterUiState.Idle
+                    } else {
+                        _state.value = RegisterUiState.Error(e.localizedMessage ?: "Error Google: ${e.message}")
+                    }
+                }
+        }
     }
 
     fun enterDemoMode() {

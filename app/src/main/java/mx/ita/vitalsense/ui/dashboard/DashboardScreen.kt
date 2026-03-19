@@ -1,6 +1,7 @@
 package mx.ita.vitalsense.ui.dashboard
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,8 +12,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -22,16 +25,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,10 +54,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import mx.ita.vitalsense.R
+import mx.ita.vitalsense.data.model.Medication
+import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
 import mx.ita.vitalsense.ui.components.BottomNav
 import mx.ita.vitalsense.ui.components.BottomNavTab
@@ -60,8 +78,22 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
+// ─── Figma / Image design tokens ──────────────────────────────────────────────
+private val BlueCardBg     = Color(0xFF90C2F9)
+private val PrimaryBlue    = Color(0xFF1169FF)
+private val TextDark       = Color(0xFF221F1F)
+private val TextGray       = Color(0xFF7F8C8D)
+private val SuccessGreen   = Color(0xFF10B981)
+private val HeartRateCurve = Color(0xFFEF4444)
+
 @Composable
 fun DashboardScreen(
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToDetailed: () -> Unit = {},
+    onNavigateToReports: () -> Unit = {},
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {},
     onConnectDevice: () -> Unit = {},
     onPatientClick: (String) -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -70,6 +102,10 @@ fun DashboardScreen(
     vm: DashboardViewModel = viewModel(),
 ) {
     val uiState by vm.uiState.collectAsState()
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val userName = currentUser?.displayName ?: "Usuario"
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize().background(DashBg)) {
         when (val state = uiState) {
@@ -78,12 +114,25 @@ fun DashboardScreen(
             }
             else -> {
                 val patients = if (state is DashboardUiState.Success) state.patients else emptyList()
+                val sleepData = if (state is DashboardUiState.Success) state.sleepData else null
+                val vitalsHistory = if (state is DashboardUiState.Success) state.vitalsHistory else emptyList()
+                val medications = if (state is DashboardUiState.Success) state.medications else emptyList()
+
                 DashboardContent(
+                    userName = userName,
                     patients = patients,
+                    sleepData = sleepData,
+                    vitalsHistory = vitalsHistory,
+                    medications = medications,
                     onPatientClick = onPatientClick,
                     onReportClick = onReportClick,
-                    onProfileClick = onProfileClick,
-                    onNotifClick = onNotifClick,
+                    onProfileClick = { onNavigateToProfile(); onProfileClick() },
+                    onNotifClick = { onNavigateToNotifications(); onNotifClick() },
+                    onDetailedClick = onNavigateToDetailed,
+                    snackbarHostState = snackbarHostState,
+                    onSearchClick = {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Función de búsqueda en desarrollo") }
+                    },
                 )
             }
         }
@@ -92,13 +141,18 @@ fun DashboardScreen(
             selected = BottomNavTab.HOME,
             onSelect = { tab ->
                 when (tab) {
-                    BottomNavTab.HEALTH  -> onReportClick()
-                    BottomNavTab.PROFILE -> onProfileClick()
-                    BottomNavTab.CHAT    -> onNotifClick()
+                    BottomNavTab.HEALTH  -> { onReportClick(); onNavigateToReports() }
+                    BottomNavTab.PROFILE -> { onProfileClick(); onNavigateToProfile() }
+                    BottomNavTab.CHAT    -> { onNotifClick(); onNavigateToChat() }
                     else -> {}
                 }
             },
             modifier = Modifier.align(Alignment.BottomCenter),
+        )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
         )
     }
 }
@@ -107,324 +161,252 @@ fun DashboardScreen(
 
 @Composable
 private fun DashboardContent(
+    userName: String,
     patients: List<VitalsData>,
+    sleepData: SleepData?,
+    vitalsHistory: List<VitalsData>,
+    medications: List<Medication>,
     onPatientClick: (String) -> Unit,
     onReportClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onNotifClick: () -> Unit = {},
+    onNotifClick: () -> Unit,
+    onDetailedClick: () -> Unit,
+    snackbarHostState: SnackbarHostState,
+    onSearchClick: () -> Unit,
 ) {
-    val userName = FirebaseAuth.getInstance().currentUser?.displayName
-        ?: patients.firstOrNull()?.patientName
-        ?: "Usuario"
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(bottom = 90.dp),
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(24.dp))
 
         // ── Header: avatar + saludo + campana ────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Avatar circular con inicial
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(DashBlue)
-                    .clickable { onProfileClick() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = userName.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
-                    fontFamily = Manrope,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = Color.White,
-                )
-            }
+        UserHeader(
+            name = userName,
+            onNotificationClick = onNotifClick,
+            onProfileClick = onProfileClick,
+        )
 
-            Spacer(Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Bienvenido",
-                    fontFamily = Manrope,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
-                    color = Color(0xFF5A7A9A),
-                )
-                Text(
-                    text = userName,
-                    fontFamily = Manrope,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = Color(0xFF0D1B2A),
-                )
-            }
-
-            // Campana de notificaciones
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White)
-                    .clickable { onNotifClick() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = "Notificaciones",
-                    tint = Color(0xFF0D1B2A),
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
         // ── Search bar ───────────────────────────────────────────────────────
-        Row(
+        SearchBar(
+            onSearchClick = onSearchClick,
+            onSettingsClick = onProfileClick,
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // ── Blue rounded container ────────────────────────────────────────────
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
+                .background(BlueCardBg)
+                .padding(24.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = null,
-                    tint = Color(0xFFB0B8C4),
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "Buscar",
-                    fontFamily = Manrope,
-                    fontSize = 14.sp,
-                    color = Color(0xFFB0B8C4),
-                )
-            }
+            // ── "Esta semana" — sleep / HR / Kcal pager ───────────────────────
+            SectionHeader(title = "Esta semana", showArrow = true)
+            Spacer(Modifier.height(16.dp))
 
-            Spacer(Modifier.width(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(DashBlue),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Tune,
-                    contentDescription = "Filtros",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // ── "Esta semana" — blue rounded section ──────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(DashBg)
-                .padding(18.dp),
-        ) {
-            Column {
-                // Header row
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Esta semana",
-                        fontFamily = Manrope,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = Color(0xFF1A1A2E),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowForward,
-                        contentDescription = null,
-                        tint = Color(0xFF1A1A2E),
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-
-                Spacer(Modifier.height(14.dp))
-
-                // Sleep / HR / Kcal pager
-                val pagerState = rememberPagerState(pageCount = { 3 })
-                val sleepPct = if (patients.isNotEmpty()) {
+            val pagerState = rememberPagerState(pageCount = { 3 })
+            val sleepPct = sleepData?.score
+                ?: if (patients.isNotEmpty()) {
                     ((patients.first().spo2 - 85).coerceIn(0, 15) * 100 / 15 + 60).coerceIn(0, 100)
                 } else 70
 
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { page ->
-                    when (page) {
-                        0 -> SleepCard(percent = sleepPct)
-                        1 -> HrMiniCard(patients)
-                        else -> KcalMiniCard(patients)
-                    }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth(),
+            ) { page ->
+                when (page) {
+                    0 -> SleepMetricCard(sleepData = sleepData, pctFallback = sleepPct, onClick = onReportClick)
+                    1 -> HrMiniCard(patients)
+                    else -> KcalMiniCard(patients)
                 }
-
-                Spacer(Modifier.height(12.dp))
-                PagerDots(count = 3, selected = pagerState.currentPage)
             }
-        }
 
-        Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
+            PagerDots(count = 3, selected = pagerState.currentPage)
 
-        // ── Métricas de Salud — white card ────────────────────────────────────
-        WhiteCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Metricas de Salud",
-                        fontFamily = Manrope,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = Color(0xFF1A1A2E),
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Ver todo",
-                            fontFamily = Manrope,
-                            fontSize = 13.sp,
-                            color = Color(0xFF1A1A2E),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        ArrowCircle(onClick = onReportClick)
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                WeeklyHrChart(patients = patients)
-            }
-        }
+            Spacer(Modifier.height(24.dp))
 
-        Spacer(Modifier.height(12.dp))
+            // ── Métricas de Salud ─────────────────────────────────────────────
+            HealthMetricsGraphCard(
+                patients = patients,
+                vitalsHistory = vitalsHistory,
+                onSeeAllClick = onDetailedClick,
+            )
 
-        // Pager dots for metrics
-        val metricsPager = rememberPagerState(pageCount = { 3 })
-        PagerDots(count = 3, selected = metricsPager.currentPage)
+            Spacer(Modifier.height(24.dp))
 
-        Spacer(Modifier.height(20.dp))
+            // ── Medicamentos ──────────────────────────────────────────────────
+            MedicationsCard(
+                medications = medications,
+                patients = patients,
+                onSeeAllClick = onReportClick,
+            )
 
-        // ── Medicamentos — white card ──────────────────────────────────────────
-        WhiteCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Medicamentos",
-                            fontFamily = Manrope,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = Color(0xFF1A1A2E),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            Icons.AutoMirrored.Outlined.ArrowForward,
-                            contentDescription = null,
-                            tint = Color(0xFF1A1A2E),
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "Ver todo", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF1A1A2E))
-                        Spacer(Modifier.width(8.dp))
-                        ArrowCircle(onClick = onReportClick)
-                    }
-                }
+            Spacer(Modifier.height(24.dp))
 
-                Spacer(Modifier.height(16.dp))
-                DateStrip()
-                Spacer(Modifier.height(20.dp))
-
-                val kcal = if (patients.isNotEmpty()) 800 + patients.sumOf { it.heartRate } * 2 else 1038
-                Text(
-                    text = "%,d Kcal".format(kcal),
-                    fontFamily = Manrope,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 36.sp,
-                    color = Color(0xFF1A1A2E),
-                )
-                Text(
-                    text = "Total del dia",
-                    fontFamily = Manrope,
-                    fontSize = 13.sp,
-                    color = Color(0xFF8A8A8A),
-                )
-            }
-        }
-
-        // ── Patients ──────────────────────────────────────────────────────────
-        if (patients.isNotEmpty()) {
-            Spacer(Modifier.height(20.dp))
-            patients.forEach { patient ->
-                WhiteCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .clickable { onPatientClick(patient.patientId) },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+            // ── Patients list ─────────────────────────────────────────────────
+            if (patients.isNotEmpty()) {
+                patients.forEach { patient ->
+                    WhiteCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPatientClick(patient.patientId) },
                     ) {
-                        Box(
-                            modifier = Modifier.size(44.dp).clip(CircleShape).background(DashBlue.copy(0.15f)),
-                            contentAlignment = Alignment.Center,
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = patient.patientName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = DashBlue,
-                            )
+                            Box(
+                                modifier = Modifier.size(44.dp).clip(CircleShape).background(DashBlue.copy(0.15f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = patient.patientName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                    fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = DashBlue,
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(patient.patientName, fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1A1A2E))
+                                Text("❤️ ${patient.heartRate} BPM · SpO₂ ${patient.spo2}%", fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A))
+                            }
+                            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Color(0xFFB0B0B0), modifier = Modifier.size(18.dp))
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(patient.patientName, fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1A1A2E))
-                            Text("❤️ ${patient.heartRate} BPM · SpO₂ ${patient.spo2}%", fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A))
-                        }
-                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Color(0xFFB0B0B0), modifier = Modifier.size(18.dp))
                     }
+                    Spacer(Modifier.height(10.dp))
                 }
-                Spacer(Modifier.height(10.dp))
             }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+// ─── User Header ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun UserHeader(
+    name: String,
+    onNotificationClick: () -> Unit,
+    onProfileClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar circular con inicial
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(DashBlue)
+                .clickable { onProfileClick() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = name.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
+                fontFamily = Manrope,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = Color.White,
+            )
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Bienvenido", color = TextGray, fontSize = 14.sp, fontFamily = Manrope)
+            Text(name, color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
+        }
+
+        // Campana de notificaciones con punto rojo
+        Box(modifier = Modifier.clickable { onNotificationClick() }) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                shadowElevation = 2.dp
+            ) {
+                Icon(
+                    Icons.Filled.Notifications,
+                    contentDescription = "Notificaciones",
+                    modifier = Modifier.padding(12.dp),
+                    tint = TextDark
+                )
+            }
+            // Red dot
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(Color.Red, CircleShape)
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-10).dp, y = 10.dp)
+            )
+        }
+    }
+}
+
+// ─── Search bar ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun SearchBar(onSearchClick: () -> Unit, onSettingsClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp)
+                .clickable { onSearchClick() },
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White.copy(alpha = 0.5f)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Icon(Icons.Filled.Search, contentDescription = null, tint = TextGray)
+                Spacer(Modifier.width(8.dp))
+                Text("Buscar paciente...", color = TextGray, fontFamily = Manrope)
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Surface(
+            modifier = Modifier.size(56.dp).clickable { onSettingsClick() },
+            shape = RoundedCornerShape(16.dp),
+            color = PrimaryBlue
+        ) {
+            Icon(
+                Icons.Filled.Tune,
+                contentDescription = "Configuración",
+                tint = Color.White,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+@Composable
+private fun SectionHeader(title: String, showArrow: Boolean = false) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
+        if (showArrow) {
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp), tint = TextDark)
         }
     }
 }
@@ -432,36 +414,38 @@ private fun DashboardContent(
 // ─── Sleep card ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun SleepCard(percent: Int) {
-    WhiteCard(modifier = Modifier.fillMaxWidth()) {
+private fun SleepMetricCard(sleepData: SleepData?, pctFallback: Int, onClick: () -> Unit) {
+    val progress = (sleepData?.score ?: pctFallback) / 100f
+    val scoreText = sleepData?.score?.toString() ?: "$pctFallback"
+
+    WhiteCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
         Row(
             modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            SleepRing(percent = percent)
+            // Circular progress ring
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(72.dp),
+                    color = SuccessGreen,
+                    strokeWidth = 6.dp,
+                    trackColor = SuccessGreen.copy(0.1f)
+                )
+                Text("$scoreText%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A2E), fontFamily = Manrope)
+            }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Sueño", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = SleepGreen)
+                Text("Sueño", color = SleepGreen, fontWeight = FontWeight.Bold, fontSize = 18.sp, fontFamily = Manrope)
                 val today = LocalDate.now()
                 Text(
                     text = "${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL, Locale("es")).replaceFirstChar { it.uppercase() }} ${today.year}",
                     fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A),
                 )
+                Text(sleepData?.estado ?: "Sin Datos", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
             }
             Text(text = "+10%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SleepGreen)
         }
-    }
-}
-
-@Composable
-private fun SleepRing(percent: Int) {
-    Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = Stroke(8.dp.toPx(), cap = StrokeCap.Round)
-            drawArc(Color(0xFFE0E0E0), -90f, 360f, false, style = stroke)
-            drawArc(SleepGreen, -90f, 360f * percent / 100f, false, style = stroke)
-        }
-        Text(text = "$percent%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1A1A2E))
     }
 }
 
@@ -470,7 +454,7 @@ private fun HrMiniCard(patients: List<VitalsData>) {
     val hr = patients.firstOrNull()?.heartRate ?: 80
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("❤️", fontSize = 28.sp)
+            Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateCurve, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("Ritmo cardiaco", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
@@ -487,6 +471,139 @@ private fun KcalMiniCard(patients: List<VitalsData>) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("%,d".format(kcal), fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 36.sp, color = Color(0xFF1A1A2E))
             Text("Kcal hoy", fontFamily = Manrope, fontSize = 14.sp, color = Color(0xFF8A8A8A))
+        }
+    }
+}
+
+// ─── Health Metrics Graph Card ─────────────────────────────────────────────────
+
+@Composable
+private fun HealthMetricsGraphCard(
+    patients: List<VitalsData>,
+    vitalsHistory: List<VitalsData>,
+    onSeeAllClick: () -> Unit,
+) {
+    val displayBpm = vitalsHistory.lastOrNull()?.heartRate ?: patients.firstOrNull()?.heartRate ?: 0
+
+    WhiteCard(modifier = Modifier.fillMaxWidth().clickable { onSeeAllClick() }) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Metricas de Salud",
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFF1A1A2E),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Ver todo",
+                        color = TextGray,
+                        fontSize = 12.sp,
+                        fontFamily = Manrope,
+                        modifier = Modifier.clickable { onSeeAllClick() }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    ArrowCircle(onClick = onSeeAllClick)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Chart using Canvas (Justin's bezier implementation)
+            WeeklyHrChart(patients = patients)
+
+            // Tooltip overlay
+            if (displayBpm > 0) {
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Favorite, null, tint = HeartRateCurve, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("$displayBpm BPM", fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Manrope, color = Color(0xFF1A1A2E))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Heart Rate", fontSize = 11.sp, color = TextGray, fontFamily = Manrope)
+                }
+            }
+        }
+    }
+}
+
+// ─── Medications card ─────────────────────────────────────────────────────────
+
+@Composable
+private fun MedicationsCard(
+    medications: List<Medication>,
+    patients: List<VitalsData>,
+    onSeeAllClick: () -> Unit,
+) {
+    WhiteCard(modifier = Modifier.fillMaxWidth().clickable { onSeeAllClick() }) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Medicamentos",
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color(0xFF1A1A2E),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowForward,
+                        contentDescription = null,
+                        tint = Color(0xFF1A1A2E),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ver todo", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF1A1A2E))
+                    Spacer(Modifier.width(8.dp))
+                    ArrowCircle(onClick = onSeeAllClick)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            DateStrip()
+            Spacer(Modifier.height(20.dp))
+
+            if (medications.isEmpty()) {
+                val kcal = if (patients.isNotEmpty()) 800 + patients.sumOf { it.heartRate } * 2 else 1038
+                Text(
+                    text = "%,d Kcal".format(kcal),
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 36.sp,
+                    color = Color(0xFF1A1A2E),
+                )
+                Text(
+                    text = "Total del dia",
+                    fontFamily = Manrope,
+                    fontSize = 13.sp,
+                    color = Color(0xFF8A8A8A),
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    medications.take(3).forEach { med ->
+                        Surface(color = Color(0xFFE3F2FD), shape = RoundedCornerShape(12.dp)) {
+                            Text(
+                                med.nombre,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                fontFamily = Manrope,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

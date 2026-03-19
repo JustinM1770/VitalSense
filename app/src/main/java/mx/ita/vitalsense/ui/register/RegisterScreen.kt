@@ -105,15 +105,17 @@ fun RegisterScreen(
                     .padding(horizontal = 20.dp)
                     .height(40.dp),
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Regresar",
-                    tint = TextDark,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .align(Alignment.CenterStart)
-                        .clickable(onClick = onBack),
-                )
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Regresar",
+                        tint = TextDark,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
                 Text(
                     text = "Registrate",
                     fontFamily = Manrope,
@@ -206,7 +208,7 @@ fun RegisterScreen(
 
             // ── Botón Registrate ──────────────────────────────────────────────
             Button(
-                onClick = { vm.registerWithEmail(email, password) },
+                onClick = { vm.registerWithEmail(name, email, password) },
                 enabled = uiState !is RegisterUiState.Loading && termsAccepted,
                 modifier = Modifier
                     .fillMaxWidth()

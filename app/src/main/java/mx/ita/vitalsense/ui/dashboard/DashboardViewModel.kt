@@ -19,14 +19,28 @@ import kotlinx.coroutines.withTimeoutOrNull
 import mx.ita.vitalsense.HealthSensorApp
 import mx.ita.vitalsense.MainActivity
 import mx.ita.vitalsense.R
+import mx.ita.vitalsense.data.model.Medication
+import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
 import mx.ita.vitalsense.data.model.computeAlerts
 import mx.ita.vitalsense.data.repository.VitalsRepository
 import mx.ita.vitalsense.data.test.TestDataSeeder
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.tasks.await
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
+// Sealed interface keeps Justin's patient-list approach;
+// the extra Jonathan fields are embedded in the Success state.
 sealed interface DashboardUiState {
     data object Loading : DashboardUiState
-    data class Success(val patients: List<VitalsData>) : DashboardUiState
+    data class Success(
+        val patients: List<VitalsData>,
+        val vitalsHistory: List<VitalsData> = emptyList(),
+        val sleepData: SleepData? = null,
+        val medications: List<Medication> = emptyList(),
+    ) : DashboardUiState
     data class Error(val message: String) : DashboardUiState
 }
 
@@ -37,6 +51,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseDatabase.getInstance()
+
     // Rastreo de qué pacientes ya recibieron notificación para no repetir
     private val notifiedPatients = mutableSetOf<String>()
     // Último estado conocido para detectar cambios reales
@@ -44,6 +61,54 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         observePatients()
+        loadAdditionalData()
+    }
+
+    private fun loadAdditionalData() {
+        val userId = auth.currentUser?.uid ?: return
+        val dateKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+
+        viewModelScope.launch {
+            try {
+                // 1. Sleep data
+                val sleepSnapshot = db.getReference("sleep/$userId/$dateKey").get().await()
+                val sleep = sleepSnapshot.getValue(SleepData::class.java)
+
+                // 2. Vitals History (last 10)
+                val vitalsSnapshot = db.getReference("patients").limitToFirst(1).get().await()
+                val patientId = vitalsSnapshot.children.firstOrNull()?.key
+                val historyList = mutableListOf<VitalsData>()
+                if (patientId != null) {
+                    val historySnapshot = db.getReference("patients/$patientId/history").limitToLast(10).get().await()
+                    historySnapshot.children.forEach {
+                        it.getValue(VitalsData::class.java)?.let { v -> historyList.add(v) }
+                    }
+                }
+
+                // 3. Medications
+                val medsSnapshot = db.getReference("medications/$userId").get().await()
+                val medsList = medsSnapshot.children.mapNotNull {
+                    it.getValue(Medication::class.java)
+                }.filter { it.activo }
+
+                val current = _uiState.value
+                _uiState.value = when (current) {
+                    is DashboardUiState.Success -> current.copy(
+                        sleepData = sleep,
+                        vitalsHistory = historyList,
+                        medications = medsList,
+                    )
+                    else -> DashboardUiState.Success(
+                        patients = TestDataSeeder.mockPatients,
+                        sleepData = sleep,
+                        vitalsHistory = historyList,
+                        medications = medsList,
+                    )
+                }
+            } catch (e: Exception) {
+                // Non-fatal: additional data failed, keep existing state
+            }
+        }
     }
 
     private fun observePatients() {
@@ -68,16 +133,21 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun applyResult(result: Result<List<VitalsData>>) {
+        val current = _uiState.value
+        val (sleep, history, meds) = when (current) {
+            is DashboardUiState.Success -> Triple(current.sleepData, current.vitalsHistory, current.medications)
+            else -> Triple(null, emptyList(), emptyList())
+        }
         _uiState.value = result.fold(
             onSuccess = { patients ->
                 val finalList = patients.ifEmpty { TestDataSeeder.mockPatients }
                 finalList.forEach { processPatientUpdate(it) }
-                DashboardUiState.Success(finalList)
+                DashboardUiState.Success(finalList, history, sleep, meds)
             },
             onFailure = {
                 val mock = TestDataSeeder.mockPatients
                 mock.forEach { processPatientUpdate(it) }
-                DashboardUiState.Success(mock)
+                DashboardUiState.Success(mock, history, sleep, meds)
             },
         )
     }

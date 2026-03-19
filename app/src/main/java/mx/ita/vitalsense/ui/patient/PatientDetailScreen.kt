@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,8 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.WaterDrop
@@ -36,6 +39,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -46,7 +52,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +73,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import mx.ita.vitalsense.data.model.Medication
 import mx.ita.vitalsense.data.model.OverallStatus
 import mx.ita.vitalsense.data.model.TrendDirection
 import mx.ita.vitalsense.data.model.VitalAlert
@@ -103,7 +113,7 @@ sealed interface PatientDetailUiState {
     data class Error(val message: String) : PatientDetailUiState
 }
 
-class PatientDetailViewModel(patientId: String) : ViewModel() {
+class PatientDetailViewModel(patientId: String = "") : ViewModel() {
 
     private val repo = VitalsRepository()
 
@@ -115,13 +125,42 @@ class PatientDetailViewModel(patientId: String) : ViewModel() {
         .map { list -> list.ifEmpty { TestDataSeeder.mockHistory(patientId) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TestDataSeeder.mockHistory(patientId))
 
+    // Expose patient name for Jonathan's Scaffold topBar
+    val patientName: String
+        get() = (_uiState.value as? PatientDetailUiState.Success)?.patient?.patientName ?: ""
+
+    // Heart rate history for monthly chart (Jonathan's ExpandedHeartRateCard)
+    val heartRateHistory: Map<String, Float>
+        get() {
+            val snapshots = history.value
+            val months = listOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio")
+            return months.associateWith { month ->
+                snapshots.filter { it.timestamp > 0 }.map { it.heartRate.toFloat() }.average().toFloat().takeIf { !it.isNaN() } ?: 0f
+            }
+        }
+
+    val medications: List<Medication> = emptyList()
+
     init {
-        viewModelScope.launch {
-            repo.observePatient(patientId).collect { result ->
-                _uiState.value = result.fold(
-                    onSuccess = { PatientDetailUiState.Success(it) },
-                    onFailure = { PatientDetailUiState.Error(it.message ?: "Error") },
-                )
+        if (patientId.isNotEmpty()) {
+            viewModelScope.launch {
+                repo.observePatient(patientId).collect { result ->
+                    _uiState.value = result.fold(
+                        onSuccess = { PatientDetailUiState.Success(it) },
+                        onFailure = { PatientDetailUiState.Error(it.message ?: "Error") },
+                    )
+                }
+            }
+        } else {
+            // No patientId: load first available patient
+            viewModelScope.launch {
+                repo.observePatients().collect { result ->
+                    result.onSuccess { patients ->
+                        patients.firstOrNull()?.let {
+                            _uiState.value = PatientDetailUiState.Success(it)
+                        }
+                    }
+                }
             }
         }
     }
@@ -133,16 +172,34 @@ class PatientDetailViewModel(patientId: String) : ViewModel() {
     }
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
+// ─── Screen — overloaded to support both patientId and no-arg signatures ──────
 
 private val TextDark = Color(0xFF221F1F)
 
+/** Full patient detail screen — used from patient list (with patientId). */
 @Composable
 fun PatientDetailScreen(
     patientId: String,
     onBack: () -> Unit,
 ) {
     val vm: PatientDetailViewModel = viewModel(factory = PatientDetailViewModel.Factory(patientId))
+    PatientDetailScreenContent(vm = vm, onBack = onBack)
+}
+
+/** Simplified signature used from global nav (no patientId, loads first patient). */
+@Composable
+fun PatientDetailScreen(
+    onBack: () -> Unit,
+    vm: PatientDetailViewModel = viewModel(),
+) {
+    PatientDetailScreenContent(vm = vm, onBack = onBack)
+}
+
+@Composable
+private fun PatientDetailScreenContent(
+    vm: PatientDetailViewModel,
+    onBack: () -> Unit,
+) {
     val uiState by vm.uiState.collectAsState()
     val history by vm.history.collectAsState()
     val context = LocalContext.current
@@ -156,9 +213,8 @@ fun PatientDetailScreen(
             .background(NeomorphicBackground)
             .padding(top = 52.dp),
     ) {
-
         // ── Header ────────────────────────────────────────────────────────────
-        val patientName = (uiState as? PatientDetailUiState.Success)?.patient?.patientName ?: "Paciente"
+        val patientName = (uiState as? PatientDetailUiState.Success)?.patient?.patientName ?: "Reporte Detallado"
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -183,7 +239,7 @@ fun PatientDetailScreen(
                 color = TextDark,
                 modifier = Modifier.align(Alignment.Center),
             )
-            // Botón exportar PDF
+            // Botón exportar PDF (only when patient is loaded)
             if (uiState is PatientDetailUiState.Success) {
                 Icon(
                     imageVector = Icons.Outlined.PictureAsPdf,
@@ -220,6 +276,8 @@ fun PatientDetailScreen(
                 trend = trend,
                 selectedMetric = selectedMetric,
                 onMetricSelected = { selectedMetric = it },
+                medications = vm.medications,
+                heartRateHistory = vm.heartRateHistory,
             )
         }
     }
@@ -254,6 +312,8 @@ private fun DetailContent(
     trend: VitalsTrend,
     selectedMetric: ChartMetric,
     onMetricSelected: (ChartMetric) -> Unit,
+    medications: List<Medication>,
+    heartRateHistory: Map<String, Float>,
 ) {
     val alerts = patient.computeAlerts()
     val status = patient.overallStatus()
@@ -264,7 +324,6 @@ private fun DetailContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
-
         // ── Badge de estado ───────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -323,7 +382,12 @@ private fun DetailContent(
 
         Spacer(Modifier.height(24.dp))
 
-        // ── Gráfica de tendencia ──────────────────────────────────────────────
+        // ── Gráfica expandida de Ritmo Cardíaco (Jonathan) ───────────────────
+        ExpandedHeartRateCard(history = heartRateHistory)
+
+        Spacer(Modifier.height(24.dp))
+
+        // ── Gráfica de tendencia con selector de métrica (Justin) ────────────
         NeuCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -375,6 +439,17 @@ private fun DetailContent(
             }
         }
 
+        // ── Medicamentos (Jonathan) ───────────────────────────────────────────
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = "Medicamentos",
+            style = MaterialTheme.typography.titleLarge,
+            color = TextPrimary,
+            fontFamily = Manrope,
+        )
+        Spacer(Modifier.height(16.dp))
+        MedicationsList(medications)
+
         // ── Alertas ───────────────────────────────────────────────────────────
         AnimatedVisibility(
             visible = alerts.isNotEmpty(),
@@ -396,7 +471,134 @@ private fun DetailContent(
             }
         }
 
-        Spacer(Modifier.height(88.dp))
+        Spacer(Modifier.height(96.dp))
+    }
+}
+
+// ─── Expanded Heart Rate Card (Jonathan) ─────────────────────────────────────
+
+@Composable
+private fun ExpandedHeartRateCard(history: Map<String, Float>) {
+    NeuCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateRed, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Ritmo Cardíaco", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Text("Promedio Mensual", fontSize = 12.sp, color = TextSecondary)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            val months = listOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio")
+            val points = months.map { history[it] ?: 0f }
+
+            ExpandedLineChart(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                color = HeartRateRed,
+                points = points.map { it / 200f },
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                months.forEach { month ->
+                    Text(month.take(3), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpandedLineChart(modifier: Modifier = Modifier, color: Color, points: List<Float>) {
+    Canvas(modifier = modifier) {
+        val path = Path()
+        val width = size.width
+        val height = size.height
+        if (points.size < 2) return@Canvas
+        val stepX = width / (points.size - 1)
+
+        points.forEachIndexed { index, value ->
+            val x = index * stepX
+            val y = height - (value * height).coerceIn(0f, height)
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = 4.dp.toPx())
+        )
+
+        // Horizontal grid lines
+        for (i in 0..3) {
+            val y = height - (i * height / 3)
+            drawLine(
+                color = TextMuted.copy(alpha = 0.1f),
+                start = Offset(0f, y),
+                end = Offset(width, y),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
+    }
+}
+
+// ─── Medications list (Jonathan) ─────────────────────────────────────────────
+
+@Composable
+private fun MedicationsList(meds: List<Medication>) {
+    if (meds.isEmpty()) {
+        NeuCard(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Text("No hay medicamentos activos", style = MaterialTheme.typography.bodyLarge, color = TextMuted)
+            }
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            meds.forEach { med ->
+                MedicationItem(med)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MedicationItem(med: Medication) {
+    NeuCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(PrimaryBlue.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.Medication, contentDescription = null, tint = PrimaryBlue)
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(med.nombre, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(med.dosis, fontSize = 12.sp, color = TextSecondary)
+            }
+            Text(med.horario, style = MaterialTheme.typography.labelLarge, color = PrimaryBlue)
+        }
     }
 }
 
