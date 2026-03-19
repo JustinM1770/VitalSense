@@ -88,7 +88,7 @@ fun PatientDetailScreen(
             
             MedicationsList(state.medications)
             
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(96.dp)) // Espacio para nav bar global
         }
     }
 }

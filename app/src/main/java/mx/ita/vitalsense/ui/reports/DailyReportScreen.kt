@@ -104,7 +104,11 @@ fun DailyReportScreen(
             
             HeartRateTrendCard(history = state.vitalsHistory)
             
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
+            
+            SleepMetricCardDaily(sleepData = state.sleepData)
+            
+            Spacer(Modifier.height(96.dp)) // Espacio para Global Nav Bar
         }
     }
 }
@@ -376,5 +380,39 @@ fun LineChart(modifier: Modifier = Modifier, color: Color, points: List<Float>) 
             color = color,
             style = Stroke(width = 3.dp.toPx())
         )
+    }
+}
+
+@Composable
+fun SleepMetricCardDaily(
+    sleepData: mx.ita.vitalsense.data.model.SleepData?
+) {
+    val progress = (sleepData?.score ?: 0) / 100f
+    val scoreText = sleepData?.score?.toString() ?: "0"
+
+    mx.ita.vitalsense.ui.components.NeuCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Circular progress
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(60.dp),
+                    color = Color(0xFF10B981), // SuccessGreen
+                    strokeWidth = 6.dp,
+                    trackColor = Color(0xFF10B981).copy(alpha = 0.1f)
+                )
+                Text("$scoreText%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            }
+            Spacer(Modifier.width(16.dp))
+            Text("Sueño", color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Promedio de Hoy", fontSize = 11.sp, color = TextSecondary)
+                Text(sleepData?.estado ?: "Sin Datos", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
