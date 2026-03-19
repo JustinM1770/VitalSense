@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.model.VitalsData
 
@@ -42,12 +43,13 @@ private val HeartRateCurve = Color(0xFFEF4444)
 
 @Composable
 fun DashboardScreen(
-    onConnectDevice: () -> Unit = {},
-    onNavigateToReports: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToDetailed: () -> Unit = {},
+    onNavigateToReports: () -> Unit = {},
     onNavigateToHome: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
+    onConnectDevice: () -> Unit = {},
     vm: DashboardViewModel = viewModel(),
 ) {
     val uiState by vm.uiState.collectAsState()
@@ -82,7 +84,19 @@ fun DashboardScreen(
             Spacer(Modifier.height(24.dp))
 
             // 2. Search Bar
-            SearchBar()
+            val snackbarHostState = remember { SnackbarHostState() }
+            val coroutineScope = rememberCoroutineScope()
+            
+            SearchBar(
+                onSearchClick = {
+                    coroutineScope.launch { snackbarHostState.showSnackbar("Función de búsqueda en desarrollo") }
+                },
+                onSettingsClick = onNavigateToProfile
+            )
+            
+            Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                SnackbarHost(hostState = snackbarHostState)
+            }
 
             Spacer(Modifier.height(24.dp))
 
@@ -97,7 +111,7 @@ fun DashboardScreen(
                 // Sleep Card
                 SectionHeader(title = "Esta semana", showArrow = true)
                 Spacer(Modifier.height(16.dp))
-                SleepMetricCard()
+                SleepMetricCard(sleepData = uiState.sleepData)
 
                 Spacer(Modifier.height(16.dp))
                 DotsIndicator(selected = 0)
@@ -105,7 +119,10 @@ fun DashboardScreen(
                 Spacer(Modifier.height(24.dp))
 
                 // Health Metrics Card (Graph)
-                HealthMetricsGraphCard(onSeeAllClick = onNavigateToReports)
+                HealthMetricsGraphCard(
+                    history = uiState.vitalsHistory,
+                    onSeeAllClick = onNavigateToDetailed
+                )
                 
                 Spacer(Modifier.height(16.dp))
                 DotsIndicator(selected = 0)
@@ -113,7 +130,10 @@ fun DashboardScreen(
                 Spacer(Modifier.height(24.dp))
 
                 // Medications Card
-                MedicationsCard()
+                MedicationsCard(
+                    medications = uiState.medications,
+                    onSeeAllClick = onNavigateToDetailed
+                )
                 
                 Spacer(Modifier.height(40.dp))
             }
@@ -172,7 +192,7 @@ private fun UserHeader(name: String, onNotificationClick: () -> Unit) {
 }
 
 @Composable
-private fun SearchBar() {
+private fun SearchBar(onSearchClick: () -> Unit, onSettingsClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -182,7 +202,8 @@ private fun SearchBar() {
         Surface(
             modifier = Modifier
                 .weight(1f)
-                .height(56.dp),
+                .height(56.dp)
+                .clickable { onSearchClick() },
             shape = RoundedCornerShape(16.dp),
             color = Color.White.copy(alpha = 0.5f)
         ) {
@@ -192,18 +213,18 @@ private fun SearchBar() {
             ) {
                 Icon(Icons.Default.Search, contentDescription = null, tint = TextGray)
                 Spacer(Modifier.width(8.dp))
-                Text("Buscar", color = TextGray)
+                Text("Buscar paciente...", color = TextGray)
             }
         }
         Spacer(Modifier.width(16.dp))
         Surface(
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(56.dp).clickable { onSettingsClick() },
             shape = RoundedCornerShape(16.dp),
             color = PrimaryBlue
         ) {
             Icon(
                 Icons.Default.Tune,
-                contentDescription = null,
+                contentDescription = "Configuración",
                 tint = Color.White,
                 modifier = Modifier.padding(16.dp)
             )
@@ -223,7 +244,10 @@ private fun SectionHeader(title: String, showArrow: Boolean = false) {
 }
 
 @Composable
-private fun SleepMetricCard() {
+private fun SleepMetricCard(sleepData: mx.ita.vitalsense.data.model.SleepData?) {
+    val progress = (sleepData?.score ?: 0) / 100f
+    val scoreText = sleepData?.score?.toString() ?: "0"
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -236,29 +260,34 @@ private fun SleepMetricCard() {
             // Circular progress
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
-                    progress = 0.7f,
+                    progress = { progress },
                     modifier = Modifier.size(60.dp),
                     color = SuccessGreen,
                     strokeWidth = 6.dp,
                     trackColor = SuccessGreen.copy(0.1f)
                 )
-                Text("70%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                Text("$scoreText%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextDark)
             }
             Spacer(Modifier.width(16.dp))
             Text("Sueño", color = SuccessGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
-                Text("14 Febrero 2025", fontSize = 11.sp, color = TextGray)
-                Text("+10%", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Promedio de Hoy", fontSize = 11.sp, color = TextGray)
+                Text(sleepData?.estado ?: "Sin Datos", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun HealthMetricsGraphCard(onSeeAllClick: () -> Unit) {
+private fun HealthMetricsGraphCard(
+    history: List<VitalsData>,
+    onSeeAllClick: () -> Unit
+) {
+    val displayBpm = history.lastOrNull()?.heartRate ?: 0
+
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onSeeAllClick() },
         shape = RoundedCornerShape(24.dp),
         color = Color.White
     ) {
@@ -278,20 +307,28 @@ private fun HealthMetricsGraphCard(onSeeAllClick: () -> Unit) {
             
             Spacer(Modifier.height(20.dp))
             
-            // Simulación de gráfico (Imagen o Canvas)
+            // Gráfico de Ritmo Cardíaco
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp),
-                contentAlignment = Alignment.Center
+                    .height(150.dp)
+                    .padding(bottom = 16.dp),
+                contentAlignment = Alignment.BottomCenter
             ) {
-                // Aquí iría el dibujo del gráfico de ritmo cardíaco
-                // Por ahora usamos un placeholder estilizado
-                Text("Gráfico de Ritmo Cardíaco", color = HeartRateCurve.copy(0.5f))
+                val points = history.takeLast(10).map { it.heartRate.toFloat() / 200f }
+                if (points.isNotEmpty()) {
+                    mx.ita.vitalsense.ui.reports.LineChart(
+                        modifier = Modifier.fillMaxSize(),
+                        color = HeartRateCurve,
+                        points = points
+                    )
+                } else {
+                    Text("No hay datos de ritmo cardíaco", color = HeartRateCurve.copy(0.5f))
+                }
                 
-                // Tooltip simulado
+                // Tooltip
                 Surface(
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 40.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 10.dp, top = 10.dp),
                     shape = RoundedCornerShape(12.dp),
                     color = Color.White,
                     shadowElevation = 4.dp
@@ -300,7 +337,7 @@ private fun HealthMetricsGraphCard(onSeeAllClick: () -> Unit) {
                         Text("Heart Rate", fontSize = 10.sp, color = TextGray)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Rounded.Favorite, null, tint = HeartRateCurve, modifier = Modifier.size(12.dp))
-                            Text(" 118", fontWeight = FontWeight.Bold)
+                            Text(" $displayBpm", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -310,34 +347,42 @@ private fun HealthMetricsGraphCard(onSeeAllClick: () -> Unit) {
 }
 
 @Composable
-private fun MedicationsCard() {
+private fun MedicationsCard(
+    medications: List<mx.ita.vitalsense.data.model.Medication>,
+    onSeeAllClick: () -> Unit
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onSeeAllClick() },
         shape = RoundedCornerShape(24.dp),
         color = Color.White
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Medicamentos", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(Modifier.width(4.dp))
                 Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.weight(1f))
                 Text("Ver todo", color = TextGray, fontSize = 12.sp)
                 Spacer(Modifier.width(4.dp))
                 IconButton(
-                    onClick = {},
+                    onClick = onSeeAllClick,
                     modifier = Modifier.size(24.dp).background(PrimaryBlue, CircleShape)
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Color.White, modifier = Modifier.size(12.dp))
                 }
             }
             Spacer(Modifier.height(16.dp))
-            // Calendario horizontal simulado
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                repeat(3) { Text("${11+it}", color = TextGray) }
-                Surface(color = Color(0xFFE3F2FD), shape = RoundedCornerShape(12.dp)) {
-                    Text("Today, 14 Feb", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), fontWeight = FontWeight.Bold)
+            
+            if (medications.isEmpty()) {
+                Text("No hay medicamentos activos", color = TextGray, fontSize = 14.sp)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    medications.take(3).forEach { med ->
+                        Surface(color = Color(0xFFE3F2FD), shape = RoundedCornerShape(12.dp)) {
+                            Text(med.nombre, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
                 }
-                repeat(2) { Text("${16+it}", color = TextGray) }
             }
         }
     }
