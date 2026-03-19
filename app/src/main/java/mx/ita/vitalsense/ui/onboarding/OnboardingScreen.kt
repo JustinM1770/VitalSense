@@ -68,7 +68,7 @@ private val pages = listOf(
     OnboardingPage(
         title = "Prevencion basada en datos.",
         body = "No necesitas estar pegado a la pantalla. Nuestra IA analiza el rito cardiaco y niveles de glucosa por ti, notificandote de inmediato solo si detecta un patron de riesgo.",
-        illustration = null,
+        illustration = R.drawable.corazon,
     ),
 )
 
