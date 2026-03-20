@@ -37,6 +37,7 @@ object Route {
     const val DEVICE = "device"
     const val DAILY_REPORT = "daily_report"
     const val DETAILED_REPORT = "detailed_report"
+    const val SLEEP_DETAIL = "sleep_detail"
     const val NOTIFICATIONS = "notifications"
     const val PROFILE = "profile"
     const val CHAT = "chat"
@@ -140,7 +141,31 @@ fun AppNavigation() {
                 composable(Route.DAILY_REPORT) {
                     DailyReportScreen(
                         onBack = { navController.navigateUp() },
-                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) }
+                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
+                        onNavigateToSleepDetail = { sleepData ->
+                            val score = sleepData?.score ?: 0
+                            val horas = sleepData?.horas ?: 0f
+                            val estado = sleepData?.estado ?: "Sin Datos"
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&horas=$horas&estado=$estado")
+                        }
+                    )
+                }
+                composable(
+                    route = "${Route.SLEEP_DETAIL}?score={score}&horas={horas}&estado={estado}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("score") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
+                        androidx.navigation.navArgument("horas") { defaultValue = 0f; type = androidx.navigation.NavType.FloatType },
+                        androidx.navigation.navArgument("estado") { defaultValue = "Sin Datos"; type = androidx.navigation.NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val score = backStackEntry.arguments?.getInt("score") ?: 0
+                    val horas = backStackEntry.arguments?.getFloat("horas") ?: 0f
+                    val estado = backStackEntry.arguments?.getString("estado") ?: "Sin Datos"
+                    mx.ita.vitalsense.ui.reports.SleepDetailScreen(
+                        score = score,
+                        horas = horas,
+                        estado = estado,
+                        onBack = { navController.navigateUp() }
                     )
                 }
                 composable(Route.DETAILED_REPORT) {

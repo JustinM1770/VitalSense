@@ -34,7 +34,7 @@ class HealthConnectRepository(private val context: Context) {
         if (!hasPermissions()) return null
         
         val now = Instant.now()
-        val timeRange = TimeRangeFilter.between(now.minus(1, ChronoUnit.DAYS), now)
+        val timeRange = TimeRangeFilter.between(now.minus(7, ChronoUnit.DAYS), now)
         
         val hrResponse = healthConnectClient.readRecords(
             ReadRecordsRequest(
@@ -87,8 +87,7 @@ class HealthConnectRepository(private val context: Context) {
         if (!hasPermissions()) return null
         
         val now = Instant.now()
-        val startOfDay = now.truncatedTo(ChronoUnit.DAYS) // Hoy a las 00:00
-        val timeRange = TimeRangeFilter.between(startOfDay.minus(24, ChronoUnit.HOURS), now)
+        val timeRange = TimeRangeFilter.between(now.minus(7, ChronoUnit.DAYS), now)
         
         val sleepResponse = healthConnectClient.readRecords(
             ReadRecordsRequest(

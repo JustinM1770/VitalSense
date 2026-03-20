@@ -40,6 +40,7 @@ import kotlin.math.sin
 fun DailyReportScreen(
     onBack: () -> Unit,
     onNavigateToDetailed: () -> Unit,
+    onNavigateToSleepDetail: (mx.ita.vitalsense.data.model.SleepData?) -> Unit,
     vm: DailyReportViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
@@ -134,7 +135,10 @@ fun DailyReportScreen(
             
             Spacer(Modifier.height(24.dp))
             
-            SleepMetricCardDaily(sleepData = state.sleepData)
+            SleepMetricCardDaily(
+                sleepData = state.sleepData,
+                onClick = { onNavigateToSleepDetail(state.sleepData) }
+            )
             
             Spacer(Modifier.height(96.dp)) // Espacio para Global Nav Bar
         }
@@ -416,12 +420,17 @@ fun LineChart(modifier: Modifier = Modifier, color: Color, points: List<Float>) 
 
 @Composable
 fun SleepMetricCardDaily(
-    sleepData: mx.ita.vitalsense.data.model.SleepData?
+    sleepData: mx.ita.vitalsense.data.model.SleepData?,
+    onClick: () -> Unit
 ) {
     val progress = (sleepData?.score ?: 0) / 100f
     val scoreText = sleepData?.score?.toString() ?: "0"
 
-    mx.ita.vitalsense.ui.components.NeuCard(modifier = Modifier.fillMaxWidth()) {
+    mx.ita.vitalsense.ui.components.NeuCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically

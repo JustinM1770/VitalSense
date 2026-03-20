@@ -14,8 +14,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import mx.ita.vitalsense.data.healthconnect.HealthConnectRepository
 import mx.ita.vitalsense.data.healthconnect.HealthConnectVitals
+import mx.ita.vitalsense.data.model.SleepData
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 enum class HealthConnectState {
     IDLE,
@@ -100,15 +105,44 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun writeSleepToFirebase(sleep: SleepData) {
+        try {
+            val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            val dateKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            val ref = FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com").getReference("sleep/$userId/$dateKey")
+            ref.setValue(sleep)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error writing sleep to Firebase", e)
+        }
+    }
+
     /** Lee los datos más recientes sin cambiar el estado de emparejamiento */
     private suspend fun refreshData() {
         try {
             val repo = getRepo() ?: return
+            
+            if (!repo.hasPermissions()) {
+                _state.value = HealthConnectState.PERMISSION_DENIED
+                _errorMessage.value = "Faltan permisos. Por favor, asegúrate de permitir el acceso a TODOS los datos (Ritmo Cardíaco, SpO2, Glucosa y Sueño)."
+                return
+            }
+
             val data = repo.readLatestVitals()
-            if (data != null && (data.heartRate != null || data.glucose != null || data.spo2 != null)) {
-                _vitals.value = data
+            val sleepData = repo.readSleepData()
+            
+            if (sleepData != null) {
+                writeSleepToFirebase(sleepData)
+            }
+            
+            val hasVitals = data != null && (data.heartRate != null || data.glucose != null || data.spo2 != null)
+            val hasSleep = sleepData != null
+
+            if (hasVitals || hasSleep) {
+                if (hasVitals) {
+                    _vitals.value = data
+                }
                 _state.value = HealthConnectState.SUCCESS
-                Log.d(TAG, "refreshData: HR=${data.heartRate}, SpO2=${data.spo2}, Glucose=${data.glucose}")
+                Log.d(TAG, "refreshData: HR=${data?.heartRate}, SpO2=${data?.spo2}, Glucose=${data?.glucose}, Sleep=${sleepData?.score}")
             } else {
                 // Si ya está emparejado pero no hay datos recientes, mantener SUCCESS con los últimos datos
                 if (_vitals.value == null) {
@@ -134,10 +168,27 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
                     _errorMessage.value = "No se pudo inicializar Health Connect. Verifica que esté instalado."
                     return@launch
                 }
+                
+                if (!repo.hasPermissions()) {
+                    _state.value = HealthConnectState.PERMISSION_DENIED
+                    _errorMessage.value = "Faltan permisos. Por favor, asegúrate de permitir el acceso a TODOS los datos (Ritmo Cardíaco, SpO2, Glucosa y Sueño)."
+                    return@launch
+                }
 
                 val data = repo.readLatestVitals()
-                if (data != null && (data.heartRate != null || data.glucose != null || data.spo2 != null)) {
-                    _vitals.value = data
+                val sleepData = repo.readSleepData()
+                
+                if (sleepData != null) {
+                    writeSleepToFirebase(sleepData)
+                }
+                
+                val hasVitals = data != null && (data.heartRate != null || data.glucose != null || data.spo2 != null)
+                val hasSleep = sleepData != null
+
+                if (hasVitals || hasSleep) {
+                    if (hasVitals) {
+                        _vitals.value = data
+                    }
                     _state.value = HealthConnectState.SUCCESS
                     // ¡Emparejar permanentemente!
                     savePairedState(true)
