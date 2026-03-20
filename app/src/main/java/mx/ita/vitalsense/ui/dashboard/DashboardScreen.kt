@@ -1,6 +1,7 @@
 package mx.ita.vitalsense.ui.dashboard
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -159,6 +161,26 @@ fun DashboardScreen(
 
 @Composable
 private fun UserHeader(name: String, onNotificationClick: () -> Unit) {
+    // Dynamic badge: check Firebase for unread alerts
+    var hasUnread by remember { mutableStateOf(false) }
+    val auth = FirebaseAuth.getInstance()
+    DisposableEffect(Unit) {
+        val userId = auth.currentUser?.uid ?: "global"
+        val db = com.google.firebase.database.FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com")
+        val ref = db.getReference("alerts").child(userId)
+        val listener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                hasUnread = snapshot.children.any { child ->
+                    val data = child.value as? Map<String, Any>
+                    data != null && data["read"] != true
+                }
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        }
+        ref.addValueEventListener(listener)
+        onDispose { ref.removeEventListener(listener) }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -180,7 +202,7 @@ private fun UserHeader(name: String, onNotificationClick: () -> Unit) {
             Text("Bienvenido", color = TextGray, fontSize = 14.sp)
             Text(name, color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
-        // Notification bell with dot
+        // Notification bell with dynamic dot
         Box(modifier = Modifier.clickable { onNotificationClick() }) {
             Surface(
                 modifier = Modifier.size(48.dp),
@@ -195,14 +217,16 @@ private fun UserHeader(name: String, onNotificationClick: () -> Unit) {
                     tint = TextDark
                 )
             }
-            // Red dot
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(Color.Red, CircleShape)
-                    .align(Alignment.TopEnd)
-                    .offset(x = (-10).dp, y = 10.dp)
-            )
+            // Red dot – only if there are unread alerts
+            if (hasUnread) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(Color.Red, CircleShape)
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-8).dp, y = 8.dp)
+                )
+            }
         }
     }
 }
@@ -256,6 +280,8 @@ private fun SectionHeader(title: String, showArrow: Boolean = false) {
             Spacer(Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp), tint = TextDark)
         }
+    }
+}
 
 @Composable
 private fun SleepMetricCard(
@@ -292,6 +318,9 @@ private fun SleepMetricCard(
                 Text("Promedio de Hoy", fontSize = 11.sp, color = TextGray)
                 Text(sleepData?.estado ?: "Sin Datos", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
+        }
+    }
+}
 
 @Composable
 private fun HealthMetricsGraphCard(

@@ -141,24 +141,30 @@ fun AppNavigation() {
                     )
                 }
                 composable(Route.NOTIFICATIONS) {
-                    Scaffold(
-                        bottomBar = { Spacer(Modifier.height(80.dp)) } // Reservar espacio para la barra global
-                    ) { innerPadding ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Pantalla de Notificaciones", style = MaterialTheme.typography.titleLarge)
-                                Spacer(Modifier.height(20.dp))
-                                Button(onClick = { navController.navigateUp() }) {
-                                    Text("Volver")
-                                }
+                    NotificacionesScreen(
+                        onBack = { navController.navigateUp() },
+                        onHomeClick = {
+                            navController.navigate(Route.DASHBOARD) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                        }
-                    }
+                        },
+                        onHealthClick = {
+                            navController.navigate(Route.DAILY_REPORT) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onProfileClick = {
+                            navController.navigate(Route.PROFILE) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                    )
                 }
                 composable(Route.PROFILE) {
                     mx.ita.vitalsense.ui.profile.ProfileScreen(
