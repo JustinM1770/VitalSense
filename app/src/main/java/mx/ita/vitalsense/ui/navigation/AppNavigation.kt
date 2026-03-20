@@ -13,6 +13,7 @@ import com.google.firebase.auth.FirebaseAuth
 import mx.ita.vitalsense.ui.dashboard.DashboardScreen
 import mx.ita.vitalsense.ui.device.DeviceScanScreen
 import mx.ita.vitalsense.ui.documentos.DocumentosScreen
+import mx.ita.vitalsense.ui.forgotpassword.ForgotPasswordScreen
 import mx.ita.vitalsense.ui.login.LoginScreen
 import mx.ita.vitalsense.ui.notifications.NotificacionesScreen
 import mx.ita.vitalsense.ui.onboarding.OnboardingScreen
@@ -39,6 +40,7 @@ object Route {
     const val NOTIFICATIONS = "notifications"
     const val PROFILE = "profile"
     const val CHAT = "chat"
+    const val FORGOT_PASSWORD = "forgot_password"
 }
 
 @Composable
@@ -94,7 +96,18 @@ fun AppNavigation() {
                                 popUpTo(0) { inclusive = true }
                             }
                         },
-                        onRegisterClick = { navController.navigate(Route.REGISTER) }
+                        onRegisterClick = { navController.navigate(Route.REGISTER) },
+                        onForgotPassword = { navController.navigate(Route.FORGOT_PASSWORD) }
+                    )
+                }
+                composable(Route.FORGOT_PASSWORD) {
+                    ForgotPasswordScreen(
+                        onBack = { navController.navigateUp() },
+                        onBackToLogin = {
+                            navController.navigate(Route.LOGIN) {
+                                popUpTo(Route.LOGIN) { inclusive = true }
+                            }
+                        }
                     )
                 }
                 composable(Route.REGISTER) {

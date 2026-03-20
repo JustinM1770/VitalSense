@@ -61,6 +61,7 @@ fun RegisterScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var termsAccepted   by remember { mutableStateOf(false) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState) {
@@ -225,6 +226,73 @@ fun RegisterScreen(
                         fontSize = 16.sp,
                     )
                 }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── "O" separator ────────────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(Color(0xFFE5E5E5)))
+                Text(
+                    text = "  O  ",
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = Color(0xFF8A8A8A),
+                )
+                Box(Modifier.weight(1f).height(1.dp).background(Color(0xFFE5E5E5)))
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── Google Button ────────────────────────────────────────────
+            OutlinedButton(
+                onClick = { /* TODO: Google register */ },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .height(52.dp),
+                shape = RoundedCornerShape(32.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5E5E5)),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+            ) {
+                Text("Regístrate con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)) { append("G") }
+                        withStyle(SpanStyle(color = Color(0xFFEA4335), fontWeight = FontWeight.Bold)) { append("o") }
+                        withStyle(SpanStyle(color = Color(0xFFFBBC05), fontWeight = FontWeight.Bold)) { append("o") }
+                        withStyle(SpanStyle(color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)) { append("g") }
+                        withStyle(SpanStyle(color = Color(0xFF34A853), fontWeight = FontWeight.Bold)) { append("l") }
+                        withStyle(SpanStyle(color = Color(0xFFEA4335), fontWeight = FontWeight.Bold)) { append("e") }
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = { vm.signInWithFacebook(context) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .height(52.dp),
+                shape = RoundedCornerShape(32.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5E5E5)),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+            ) {
+                Text("Regístrate con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
+                Text(
+                    text = "Facebook",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = Color(0xFF1877F2),
+                )
             }
 
             Spacer(Modifier.height(24.dp))

@@ -51,6 +51,7 @@ fun LoginScreen(
     onBack: () -> Unit,
     onLoginSuccess: () -> Unit,
     onRegisterClick: () -> Unit,
+    onForgotPassword: () -> Unit,
     vm: LoginViewModel = viewModel()
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
@@ -159,7 +160,7 @@ fun LoginScreen(
                     modifier = Modifier
                         .align(Alignment.End)
                         .padding(end = 32.dp)
-                        .clickable { /* TODO: reset password flow */ }
+                        .clickable { onForgotPassword() }
                 )
 
                 Spacer(Modifier.height(32.dp))
@@ -235,6 +236,7 @@ fun LoginScreen(
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
                     enabled = uiState !is LoginUiState.Loading
                 ) {
+                    Text("Inicia Sesión con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
                     Text(
                         text = buildAnnotatedString {
                             withStyle(SpanStyle(color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)) { append("G") }
@@ -245,15 +247,14 @@ fun LoginScreen(
                             withStyle(SpanStyle(color = Color(0xFFEA4335), fontWeight = FontWeight.Bold)) { append("e") }
                         },
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Inicia Sesión con Google", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
+                    
                 }
 
                 Spacer(Modifier.height(12.dp))
 
                 // ── Facebook Button ──────────────────────────────────────────
                 OutlinedButton(
-                    onClick = { /* TODO: Facebook login */ },
+                    onClick = { vm.signInWithFacebook(context) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 32.dp)
@@ -263,14 +264,13 @@ fun LoginScreen(
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
                     enabled = uiState !is LoginUiState.Loading
                 ) {
+                    Text("Inicia Sesión con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
                     Text(
-                        text = "f",
+                        text = "Facebook",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                        fontSize = 14.sp,
                         color = Color(0xFF1877F2),
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Inicia Sesión con Facebook", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
                 }
 
                 Spacer(Modifier.height(32.dp))

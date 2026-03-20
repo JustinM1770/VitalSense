@@ -75,11 +75,56 @@ class AuthRepository {
         }
     }
 
+    // ── Facebook Sign-In ──────────────────────────────────────────────────────
+    suspend fun signInWithFacebook(activityContext: Context): Result<FirebaseUser> {
+        val activity = activityContext.findActivity()
+            ?: return Result.failure(IllegalStateException("Contexto no es una Activity"))
+
+        return kotlin.coroutines.suspendCoroutine { cont ->
+            val callbackManager = com.facebook.CallbackManager.Factory.create()
+            val loginManager = com.facebook.login.LoginManager.getInstance()
+
+            loginManager.registerCallback(
+                callbackManager,
+                object : com.facebook.FacebookCallback<com.facebook.login.LoginResult> {
+                    override fun onSuccess(result: com.facebook.login.LoginResult) {
+                        val token = result.accessToken.token
+                        val credential = com.google.firebase.auth.FacebookAuthProvider.getCredential(token)
+                        auth.signInWithCredential(credential)
+                            .addOnSuccessListener { authResult ->
+                                cont.resumeWith(Result.success(Result.success(authResult.user!!)))
+                            }
+                            .addOnFailureListener { e ->
+                                cont.resumeWith(Result.success(Result.failure(e)))
+                            }
+                    }
+
+                    override fun onCancel() {
+                        cont.resumeWith(Result.success(Result.failure(Exception("Inicio de sesión cancelado"))))
+                    }
+
+                    override fun onError(error: com.facebook.FacebookException) {
+                        cont.resumeWith(Result.success(Result.failure(error)))
+                    }
+                }
+            )
+
+            loginManager.logInWithReadPermissions(
+                activity as android.app.Activity,
+                listOf("public_profile")
+            )
+        }
+    }
+
     // ── Modo Demo: acceso anónimo sin registro ────────────────────────────────
     suspend fun signInAnonymously(): Result<FirebaseUser> =
         runCatching { auth.signInAnonymously().await().user!! }
 
     val isAnonymous: Boolean get() = auth.currentUser?.isAnonymous == true
+
+    // ── Recuperar contraseña ─────────────────────────────────────────────────
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit> =
+        runCatching { auth.sendPasswordResetEmail(email).await() }
 
     fun signOut() = auth.signOut()
 }

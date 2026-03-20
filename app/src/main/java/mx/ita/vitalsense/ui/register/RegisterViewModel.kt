@@ -58,5 +58,20 @@ class RegisterViewModel : ViewModel() {
         }
     }
 
+    fun signInWithFacebook(context: Context) {
+        viewModelScope.launch {
+            _state.value = RegisterUiState.Loading
+            repo.signInWithFacebook(context)
+                .onSuccess  { _state.value = RegisterUiState.Success }
+                .onFailure  { e ->
+                    if (e.message?.contains("cancel", ignoreCase = true) == true) {
+                        _state.value = RegisterUiState.Idle
+                    } else {
+                        _state.value = RegisterUiState.Error(e.localizedMessage ?: "Error Facebook: ${e.message}")
+                    }
+                }
+        }
+    }
+
     fun clearError() { _state.value = RegisterUiState.Idle }
 }

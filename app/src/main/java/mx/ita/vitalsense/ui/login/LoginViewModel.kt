@@ -23,7 +23,6 @@ class LoginViewModel : ViewModel() {
     private val _state = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
-<<<<<<< HEAD
     fun loginWithEmail(email: String, password: String) {
         viewModelScope.launch {
             _state.value = LoginUiState.Loading
@@ -47,14 +46,21 @@ class LoginViewModel : ViewModel() {
                     }
                 }
         }
-=======
-    fun signInWithEmail(email: String, password: String) {
-        _state.value = LoginUiState.Success
     }
 
-    fun signInWithGoogle(context: Context) {
-        _state.value = LoginUiState.Success
->>>>>>> 5b14bb15ac5277f3be8467bf84e007c83ca41308
+    fun signInWithFacebook(context: Context) {
+        viewModelScope.launch {
+            _state.value = LoginUiState.Loading
+            repo.signInWithFacebook(context)
+                .onSuccess  { _state.value = LoginUiState.Success }
+                .onFailure  { e ->
+                    if (e.message?.contains("cancel", ignoreCase = true) == true) {
+                        _state.value = LoginUiState.Idle
+                    } else {
+                        _state.value = LoginUiState.Error(e.localizedMessage ?: "Error Facebook: ${e.message}")
+                    }
+                }
+        }
     }
 
     fun clearError() { _state.value = LoginUiState.Idle }
