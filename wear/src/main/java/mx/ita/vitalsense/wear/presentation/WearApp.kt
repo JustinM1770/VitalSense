@@ -82,6 +82,7 @@ fun WearApp(isAmbient: Boolean = false) {
     var isPaired by remember { mutableStateOf(prefs.getBoolean(KEY_PAIRED, false)) }
     var pairingCode by remember { mutableStateOf(prefs.getString(KEY_PAIRING_CODE, "") ?: "") }
     var isAuthenticated by remember { mutableStateOf(auth.currentUser != null) }
+    var showSuccessScreen by remember { mutableStateOf(false) }
     
     // Auth Anónima
     LaunchedEffect(Unit) {
@@ -147,6 +148,19 @@ fun WearApp(isAmbient: Boolean = false) {
         }
     }
 
+    // --- 5. Unpairing logic helper ---
+    val unpairWatch = {
+        prefs.edit()
+            .putBoolean(KEY_PAIRED, false)
+            .remove(KEY_USER_ID)
+            .remove(KEY_PAIRING_CODE)
+            .apply()
+        isPaired = false
+        pairingCode = ""
+        val intent = Intent(context, VitalSignsService::class.java)
+        context.stopService(intent)
+    }
+
     // UI
     VitalSenseWearTheme {
         Box(
@@ -155,6 +169,8 @@ fun WearApp(isAmbient: Boolean = false) {
         ) {
             if (!isPaired) {
                 CodeScreen(pairingCode)
+            } else if (showSuccessScreen) {
+                SuccessScreen()
             } else if (!hasPermission) {
                 PermissionScreen { launcher.launch(permissions) }
             } else {
@@ -170,40 +186,205 @@ fun WearApp(isAmbient: Boolean = false) {
 
     // Vinculación mejorada con persistencia de USER_ID
     LaunchedEffect(pairingCode, isAuthenticated) {
-        if (!isPaired && isAuthenticated && pairingCode.isNotEmpty()) {
+        if (isAuthenticated && pairingCode.isNotEmpty()) {
             val ref = database.getReference("pairing_codes").child(pairingCode)
-            ref.setValue(mapOf(
-                "code" to pairingCode, "active" to true, "paired" to false, 
-                "deviceName" to Build.MODEL, "timestamp" to System.currentTimeMillis()
-            ))
+            
+            // Si no está emparejado, inicializamos el código en Firebase
+            if (!isPaired) {
+                ref.setValue(mapOf(
+                    "code" to pairingCode, "active" to true, "paired" to false, 
+                    "deviceName" to Build.MODEL, "timestamp" to System.currentTimeMillis()
+                ))
+            }
+            
             ref.addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!snapshot.exists()) {
+                        if (isPaired) {
+                            unpairWatch()
+                        }
+                        return
+                    }
+                    
                     val paired = snapshot.child("paired").getValue(Boolean::class.java) ?: false
                     val remoteUid = snapshot.child("userId").getValue(String::class.java) ?: "global"
                     
-                    if (paired) {
+                    if (paired && !isPaired) {
                         prefs.edit()
                             .putBoolean(KEY_PAIRED, true)
                             .putString(KEY_USER_ID, remoteUid)
                             .apply()
                         isPaired = true
+                        showSuccessScreen = true
+                    } else if (!paired && isPaired) {
+                        unpairWatch()
                     }
                 }
                 override fun onCancelled(error: DatabaseError) {}
             })
         }
     }
+
+    LaunchedEffect(showSuccessScreen) {
+        if (showSuccessScreen) {
+            delay(3000)
+            showSuccessScreen = false
+        }
+    }
 }
 
 @Composable
 fun CodeScreen(code: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-        Text("Vincular Reloj", color = Color.Gray, fontSize = 12.sp)
-        Spacer(Modifier.height(8.dp))
-        Text(code, color = Color(0xFF3B82F6), fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text("Ingresa este código en la sección 'Conectar Wearable' de tu teléfono.", 
-            textAlign = TextAlign.Center, color = Color.DarkGray, fontSize = 10.sp)
+    var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    val timeFormatter = DateTimeFormatter.ofPattern("H:mm")
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = LocalTime.now()
+            delay(1000L)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(16.dp)
+    ) {
+        // Hora superior derecha (color negro porque el fondo es blanco)
+        Text(
+            text = currentTime.format(timeFormatter),
+            color = Color.Black,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 16.dp, top = 12.dp)
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            // Logo VitalSense
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Vital",
+                    color = Color(0xFF1E293B), // Slate 800
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Sense",
+                    color = Color(0xFF3B82F6), // Blue 500
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // Código espaciado
+            val formattedCode = code.chunked(1).joinToString(" ")
+            Text(
+                text = formattedCode,
+                color = Color(0xFF3B82F6), // Blue 500
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 2.sp
+            )
+            
+            Spacer(Modifier.height(16.dp))
+            
+            Text(
+                text = "El Código Expira\nEn 5 Minutos", 
+                textAlign = TextAlign.Center, 
+                color = Color(0xFF475569), // Slate 600
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun SuccessScreen() {
+    var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    val timeFormatter = DateTimeFormatter.ofPattern("H:mm")
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = LocalTime.now()
+            delay(1000L)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(16.dp)
+    ) {
+        // Hora superior derecha
+        Text(
+            text = currentTime.format(timeFormatter),
+            color = Color.Black,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 16.dp, top = 12.dp)
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            // Logo VitalSense
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Vital",
+                    color = Color(0xFF1E293B), // Slate 800
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Sense",
+                    color = Color(0xFF3B82F6), // Blue 500
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // Green Checkmark icon
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(Color(0xFF34C759), shape = CircleShape), // Verde
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.wear.compose.material.Text(
+                    text = "✓",
+                    color = Color.White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            Text(
+                text = "Verificación Exitosa", 
+                textAlign = TextAlign.Center, 
+                color = Color(0xFF475569), // Slate 600
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
