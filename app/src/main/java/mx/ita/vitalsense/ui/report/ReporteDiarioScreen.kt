@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import mx.ita.vitalsense.ui.components.BottomNav
 import mx.ita.vitalsense.ui.components.BottomNavTab
-import mx.ita.vitalsense.ui.dashboard.DashWhiteCard
 import mx.ita.vitalsense.ui.theme.ChartRed
 import mx.ita.vitalsense.ui.theme.DashBg
 import mx.ita.vitalsense.ui.theme.DashBlue
@@ -52,6 +51,20 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
+
+@Composable
+fun DashWhiteCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White)
+    ) {
+        content()
+    }
+}
 
 @Composable
 fun ReporteDiarioScreen(

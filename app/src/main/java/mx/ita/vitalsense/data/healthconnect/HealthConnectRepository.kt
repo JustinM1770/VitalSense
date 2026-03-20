@@ -18,6 +18,7 @@ data class HealthConnectVitals(
     val heartRate: Int? = null,
     val glucose: Double? = null,
     val spo2: Int? = null,
+    val timestamp: java.time.Instant? = null
 )
 
 class HealthConnectRepository(private val context: Context) {
@@ -43,7 +44,10 @@ class HealthConnectRepository(private val context: Context) {
                 pageSize = 1
             )
         )
-        val hr = hrResponse.records.firstOrNull()?.samples?.firstOrNull()?.beatsPerMinute?.toInt()
+        val hrRecord = hrResponse.records.firstOrNull()
+        val hrSample = hrRecord?.samples?.lastOrNull() 
+        val hr = hrSample?.beatsPerMinute?.toInt()
+        val hrTime = hrSample?.time ?: hrRecord?.startTime 
 
         val spo2Response = healthConnectClient.readRecords(
             ReadRecordsRequest(
@@ -53,7 +57,9 @@ class HealthConnectRepository(private val context: Context) {
                 pageSize = 1
             )
         )
-        val spo2 = spo2Response.records.firstOrNull()?.percentage?.value?.times(100)?.toInt()
+        val spo2Record = spo2Response.records.firstOrNull()
+        val spo2 = spo2Record?.percentage?.value?.times(100)?.toInt()
+        val spo2Time = spo2Record?.time
 
         val glucoseResponse = healthConnectClient.readRecords(
             ReadRecordsRequest(
@@ -63,9 +69,18 @@ class HealthConnectRepository(private val context: Context) {
                 pageSize = 1
             )
         )
-        val glucose = glucoseResponse.records.firstOrNull()?.level?.inMilligramsPerDeciliter
+        val glucoseRecord = glucoseResponse.records.firstOrNull()
+        val glucose = glucoseRecord?.level?.inMilligramsPerDeciliter
+        val glucoseTime = glucoseRecord?.time
 
-        return HealthConnectVitals(heartRate = hr, spo2 = spo2, glucose = glucose)
+        val latestTime = listOfNotNull(hrTime, spo2Time, glucoseTime).maxOrNull()
+
+        return HealthConnectVitals(
+            heartRate = hr, 
+            spo2 = spo2, 
+            glucose = glucose,
+            timestamp = latestTime
+        )
     }
 
     suspend fun readSleepData(): SleepData? {

@@ -50,6 +50,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     val prefsShared = remember { context.getSharedPreferences("vitalsense_watch_prefs", Context.MODE_PRIVATE) }
     val isWatchPaired = remember { mutableStateOf(prefsShared.getBoolean("code_paired", false)) }
+    val pairedDeviceName = remember { mutableStateOf(prefsShared.getString("paired_device_name", "Wearable") ?: "Wearable") }
     
     val currentUser = FirebaseAuth.getInstance().currentUser
     val displayName = currentUser?.displayName ?: ""
@@ -177,73 +178,6 @@ fun ProfileScreen(
                     }
 
                     Spacer(Modifier.height(30.dp))
-
-                    // Watch Status Section (Integrated from Local)
-                    Text(
-                        "Dispositivos Vinculados",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1A1A2E),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Tarjeta de Reloj
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onDeviceClick() },
-                        shape = RoundedCornerShape(16.dp),
-                        color = DashBg.copy(alpha = 0.5f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isWatchPaired.value) SuccessGreen.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Watch,
-                                    contentDescription = null,
-                                    tint = if (isWatchPaired.value) SuccessGreen else Color.Gray,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-
-                            Spacer(Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Galaxy Watch 4",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
-                                    color = Color(0xFF1A1A2E)
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isWatchPaired.value) SuccessGreen else Color.Gray)
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        if (isWatchPaired.value) "Sincronizado" else "No vinculado",
-                                        fontSize = 12.sp,
-                                        color = if (isWatchPaired.value) SuccessGreen else Color.Gray
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(28.dp))
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(

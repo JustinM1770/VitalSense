@@ -12,13 +12,10 @@ import mx.ita.vitalsense.data.model.VitalsSnapshot
 
 class VitalsRepository {
 
-<<<<<<< HEAD
+    private val db = FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com")
     private val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-    private fun getVitalsRef() = FirebaseDatabase.getInstance()
-        .getReference("vitals/current/${auth.currentUser?.uid ?: "global"}")
-=======
-    private val db = FirebaseDatabase.getInstance()
->>>>>>> 5b14bb15ac5277f3be8467bf84e007c83ca41308
+
+    private fun getVitalsRef() = db.getReference("vitals/current/${auth.currentUser?.uid ?: "global"}")
 
     // ── Multiusuario: todos los pacientes bajo "patients/" ──────────────────
     fun observePatients(): Flow<Result<List<VitalsData>>> = callbackFlow {
@@ -95,11 +92,7 @@ class VitalsRepository {
 
     // ── Un solo paciente (usado por DeviceScan / BLE) ────────────────────────
     fun observeVitals(): Flow<Result<VitalsData>> = callbackFlow {
-<<<<<<< HEAD
         val ref = getVitalsRef()
-=======
-        val ref = db.getReference("vitals/current")
->>>>>>> 5b14bb15ac5277f3be8467bf84e007c83ca41308
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
@@ -114,10 +107,7 @@ class VitalsRepository {
                 trySend(Result.failure(error.toException()))
             }
         }
-<<<<<<< HEAD
 
-=======
->>>>>>> 5b14bb15ac5277f3be8467bf84e007c83ca41308
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }

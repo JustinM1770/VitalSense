@@ -1,6 +1,6 @@
 package mx.ita.vitalsense.ui.dashboard
 
-import androidx.compose.foundation.Canvas
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -80,7 +80,7 @@ fun DashboardScreen(
     val userName = currentUser?.displayName ?: "Usuario"
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = Color(0xFFF7F9FC),
@@ -107,7 +107,7 @@ fun DashboardScreen(
                 onSearchClick = {
                     coroutineScope.launch { snackbarHostState.showSnackbar("Función de búsqueda en desarrollo") }
                 },
-                onSettingsClick = onNavigateToProfile
+                onSettingsClick = { showSettingsDialog = true }
             )
 
             Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp))
@@ -155,6 +155,17 @@ fun DashboardScreen(
 
                 Spacer(Modifier.height(40.dp))
             }
+        }
+        
+        if (showSettingsDialog) {
+            SettingsDialog(
+                isWatchPaired = uiState.isWatchPaired,
+                onDismiss = { showSettingsDialog = false },
+                onWearableClick = {
+                    showSettingsDialog = false
+                    onConnectDevice()
+                }
+            )
         }
     }
 }
@@ -545,4 +556,95 @@ private fun WatchStatusCard(
             }
         }
     }
+}
+
+@Composable
+fun SettingsDialog(
+    isWatchPaired: Boolean,
+    onDismiss: () -> Unit,
+    onWearableClick: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = androidx.compose.runtime.remember { context.getSharedPreferences("vitalsense_watch_prefs", android.content.Context.MODE_PRIVATE) }
+    var requireBiometric by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(prefs.getBoolean("require_biometric", false)) }
+    
+    val hcViewModel: mx.ita.vitalsense.ui.device.HealthConnectViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val errorMessage by hcViewModel.errorMessage.collectAsState()
+    
+    androidx.compose.runtime.LaunchedEffect(errorMessage) {
+        if (!errorMessage.isNullOrEmpty()) {
+            android.widget.Toast.makeText(context, errorMessage, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    
+    val permissionContract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+    val hcLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        permissionContract
+    ) { _ -> 
+        hcViewModel.loadHealthConnectData()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Configuración", fontWeight = FontWeight.Bold, color = TextDark)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.fillMaxWidth()) {
+                // Wearable
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                    onWearableClick()
+                }) {
+                    Box(modifier = Modifier.size(40.dp).background(PrimaryBlue.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Watch, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Wearable", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text(if (isWatchPaired) "Conectado y enviando datos" else "Desconectado", fontSize = 12.sp, color = TextGray)
+                    }
+                }
+                
+                // Health Connect
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                    hcViewModel.checkAndRequestPermissions(hcLauncher)
+                }) {
+                    Box(modifier = Modifier.size(40.dp).background(SuccessGreen.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Favorite, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Sincronizar Sueño", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text("Vincular con Health Connect", fontSize = 12.sp, color = TextGray)
+                    }
+                }
+
+                // Biometrics
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(40.dp).background(Color(0xFFE0E0E0), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Fingerprint, contentDescription = null, tint = TextDark, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Seguridad Biométrica", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text("Huella o rostro al iniciar app", fontSize = 12.sp, color = TextGray)
+                    }
+                    Switch(
+                        checked = requireBiometric,
+                        onCheckedChange = { 
+                            requireBiometric = it
+                            prefs.edit().putBoolean("require_biometric", it).apply()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue, checkedTrackColor = PrimaryBlue.copy(alpha = 0.5f))
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Listo", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color.White
+    )
 }

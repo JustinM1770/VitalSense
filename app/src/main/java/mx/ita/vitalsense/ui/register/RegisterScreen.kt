@@ -252,7 +252,7 @@ fun RegisterScreen(
 
             // ── Google Button ────────────────────────────────────────────
             OutlinedButton(
-                onClick = { /* TODO: Google register */ },
+                onClick = { vm.signInWithGoogle(context) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
