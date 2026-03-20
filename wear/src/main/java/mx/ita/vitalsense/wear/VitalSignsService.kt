@@ -69,7 +69,9 @@ class VitalSignsService : Service() {
         val userId = prefs.getString("user_id", "global") ?: "global"
         
         startHrMonitoring(userId)
-        startSleepSync(userId)
+        // La sincronización de sueño fue removida de aquí.
+        // Ahora la aplicación del teléfono se encarga de leer los datos reales
+        // del sueño a través de Health Connect.
         
         return START_STICKY
     }
@@ -81,29 +83,6 @@ class VitalSignsService : Service() {
                 _currentHeartRate.value = hr
                 database.getReference("vitals/current").child(userId)
                     .updateChildren(mapOf("heartRate" to hr.toInt(), "timestamp" to System.currentTimeMillis()))
-            }
-        }
-    }
-
-    private fun startSleepSync(userId: String) {
-        sleepJob?.cancel()
-        sleepJob = serviceScope.launch {
-            while (isActive) {
-                // Simulación de sueño (85%, 7.5h) para demostración
-                val dateKey = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                } else {
-                    "2026-03-19"
-                }
-                
-                val sleepMap = mapOf(
-                    "score" to 85,
-                    "horas" to 7.5,
-                    "estado" to "Bueno"
-                )
-                
-                database.getReference("sleep/$userId/$dateKey").setValue(sleepMap)
-                delay(15 * 60 * 1000) // Cada 15 min
             }
         }
     }
