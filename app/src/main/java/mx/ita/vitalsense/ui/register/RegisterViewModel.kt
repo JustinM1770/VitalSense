@@ -48,11 +48,25 @@ class RegisterViewModel : ViewModel() {
             repo.signInWithGoogle(context)
                 .onSuccess  { _state.value = RegisterUiState.Success }
                 .onFailure  { e ->
-                    // Cancelación voluntaria → volver a Idle sin error
                     if (e.message?.contains("cancel", ignoreCase = true) == true) {
                         _state.value = RegisterUiState.Idle
                     } else {
                         _state.value = RegisterUiState.Error(e.localizedMessage ?: "Error Google: ${e.message}")
+                    }
+                }
+        }
+    }
+
+    fun signInWithFacebook(context: Context) {
+        viewModelScope.launch {
+            _state.value = RegisterUiState.Loading
+            repo.signInWithFacebook(context)
+                .onSuccess  { _state.value = RegisterUiState.Success }
+                .onFailure  { e ->
+                    if (e.message?.contains("cancel", ignoreCase = true) == true) {
+                        _state.value = RegisterUiState.Idle
+                    } else {
+                        _state.value = RegisterUiState.Error(e.localizedMessage ?: "Error Facebook: ${e.message}")
                     }
                 }
         }

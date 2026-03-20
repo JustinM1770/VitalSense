@@ -1,17 +1,11 @@
 package mx.ita.vitalsense.ui.profile
 
+import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,15 +20,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -51,6 +42,7 @@ import mx.ita.vitalsense.ui.theme.Manrope
 
 @Composable
 fun ProfileScreen(
+    onDeviceClick: () -> Unit = {},
     onBack: () -> Unit = {},
     onSignOut: () -> Unit = {},
     onDatosImportantes: () -> Unit = {},
@@ -59,6 +51,11 @@ fun ProfileScreen(
     onNotifClick: () -> Unit = {},
     vm: ProfileViewModel = viewModel(),
 ) {
+    val context = LocalContext.current
+    val prefsShared = remember { context.getSharedPreferences("vitalsense_watch_prefs", Context.MODE_PRIVATE) }
+    val isWatchPaired = remember { mutableStateOf(prefsShared.getBoolean("code_paired", false)) }
+    val pairedDeviceName = remember { mutableStateOf(prefsShared.getString("paired_device_name", "Wearable") ?: "Wearable") }
+
     val currentUser = FirebaseAuth.getInstance().currentUser
     val displayName = currentUser?.displayName ?: ""
     val parts = displayName.split(" ")
@@ -77,7 +74,7 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 90.dp),
+                .padding(bottom = 100.dp),
         ) {
             Spacer(Modifier.height(52.dp))
 
@@ -182,7 +179,7 @@ fun ProfileScreen(
                         ProfileField(modifier = Modifier.weight(1f), label = "Edad", value = edad, onValueChange = { edad = it }, keyboardType = KeyboardType.Number)
                     }
 
-                    Spacer(Modifier.height(28.dp))
+                    Spacer(Modifier.height(30.dp))
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
@@ -203,7 +200,7 @@ fun ProfileScreen(
                         }
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(24.dp))
                     Text(
                         text = "Cerrar sesión",
                         fontFamily = Manrope,

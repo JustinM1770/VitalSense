@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>576196499899-64b9179g789khvjv8q1idqvet829bpvj.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.576196499899-64b9179g789khvjv8q1idqvet829bpvj</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>576196499899-i3almkkrlle3lk61rm1fviqn0q1vponu.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyC031HwEG-y0cCvdcASeJ7hPRPhezWmZnY</string>
+	<key>GCM_SENDER_ID</key>
+	<string>576196499899</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>mx.ita.vitalsense.ios</string>
+	<key>PROJECT_ID</key>
+	<string>vitalsenseai-1cb9f</string>
+	<key>STORAGE_BUCKET</key>
+	<string>vitalsenseai-1cb9f.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:576196499899:ios:7e4204c793ee2e0e0b4c9e</string>
+	<key>DATABASE_URL</key>
+	<string>https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>

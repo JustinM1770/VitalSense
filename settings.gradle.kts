@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "VitalSense"
 include(":app")
+include(":wear")

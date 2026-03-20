@@ -29,7 +29,12 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Watch
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,12 +42,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -106,6 +117,7 @@ fun DashboardScreen(
     val userName = currentUser?.displayName ?: "Usuario"
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(DashBg)) {
         when (val state = uiState) {
@@ -117,6 +129,7 @@ fun DashboardScreen(
                 val sleepData = if (state is DashboardUiState.Success) state.sleepData else null
                 val vitalsHistory = if (state is DashboardUiState.Success) state.vitalsHistory else emptyList()
                 val medications = if (state is DashboardUiState.Success) state.medications else emptyList()
+                val isWatchPaired = state.isWatchPaired
 
                 DashboardContent(
                     userName = userName,
@@ -124,6 +137,7 @@ fun DashboardScreen(
                     sleepData = sleepData,
                     vitalsHistory = vitalsHistory,
                     medications = medications,
+                    isWatchPaired = isWatchPaired,
                     onPatientClick = onPatientClick,
                     onReportClick = onReportClick,
                     onProfileClick = { onNavigateToProfile(); onProfileClick() },
@@ -133,6 +147,9 @@ fun DashboardScreen(
                     onSearchClick = {
                         coroutineScope.launch { snackbarHostState.showSnackbar("Función de búsqueda en desarrollo") }
                     },
+                    onConnectDevice = onConnectDevice,
+                    onSettingsClick = { showSettingsDialog = true },
+                    onDisconnectWatch = { vm.disconnectWatch() },
                 )
             }
         }
@@ -154,6 +171,17 @@ fun DashboardScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
         )
+
+        if (showSettingsDialog) {
+            SettingsDialog(
+                isWatchPaired = uiState.isWatchPaired,
+                onDismiss = { showSettingsDialog = false },
+                onWearableClick = {
+                    showSettingsDialog = false
+                    onConnectDevice()
+                }
+            )
+        }
     }
 }
 
@@ -166,6 +194,7 @@ private fun DashboardContent(
     sleepData: SleepData?,
     vitalsHistory: List<VitalsData>,
     medications: List<Medication>,
+    isWatchPaired: Boolean,
     onPatientClick: (String) -> Unit,
     onReportClick: () -> Unit,
     onProfileClick: () -> Unit,
@@ -173,6 +202,9 @@ private fun DashboardContent(
     onDetailedClick: () -> Unit,
     snackbarHostState: SnackbarHostState,
     onSearchClick: () -> Unit,
+    onConnectDevice: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onDisconnectWatch: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -194,10 +226,22 @@ private fun DashboardContent(
         // ── Search bar ───────────────────────────────────────────────────────
         SearchBar(
             onSearchClick = onSearchClick,
-            onSettingsClick = onProfileClick,
+            onSettingsClick = onSettingsClick,
         )
 
         Spacer(Modifier.height(24.dp))
+
+        // ── Device connection card (only if not paired) ───────────────────────
+        if (!isWatchPaired) {
+            DeviceConnectionCard(onClick = onConnectDevice)
+            Spacer(Modifier.height(24.dp))
+        } else {
+            WatchStatusCard(
+                onDisconnect = onDisconnectWatch,
+                onClick = onConnectDevice,
+            )
+            Spacer(Modifier.height(24.dp))
+        }
 
         // ── Blue rounded container ────────────────────────────────────────────
         Column(
@@ -297,6 +341,26 @@ private fun UserHeader(
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
 ) {
+    // Dynamic badge: check Firebase for unread alerts
+    var hasUnread by remember { mutableStateOf(false) }
+    val auth = FirebaseAuth.getInstance()
+    DisposableEffect(Unit) {
+        val userId = auth.currentUser?.uid ?: "global"
+        val db = com.google.firebase.database.FirebaseDatabase.getInstance()
+        val ref = db.getReference("alerts").child(userId)
+        val listener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                hasUnread = snapshot.children.any { child ->
+                    val data = child.value as? Map<String, Any>
+                    data != null && data["read"] != true
+                }
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        }
+        ref.addValueEventListener(listener)
+        onDispose { ref.removeEventListener(listener) }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -343,14 +407,16 @@ private fun UserHeader(
                     tint = TextDark
                 )
             }
-            // Red dot
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(Color.Red, CircleShape)
-                    .align(Alignment.TopEnd)
-                    .offset(x = (-10).dp, y = 10.dp)
-            )
+            // Red dot – only if there are unread alerts
+            if (hasUnread) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(Color.Red, CircleShape)
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-8).dp, y = 8.dp)
+                )
+            }
         }
     }
 }
@@ -398,6 +464,101 @@ private fun SearchBar(onSearchClick: () -> Unit, onSettingsClick: () -> Unit) {
     }
 }
 
+// ─── Device Connection Card ───────────────────────────────────────────────────
+
+@Composable
+private fun DeviceConnectionCard(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        color = PrimaryBlue,
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.Bluetooth, contentDescription = null, tint = Color.White)
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Vincular Reloj / Sensor", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Sincroniza tus signos vitales", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+            }
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = Color.White)
+        }
+    }
+}
+
+// ─── Watch Status Card ────────────────────────────────────────────────────────
+
+@Composable
+private fun WatchStatusCard(
+    onDisconnect: () -> Unit,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        shadowElevation = 2.dp,
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(SuccessGreen, CircleShape)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Galaxy Watch 4 vinculado",
+                    color = SuccessGreen,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.weight(1f))
+                Text("Sincronizado", color = SuccessGreen, fontSize = 11.sp)
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "El reloj está enviando datos en tiempo real.",
+                    fontSize = 12.sp,
+                    color = TextGray,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    onClick = onDisconnect,
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("Desvincular", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
 // ─── Section header ───────────────────────────────────────────────────────────
 
 @Composable
@@ -423,7 +584,6 @@ private fun SleepMetricCard(sleepData: SleepData?, pctFallback: Int, onClick: ()
             modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Circular progress ring
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     progress = { progress },
@@ -514,7 +674,7 @@ private fun HealthMetricsGraphCard(
 
             Spacer(Modifier.height(16.dp))
 
-            // Chart using Canvas (Justin's bezier implementation)
+            // Chart using Canvas (bezier implementation)
             WeeklyHrChart(patients = patients)
 
             // Tooltip overlay
@@ -740,3 +900,96 @@ fun WhiteCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 // Keep DashWhiteCard as alias for backward compatibility
 @Composable
 fun DashWhiteCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) = WhiteCard(modifier, content)
+
+// ─── Settings Dialog ──────────────────────────────────────────────────────────
+
+@Composable
+fun SettingsDialog(
+    isWatchPaired: Boolean,
+    onDismiss: () -> Unit,
+    onWearableClick: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("vitalsense_watch_prefs", android.content.Context.MODE_PRIVATE) }
+    var requireBiometric by remember { mutableStateOf(prefs.getBoolean("require_biometric", false)) }
+
+    val hcViewModel: mx.ita.vitalsense.ui.device.HealthConnectViewModel = viewModel()
+    val errorMessage by hcViewModel.errorMessage.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(errorMessage) {
+        if (!errorMessage.isNullOrEmpty()) {
+            android.widget.Toast.makeText(context, errorMessage, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val permissionContract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+    val hcLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        permissionContract
+    ) { _ ->
+        hcViewModel.loadHealthConnectData()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Configuración", fontWeight = FontWeight.Bold, color = TextDark)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.fillMaxWidth()) {
+                // Wearable
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                    onWearableClick()
+                }) {
+                    Box(modifier = Modifier.size(40.dp).background(PrimaryBlue.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Watch, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Wearable", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text(if (isWatchPaired) "Conectado y enviando datos" else "Desconectado", fontSize = 12.sp, color = TextGray)
+                    }
+                }
+
+                // Health Connect
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                    hcViewModel.checkAndRequestPermissions(hcLauncher)
+                }) {
+                    Box(modifier = Modifier.size(40.dp).background(SuccessGreen.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Favorite, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Sincronizar Sueño", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text("Vincular con Health Connect", fontSize = 12.sp, color = TextGray)
+                    }
+                }
+
+                // Biometrics
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(40.dp).background(Color(0xFFE0E0E0), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Fingerprint, contentDescription = null, tint = TextDark, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Seguridad Biométrica", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text("Huella o rostro al iniciar app", fontSize = 12.sp, color = TextGray)
+                    }
+                    Switch(
+                        checked = requireBiometric,
+                        onCheckedChange = {
+                            requireBiometric = it
+                            prefs.edit().putBoolean("require_biometric", it).apply()
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue, checkedTrackColor = PrimaryBlue.copy(alpha = 0.5f))
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Listo", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color.White
+    )
+}

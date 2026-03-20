@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.google.services)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "mx.ita.vitalsense"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -38,6 +38,8 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -49,17 +51,32 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.navigation.compose)
+    implementation(libs.core.splashscreen)
+
+    // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.database)
     implementation(libs.firebase.auth)
+    implementation(libs.firebase.messaging)
+
+    // Auth
     implementation(libs.auth.manager)
     implementation(libs.auth.play.services)
     implementation(libs.googleid)
+
+    // Facebook Login
+    implementation("com.facebook.android:facebook-login:latest.release")
+
+    // Health Connect
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha11")
+
+    // Biometrics and Fragment compatibility
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
+
+    // Charts & Utils
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.firebase.messaging)
-    implementation(libs.navigation.compose)
-    implementation(libs.core.splashscreen)
-    coreLibraryDesugaring(libs.desugar.jdk.libs)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
