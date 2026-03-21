@@ -10,12 +10,15 @@ android {
 
     defaultConfig {
         applicationId = "mx.ita.vitalsense"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val claudeApiKey = project.findProperty("CLAUDE_API_KEY")?.toString() ?: ""
+        buildConfigField("String", "CLAUDE_API_KEY", "\"$claudeApiKey\"")
     }
 
     buildTypes {
@@ -34,6 +37,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -60,6 +64,9 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.core.splashscreen)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(libs.okhttp)
+    implementation(libs.facebook.android.sdk)
+    implementation(libs.androidx.health.connect)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

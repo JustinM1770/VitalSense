@@ -1,11 +1,8 @@
 package mx.ita.vitalsense.ui.navigation
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,7 +10,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
+import mx.ita.vitalsense.ui.profile.ProfileScreen
+import mx.ita.vitalsense.ui.forgotpassword.ForgotPasswordScreen
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -23,6 +23,7 @@ import mx.ita.vitalsense.ui.cuestionario.CuestionarioScreen
 import mx.ita.vitalsense.ui.dashboard.DashboardScreen
 import mx.ita.vitalsense.ui.device.DeviceScanScreen
 import mx.ita.vitalsense.ui.documentos.DocumentosScreen
+import mx.ita.vitalsense.ui.forgotpassword.ForgotPasswordScreen
 import mx.ita.vitalsense.ui.login.LoginScreen
 import mx.ita.vitalsense.ui.notifications.NotificacionesScreen
 import mx.ita.vitalsense.ui.onboarding.OnboardingScreen
@@ -40,16 +41,18 @@ object Route {
     const val ONBOARDING            = "onboarding"
     const val REGISTER              = "register"
     const val LOGIN                 = "login"
-    const val CUESTIONARIO          = "cuestionario"   // Miguel: flujo de cuestionarios
+    const val FORGOT_PASSWORD       = "forgot_password"
+    const val CUESTIONARIO          = "cuestionario"
     const val DASHBOARD             = "dashboard"
     const val DEVICE                = "device"
     const val PROFILE               = "profile"
-    const val EDITAR_PERFIL         = "editar_perfil"  // Omar: editar datos personales
+    const val EDITAR_PERFIL         = "editar_perfil"
     const val PATIENT_DETAIL        = "patient_detail"
     const val REPORTE_DIARIO        = "reporte_diario"
     const val DAILY_REPORT          = "daily_report"
-    const val REPORTE_DETALLADO     = "reporte_detallado"  // Jonathan: gráfica expandida
+    const val REPORTE_DETALLADO     = "reporte_detallado"
     const val DETAILED_REPORT       = "detailed_report"
+    const val SLEEP_DETAIL          = "sleep_detail"
     const val NOTIFICACIONES        = "notificaciones"
     const val NOTIFICATIONS         = "notifications"
     const val DATOS_IMPORTANTES     = "datos_importantes"
@@ -72,6 +75,7 @@ fun AppNavigation() {
         Route.NOTIFICACIONES,
         Route.NOTIFICATIONS,
         Route.PROFILE,
+        Route.EDITAR_PERFIL,
         Route.CHAT,
     )
     val showBottomBar = currentRoute in bottomBarRoutes
@@ -107,18 +111,6 @@ fun AppNavigation() {
                     )
                 }
 
-                composable(Route.REGISTER) {
-                    RegisterScreen(
-                        onBack = { navController.popBackStack() },
-                        onRegisterSuccess = {
-                            navController.navigate(Route.CUESTIONARIO) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
-                        onLoginClick = { navController.navigate(Route.LOGIN) },
-                    )
-                }
-
                 composable(Route.LOGIN) {
                     LoginScreen(
                         onBack = { navController.popBackStack() },
@@ -128,6 +120,29 @@ fun AppNavigation() {
                             }
                         },
                         onRegisterClick = { navController.navigate(Route.REGISTER) },
+                        onForgotPassword = { navController.navigate(Route.FORGOT_PASSWORD) },
+                    )
+                }
+
+                composable(Route.FORGOT_PASSWORD) {
+                    ForgotPasswordScreen(
+                        onBack = { navController.navigateUp() },
+                        onBackToLogin = {
+                            navController.navigate(Route.LOGIN) {
+                                popUpTo(Route.LOGIN) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+                composable(Route.REGISTER) {
+                    RegisterScreen(
+                        onBack = { navController.popBackStack() },
+                        onRegisterSuccess = {
+                            navController.navigate(Route.CUESTIONARIO) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onLoginClick = { navController.navigate(Route.LOGIN) },
                     )
                 }
 
@@ -174,6 +189,28 @@ fun AppNavigation() {
 
                 composable(Route.PROFILE) {
                     ProfileScreen(
+                        onDeviceClick = { navController.navigate(Route.DEVICE) },
+                        onBack = { navController.navigateUp() },
+                        onSignOut = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate(Route.LOGIN) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onDatosImportantes = { navController.navigate(Route.DATOS_IMPORTANTES) },
+                        onHomeClick = {
+                            navController.navigate(Route.DASHBOARD) {
+                                popUpTo(Route.DASHBOARD) { inclusive = false }
+                            }
+                        },
+                        onHealthClick  = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onNotifClick   = { navController.navigate(Route.NOTIFICACIONES) },
+                    )
+                }
+
+                composable(Route.EDITAR_PERFIL) {
+                    ProfileScreen(
+                        onDeviceClick = { navController.navigate(Route.DEVICE) },
                         onBack = { navController.popBackStack() },
                         onSignOut = {
                             FirebaseAuth.getInstance().signOut()
@@ -187,8 +224,8 @@ fun AppNavigation() {
                                 popUpTo(Route.DASHBOARD) { inclusive = false }
                             }
                         },
-                        onHealthClick  = { navController.navigate(Route.REPORTE_DIARIO) },
-                        onNotifClick   = { navController.navigate(Route.NOTIFICACIONES) },
+                        onHealthClick = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onNotifClick  = { navController.navigate(Route.NOTIFICACIONES) },
                     )
                 }
 
@@ -208,7 +245,30 @@ fun AppNavigation() {
                 composable(Route.DAILY_REPORT) {
                     DailyReportScreen(
                         onBack = { navController.popBackStack() },
-                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) }
+                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
+                        onNavigateToSleepDetail = { score, horas, estado ->
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&horas=$horas&estado=$estado")
+                        }
+                    )
+                }
+
+                composable(
+                    route = "${Route.SLEEP_DETAIL}?score={score}&horas={horas}&estado={estado}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("score") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
+                        androidx.navigation.navArgument("horas") { defaultValue = 0f; type = androidx.navigation.NavType.FloatType },
+                        androidx.navigation.navArgument("estado") { defaultValue = "Sin Datos"; type = androidx.navigation.NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val score = backStackEntry.arguments?.getInt("score") ?: 0
+                    val horas = backStackEntry.arguments?.getFloat("horas") ?: 0f
+                    val estado = backStackEntry.arguments?.getString("estado") ?: "Sin Datos"
+                    mx.ita.vitalsense.ui.reports.SleepDetailScreen(
+                        score = score,
+                        horas = horas,
+                        estado = estado,
+                        onBack = { navController.navigateUp() }
+
                     )
                 }
 
@@ -226,15 +286,30 @@ fun AppNavigation() {
                 }
 
                 composable(Route.NOTIFICATIONS) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Pantalla de Notificaciones")
-                        Button(
-                            onClick = { navController.popBackStack() },
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        ) {
-                            Text("Volver")
-                        }
-                    }
+                    NotificacionesScreen(
+                        onBack = { navController.navigateUp() },
+                        onHomeClick = {
+                            navController.navigate(Route.DASHBOARD) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onHealthClick = {
+                            navController.navigate(Route.DAILY_REPORT) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onProfileClick = {
+                            navController.navigate(Route.PROFILE) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                    )
                 }
 
                 composable(Route.DATOS_IMPORTANTES) {
@@ -254,28 +329,7 @@ fun AppNavigation() {
                     DocumentosScreen(onBack = { navController.popBackStack() })
                 }
 
-                // ── Editar Perfil (Omar implementa la pantalla completa) ──────────────
-                composable(Route.EDITAR_PERFIL) {
-                    ProfileScreen(
-                        onBack = { navController.popBackStack() },
-                        onSignOut = {
-                            FirebaseAuth.getInstance().signOut()
-                            navController.navigate(Route.ONBOARDING) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
-                        onDatosImportantes = { navController.navigate(Route.DATOS_IMPORTANTES) },
-                        onHomeClick   = {
-                            navController.navigate(Route.DASHBOARD) {
-                                popUpTo(Route.DASHBOARD) { inclusive = false }
-                            }
-                        },
-                        onHealthClick = { navController.navigate(Route.REPORTE_DIARIO) },
-                        onNotifClick  = { navController.navigate(Route.NOTIFICACIONES) },
-                    )
-                }
-
-                // ── Reporte Detallado (Jonathan implementa la pantalla) ───────────────
+                // ── Reporte Detallado ─────────────────────────────────────────
                 composable("${Route.REPORTE_DETALLADO}/{patientId}") { backStackEntry ->
                     val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
                     PatientDetailScreen(
@@ -285,8 +339,8 @@ fun AppNavigation() {
                 }
 
                 composable(Route.DETAILED_REPORT) {
-                    PatientDetailScreen(
-                        onBack = { navController.popBackStack() }
+                    mx.ita.vitalsense.ui.reports.DetailedReportScreen(
+                        onBack = { navController.navigateUp() }
                     )
                 }
 

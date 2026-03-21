@@ -40,6 +40,7 @@ import kotlin.math.sin
 fun DailyReportScreen(
     onBack: () -> Unit,
     onNavigateToDetailed: () -> Unit,
+    onNavigateToSleepDetail: (Int, Float, String) -> Unit = { _, _, _ -> },
     vm: DailyReportViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()

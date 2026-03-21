@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "576196499899",
+    "firebase_url": "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com",
+    "project_id": "vitalsenseai-1cb9f",
+    "storage_bucket": "vitalsenseai-1cb9f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:576196499899:android:6f91fb5d0d56d3f70b4c9e",
+        "android_client_info": {
+          "package_name": "mx.ita.vitalsense"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "576196499899-i3almkkrlle3lk61rm1fviqn0q1vponu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "mx.ita.vitalsense",
+            "certificate_hash": "0958210efcbb4a10e86258ca911e8d3816ba10b3"
+          }
+        },
+        {
+          "client_id": "576196499899-5gs5rfek5fnvoilukque3uqt5k84r30q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwNw4trKyn6sE2_6jis48qTP8sJ-M0bcg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "576196499899-5gs5rfek5fnvoilukque3uqt5k84r30q.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

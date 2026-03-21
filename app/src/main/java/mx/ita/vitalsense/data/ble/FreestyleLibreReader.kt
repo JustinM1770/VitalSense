@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.NfcV
+import android.os.Build
 
 class FreestyleLibreReader(private val context: Context) {
 
@@ -35,7 +36,12 @@ class FreestyleLibreReader(private val context: Context) {
     // Llamar desde onNewIntent de MainActivity cuando llega tag NFC
     fun parseFreestyleLibre(intent: Intent): Float? {
         if (intent.action != NfcAdapter.ACTION_TECH_DISCOVERED) return null
-        val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG) ?: return null
+        val tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+        } ?: return null
         val nfcV = NfcV.get(tag) ?: return null
 
         return try {

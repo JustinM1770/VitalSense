@@ -50,6 +50,7 @@ data class BleVitals(
     val heartRate: Int? = null,
     val glucose: Double? = null,
     val spo2: Int? = null,
+    val timestamp: Long? = null,
 )
 
 sealed interface BleConnectionState {
@@ -115,6 +116,27 @@ class BleRepository(private val context: Context) {
         gatt = null
         _connectionState.value = BleConnectionState.Disconnected
         _vitals.value = BleVitals()
+    }
+
+    fun setConnecting() {
+        _connectionState.value = BleConnectionState.Connecting
+    }
+
+    fun setDisconnected() {
+        _connectionState.value = BleConnectionState.Disconnected
+    }
+
+    fun setConnected(deviceName: String) {
+        _connectionState.value = BleConnectionState.Connected(deviceName)
+    }
+
+    fun connectWithCode(code: String, deviceName: String) {
+        // Mock connection associated with pairing code
+        _connectionState.value = BleConnectionState.Connected(deviceName)
+    }
+
+    fun updateVitals(vitals: BleVitals) {
+        _vitals.value = vitals
     }
 
     // ── GATT Callbacks ────────────────────────────────────────────────────────

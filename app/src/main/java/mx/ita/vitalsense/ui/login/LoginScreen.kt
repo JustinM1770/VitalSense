@@ -61,9 +61,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.ita.vitalsense.ui.theme.Manrope
 
+// ── Design tokens ────────────────────────────────────────────────────────────
 private val TextDark   = Color(0xFF221F1F)
 private val InputBg    = Color(0xFFF9F9FB)
 private val PrimaryBtn = Color(0xFF1169FF)
+private val IconTint   = Color(0xFFB0B8C4)
 private val DividerClr = Color(0xFFE5E5E5)
 
 @Composable
@@ -71,6 +73,7 @@ fun LoginScreen(
     onBack: () -> Unit,
     onLoginSuccess: () -> Unit,
     onRegisterClick: () -> Unit,
+    onForgotPassword: () -> Unit = {},
     vm: LoginViewModel = viewModel(),
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
@@ -160,15 +163,15 @@ fun LoginScreen(
 
             // ── Olvidaste contraseña ───────────────────────────────────────────
             Text(
-                text = "Olvidaste tu contraseña?",
+                text = "¿Olvidaste tu contraseña?",
                 fontFamily = Manrope,
-                fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
                 color = PrimaryBtn,
                 modifier = Modifier
                     .align(Alignment.End)
                     .padding(end = 24.dp)
-                    .clickable { },
+                    .clickable { onForgotPassword() },
             )
 
             Spacer(Modifier.weight(1f))
@@ -263,7 +266,7 @@ fun LoginScreen(
             Spacer(Modifier.height(12.dp))
 
             // ── Botón Facebook ────────────────────────────────────────────────
-            SocialButton(onClick = {}, enabled = true) {
+            SocialButton(onClick = { vm.signInWithFacebook(context) }, enabled = uiState !is LoginUiState.Loading) {
                 Box(
                     modifier = Modifier
                         .size(22.dp)

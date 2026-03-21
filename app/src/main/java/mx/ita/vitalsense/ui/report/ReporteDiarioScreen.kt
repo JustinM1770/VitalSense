@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -91,7 +92,7 @@ fun ReporteDiarioScreen(
                     )
                     val today = LocalDate.now()
                     Text(
-                        text = "${today.month.getDisplayName(TextStyle.SHORT, Locale("es")).replaceFirstChar { it.uppercase() }}, ${today.year}",
+                        text = "${today.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}, ${today.year}",
                         fontFamily = Manrope,
                         fontSize = 14.sp,
                         color = Color(0xFF8A8A8A),
@@ -321,7 +322,7 @@ private fun DateStrip() {
             ) {
                 if (isSelected) {
                     Text(
-                        text = "Hoy, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale("es")).replaceFirstChar { it.uppercase() }}",
+                        text = "Hoy, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}",
                         fontFamily = Manrope,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,

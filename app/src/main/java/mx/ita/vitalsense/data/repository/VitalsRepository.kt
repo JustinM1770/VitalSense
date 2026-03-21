@@ -13,6 +13,10 @@ import mx.ita.vitalsense.data.model.VitalsSnapshot
 class VitalsRepository {
 
     private val db = FirebaseDatabase.getInstance()
+    private val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+
+    private fun getVitalsRef() = db.getReference("vitals/current/${auth.currentUser?.uid ?: "global"}")
+
 
     // ── Multiusuario: todos los pacientes bajo "patients/" ──────────────────
     fun observePatients(): Flow<Result<List<VitalsData>>> = callbackFlow {
@@ -89,7 +93,7 @@ class VitalsRepository {
 
     // ── Un solo paciente (usado por DeviceScan / BLE) ────────────────────────
     fun observeVitals(): Flow<Result<VitalsData>> = callbackFlow {
-        val ref = db.getReference("vitals/current")
+        val ref = getVitalsRef()
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {

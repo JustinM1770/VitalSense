@@ -27,7 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.BluetoothConnected
-import androidx.compose.material.icons.outlined.BluetoothSearching
+import androidx.compose.material.icons.automirrored.outlined.BluetoothSearching
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.WaterDrop
@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.ita.vitalsense.data.ble.BleConnectionState
@@ -182,7 +184,7 @@ private fun ScanPanel(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = if (isScanning) Icons.Outlined.BluetoothSearching
+                imageVector = if (isScanning) Icons.AutoMirrored.Outlined.BluetoothSearching
                               else Icons.Outlined.Bluetooth,
                 contentDescription = null,
                 tint = OnboardingBlue,
