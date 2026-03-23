@@ -9,7 +9,7 @@
     -->
     <string name="default_web_client_id">576196499899-5gs5rfek5fnvoilukque3uqt5k84r30q.apps.googleusercontent.com</string>
     <!-- Facebook Login configuration -->
-    <string name="facebook_app_id">1234567890</string>
-    <string name="facebook_client_token">dummy_token</string>
-    <string name="fb_login_protocol_scheme">fb1234567890</string>
+    <string name="facebook_app_id">781715867960574</string>
+    <string name="facebook_client_token">0ab6ae4e29a5345e15010c42825497b0</string>
+    <string name="fb_login_protocol_scheme">fb781715867960574</string>
 </resources>

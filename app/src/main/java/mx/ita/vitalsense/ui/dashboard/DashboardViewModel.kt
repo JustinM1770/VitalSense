@@ -75,6 +75,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     init {
         observePatients()
         loadAdditionalData()
+        // Ensure paired state is always up to date
+        val isPaired = prefs.getBoolean("code_paired", false)
+        viewModelScope.launch {
+            val current = _uiState.value
+            if (current is DashboardUiState.Success && current.isWatchPaired != isPaired) {
+                _uiState.value = current.copy(isWatchPaired = isPaired)
+            }
+        }
     }
 
     fun disconnectWatch() {
@@ -222,7 +230,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val key = "${patient.patientId}:${patient.timestamp}"
                 if (!notifiedPatients.contains(key)) {
                     notifiedPatients.add(key)
-                    sendAlertNotification(patient, alerts.first().title)
+                    // Only alert if we already had previous data, avoiding alerts on initial load
+                    if (!patient.patientId.startsWith("demo_") && previous != null) {
+                        sendAlertNotification(patient, alerts.first().title)
+                    }
                 }
             }
             lastKnownVitals[patient.patientId] = patient
@@ -237,8 +248,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             ) return
         }
 
-        val intent = Intent(ctx, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("vitalsense://notifications"), ctx, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             ctx, 0, intent,

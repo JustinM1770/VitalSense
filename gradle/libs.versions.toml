@@ -24,6 +24,9 @@ kotlinxCoroutinesPlayServices = "1.9.0"
 okhttp = "4.12.0"
 facebookSdk = "17.0.2"
 healthConnect = "1.1.0-rc02"
+biometric = "1.2.0-alpha05"
+imageCropper = "4.5.0"
+coil = "2.6.0"
 
 [libraries]
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
@@ -61,6 +64,9 @@ kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "ko
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 facebook-android-sdk = { group = "com.facebook.android", name = "facebook-android-sdk", version.ref = "facebookSdk" }
 androidx-health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "biometric" }
+android-image-cropper = { group = "com.vanniktech", name = "android-image-cropper", version.ref = "imageCropper" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

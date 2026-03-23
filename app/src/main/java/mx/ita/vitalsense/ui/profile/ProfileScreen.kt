@@ -32,11 +32,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import mx.ita.vitalsense.ui.components.BottomNav
 import mx.ita.vitalsense.ui.components.BottomNavTab
 import mx.ita.vitalsense.ui.theme.DashBg
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
+import coil.compose.AsyncImage
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun ProfileScreen(
@@ -55,17 +64,86 @@ fun ProfileScreen(
     val pairedDeviceName = remember { mutableStateOf(prefsShared.getString("paired_device_name", "Wearable") ?: "Wearable") }
 
     val currentUser = FirebaseAuth.getInstance().currentUser
+    val uid = currentUser?.uid ?: ""
+    val profilePrefs = remember { context.getSharedPreferences("vitalsense_profile", Context.MODE_PRIVATE) }
+
     val displayName = currentUser?.displayName ?: ""
     val parts = displayName.split(" ")
-    var nombre by remember { mutableStateOf(parts.getOrElse(0) { "" }) }
-    var apellidos by remember { mutableStateOf(parts.drop(1).joinToString(" ").ifEmpty { "" }) }
+    var nombre by remember { mutableStateOf(profilePrefs.getString("nombre_$uid", null) ?: parts.getOrElse(0) { "" }) }
+    var apellidos by remember { mutableStateOf(profilePrefs.getString("apellidos_$uid", null) ?: parts.drop(1).joinToString(" ")) }
     var email by remember { mutableStateOf(currentUser?.email ?: "") }
     var password by remember { mutableStateOf("•••••") }
-    var nacimiento by remember { mutableStateOf("**/**/2000") }
-    var celular by remember { mutableStateOf("") }
-    var genero by remember { mutableStateOf("Hombre") }
-    var frecuencia by remember { mutableStateOf("72") }
-    var edad by remember { mutableStateOf("30") }
+    var nacimiento by remember { mutableStateOf(profilePrefs.getString("nacimiento_$uid", null) ?: "**/**/2000") }
+    var celular by remember { mutableStateOf(profilePrefs.getString("celular_$uid", null) ?: "") }
+    var genero by remember { mutableStateOf(profilePrefs.getString("genero_$uid", null) ?: "Hombre") }
+    var frecuencia by remember { mutableStateOf(profilePrefs.getString("frecuencia_$uid", null) ?: "72") }
+    var tipoSangre by remember { mutableStateOf(profilePrefs.getString("tipo_sangre_$uid", null) ?: "") }
+
+    val avatarUriString = profilePrefs.getString("avatar_uri_$uid", null)
+    var imageUri by remember { mutableStateOf<Uri?>(if (avatarUriString != null) Uri.parse(avatarUriString) else null) }
+
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            imageUri = result.uriContent
+            if (result.uriContent != null) {
+                profilePrefs.edit().putString("avatar_uri_$uid", result.uriContent.toString()).apply()
+                // Also update avatar in Firebase
+                if (uid.isNotEmpty()) {
+                    FirebaseDatabase.getInstance().getReference("patients/$uid/profile")
+                        .updateChildren(mapOf("avatarUri" to result.uriContent.toString()))
+                }
+            }
+        }
+    }
+
+    // Restore from Firebase if local data is missing (e.g. fresh install after uninstall)
+    LaunchedEffect(uid) {
+        if (uid.isEmpty()) return@LaunchedEffect
+        val hasLocalData = profilePrefs.contains("nombre_$uid")
+        if (!hasLocalData) {
+            try {
+                val snapshot = FirebaseDatabase.getInstance()
+                    .getReference("patients/$uid/profile").get().await()
+                if (snapshot.exists()) {
+                    profilePrefs.edit().apply {
+                        snapshot.child("nombre").getValue(String::class.java)?.let     { putString("nombre_$uid",      it); nombre      = it }
+                        snapshot.child("apellidos").getValue(String::class.java)?.let  { putString("apellidos_$uid",   it); apellidos   = it }
+                        snapshot.child("nacimiento").getValue(String::class.java)?.let { putString("nacimiento_$uid",  it); nacimiento  = it }
+                        snapshot.child("celular").getValue(String::class.java)?.let    { putString("celular_$uid",     it); celular     = it }
+                        snapshot.child("genero").getValue(String::class.java)?.let     { putString("genero_$uid",      it); genero      = it }
+                        snapshot.child("frecuencia").getValue(String::class.java)?.let { putString("frecuencia_$uid",  it); frecuencia  = it }
+                        snapshot.child("tipoSangre").getValue(String::class.java)?.let { putString("tipo_sangre_$uid", it); tipoSangre  = it }
+                        snapshot.child("avatarUri").getValue(String::class.java)?.let  { s ->
+                            putString("avatar_uri_$uid", s)
+                            imageUri = Uri.parse(s)
+                        }
+                        putBoolean("cuestionario_completed_$uid", true)
+                    }.apply()
+                }
+
+                // Also attempt to restore the watch pairing status
+                val watchSnapshot = FirebaseDatabase.getInstance()
+                    .getReference("patients/$uid/watch").get().await()
+                if (watchSnapshot.exists()) {
+                    val isPaired = watchSnapshot.child("paired").getValue(Boolean::class.java) ?: false
+                    if (isPaired) {
+                        val pairedCode = watchSnapshot.child("code").getValue(String::class.java) ?: ""
+                        val deviceName = watchSnapshot.child("deviceName").getValue(String::class.java) ?: "Wearable"
+                        
+                        val watchPrefs = context.getSharedPreferences("vitalsense_watch_prefs", Context.MODE_PRIVATE)
+                        watchPrefs.edit()
+                            .putBoolean("code_paired", true)
+                            .putString("paired_code", pairedCode)
+                            .putString("paired_device_name", deviceName)
+                            .apply()
+                        
+                        // Because ProfileScreen uses profilePrefs locally, no need to update its own UI for watch here 
+                    }
+                }
+
+            } catch (_: Exception) { /* No internet or data doesn't exist — keep current state */ }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(DashBg)) {
         Column(
@@ -103,20 +181,44 @@ fun ProfileScreen(
                         modifier = Modifier
                             .size(100.dp)
                             .clip(CircleShape)
-                            .background(DashBlue),
+                            .background(DashBlue)
+                            .clickable {
+                                cropLauncher.launch(
+                                    CropImageContractOptions(
+                                        uri = null,
+                                        cropImageOptions = CropImageOptions(
+                                            imageSourceIncludeGallery = true,
+                                            imageSourceIncludeCamera = true,
+                                            guidelines = CropImageView.Guidelines.ON,
+                                            aspectRatioX = 1,
+                                            aspectRatioY = 1,
+                                            fixAspectRatio = true,
+                                        )
+                                    )
+                                )
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
-                        val initials = buildString {
-                            nombre.firstOrNull()?.let { append(it.uppercaseChar()) }
-                            apellidos.firstOrNull()?.let { append(it.uppercaseChar()) }
-                        }.ifEmpty { "VS" }
-                        Text(
-                            text = initials,
-                            fontFamily = Manrope,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 32.sp,
-                            color = Color.White,
-                        )
+                        if (imageUri != null) {
+                            AsyncImage(
+                                model = imageUri,
+                                contentDescription = "Avatar",
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            val initials = buildString {
+                                nombre.firstOrNull()?.let { append(it.uppercaseChar()) }
+                                apellidos.firstOrNull()?.let { append(it.uppercaseChar()) }
+                            }.ifEmpty { "VS" }
+                            Text(
+                                text = initials,
+                                fontFamily = Manrope,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 32.sp,
+                                color = Color.White,
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier
@@ -174,14 +276,24 @@ fun ProfileScreen(
                     Spacer(Modifier.height(14.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         ProfileField(modifier = Modifier.weight(1f), label = "Frecuencia promedio", value = "❤️ $frecuencia", onValueChange = { frecuencia = it.removePrefix("❤️ ") }, keyboardType = KeyboardType.Number)
-                        ProfileField(modifier = Modifier.weight(1f), label = "Edad", value = edad, onValueChange = { edad = it }, keyboardType = KeyboardType.Number)
+                        ProfileField(modifier = Modifier.weight(1f), label = "Tipo de Sangre", value = tipoSangre, onValueChange = { tipoSangre = it })
                     }
 
                     Spacer(Modifier.height(30.dp))
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
-                            onClick = {},
+                            onClick = {
+                                profilePrefs.edit().apply {
+                                    putString("nombre_$uid", nombre)
+                                    putString("apellidos_$uid", apellidos)
+                                    putString("nacimiento_$uid", nacimiento)
+                                    putString("celular_$uid", celular)
+                                    putString("genero_$uid", genero)
+                                    putString("frecuencia_$uid", frecuencia)
+                                    putString("tipo_sangre_$uid", tipoSangre)
+                                }.apply()
+                            },
                             modifier = Modifier.weight(1f).height(50.dp),
                             shape = RoundedCornerShape(25.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = DashBlue),

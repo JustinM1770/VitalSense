@@ -321,8 +321,10 @@ private fun DateStrip() {
                 contentAlignment = Alignment.Center,
             ) {
                 if (isSelected) {
+                    val isToday = idx == 3
+                    val prefix = if (isToday) "Hoy, " else ""
                     Text(
-                        text = "Hoy, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}",
+                        text = "$prefix${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}",
                         fontFamily = Manrope,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,

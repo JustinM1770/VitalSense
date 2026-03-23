@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -232,17 +233,7 @@ private fun DashboardContent(
 
         Spacer(Modifier.height(24.dp))
 
-        // ── Device connection card (only if not paired) ───────────────────────
-        if (!isWatchPaired) {
-            DeviceConnectionCard(onClick = onConnectDevice)
-            Spacer(Modifier.height(24.dp))
-        } else {
-            WatchStatusCard(
-                onDisconnect = onDisconnectWatch,
-                onClick = onConnectDevice,
-            )
-            Spacer(Modifier.height(24.dp))
-        }
+
 
         // ── Blue rounded container ────────────────────────────────────────────
         Column(
@@ -256,7 +247,7 @@ private fun DashboardContent(
             SectionHeader(title = "Esta semana", showArrow = true)
             Spacer(Modifier.height(16.dp))
 
-            val pagerState = rememberPagerState(pageCount = { 3 })
+            val pagerState = rememberPagerState(pageCount = { 4 })
             val sleepPct = sleepData?.score
                 ?: if (patients.isNotEmpty()) {
                     ((patients.first().spo2 - 85).coerceIn(0, 15) * 100 / 15 + 60).coerceIn(0, 100)
@@ -269,12 +260,13 @@ private fun DashboardContent(
                 when (page) {
                     0 -> SleepMetricCard(sleepData = sleepData, pctFallback = sleepPct, onClick = onReportClick)
                     1 -> HrMiniCard(patients)
+                    2 -> Spo2MiniCard(patients)
                     else -> KcalMiniCard(patients)
                 }
             }
 
             Spacer(Modifier.height(12.dp))
-            PagerDots(count = 3, selected = pagerState.currentPage)
+            PagerDots(count = 4, selected = pagerState.currentPage)
 
             Spacer(Modifier.height(24.dp))
 
@@ -295,39 +287,6 @@ private fun DashboardContent(
             )
 
             Spacer(Modifier.height(24.dp))
-
-            // ── Patients list ─────────────────────────────────────────────────
-            if (patients.isNotEmpty()) {
-                patients.forEach { patient ->
-                    WhiteCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPatientClick(patient.patientId) },
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier.size(44.dp).clip(CircleShape).background(DashBlue.copy(0.15f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = patient.patientName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                    fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = DashBlue,
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(patient.patientName, fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1A1A2E))
-                                Text("❤️ ${patient.heartRate} BPM · SpO₂ ${patient.spo2}%", fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A))
-                            }
-                            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Color(0xFFB0B0B0), modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
 
             Spacer(Modifier.height(16.dp))
         }
@@ -409,13 +368,15 @@ private fun UserHeader(
                 )
             }
             // Red dot
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(Color.Red, CircleShape)
-                    .align(Alignment.TopEnd)
-                    .offset(x = (-10).dp, y = 10.dp)
-            )
+            if (hasUnread) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(Color.Red, CircleShape)
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-10).dp, y = 10.dp)
+                )
+            }
         }
     }
 }
@@ -630,6 +591,21 @@ private fun KcalMiniCard(patients: List<VitalsData>) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("%,d".format(kcal), fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 36.sp, color = Color(0xFF1A1A2E))
             Text("Kcal hoy", fontFamily = Manrope, fontSize = 14.sp, color = Color(0xFF8A8A8A))
+        }
+    }
+}
+
+@Composable
+private fun Spo2MiniCard(patients: List<VitalsData>) {
+    val spo2 = patients.firstOrNull()?.spo2 ?: 98
+    WhiteCard(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = mx.ita.vitalsense.ui.theme.SpO2Green, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("SpO₂", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
+                Text("$spo2%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF1A1A2E))
+            }
         }
     }
 }
@@ -912,22 +888,15 @@ fun SettingsDialog(
     val prefs = remember { context.getSharedPreferences("vitalsense_watch_prefs", android.content.Context.MODE_PRIVATE) }
     var requireBiometric by remember { mutableStateOf(prefs.getBoolean("require_biometric", false)) }
 
-    // TODO: HealthConnectViewModel was not found in the project. Commented out to fix build.
-    // val hcViewModel: mx.ita.vitalsense.ui.device.HealthConnectViewModel = viewModel()
-    // val errorMessage by hcViewModel.errorMessage.collectAsState()
-
-    // androidx.compose.runtime.LaunchedEffect(errorMessage) {
-    //     if (!errorMessage.isNullOrEmpty()) {
-    //         android.widget.Toast.makeText(context, errorMessage, android.widget.Toast.LENGTH_LONG).show()
-    //     }
-    // }
-
-    // val permissionContract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
-    // val hcLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-    //     permissionContract
-    // ) { _ ->
-    //     hcViewModel.loadHealthConnectData()
-    // }
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        if (granted.containsAll(mx.ita.vitalsense.data.health.HealthConnectRepository.PERMISSIONS)) {
+            android.widget.Toast.makeText(context, "Health Connect vinculado exitosamente", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            android.widget.Toast.makeText(context, "Permisos de Health Connect denegados", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -952,9 +921,11 @@ fun SettingsDialog(
 
                 // Health Connect
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
-                    // TODO: Implement health connect sync triggering
-                    // hcViewModel.checkAndRequestPermissions(hcLauncher)
-                    android.widget.Toast.makeText(context, "Buscando datos de Health Connect...", android.widget.Toast.LENGTH_SHORT).show()
+                    if (mx.ita.vitalsense.data.health.HealthConnectRepository.isAvailable(context)) {
+                        permissionLauncher.launch(mx.ita.vitalsense.data.health.HealthConnectRepository.PERMISSIONS)
+                    } else {
+                        android.widget.Toast.makeText(context, "Health Connect no disponible en este dispositivo", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }) {
                     Box(modifier = Modifier.size(40.dp).background(SuccessGreen.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
                         Icon(Icons.Rounded.Favorite, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(24.dp))

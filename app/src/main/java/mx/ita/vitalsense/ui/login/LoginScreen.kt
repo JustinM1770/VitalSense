@@ -59,6 +59,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import mx.ita.vitalsense.ui.theme.Manrope
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -267,30 +271,26 @@ fun LoginScreen(
 
             // ── Botón Facebook ────────────────────────────────────────────────
             SocialButton(onClick = { vm.signInWithFacebook(context) }, enabled = uiState !is LoginUiState.Loading) {
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF1877F2)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "f",
-                        fontFamily = Manrope,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = Color.White,
-                    )
-                }
+                Text(
+                    text = "Facebook",
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF1877F2),
+                )
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "Inicia Sesion con Facebook",
+                    text = "Continuar con Facebook",
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     color = TextDark,
                 )
             }
+
+            Spacer(Modifier.height(12.dp))
+
+
 
             Spacer(Modifier.height(40.dp))
         }

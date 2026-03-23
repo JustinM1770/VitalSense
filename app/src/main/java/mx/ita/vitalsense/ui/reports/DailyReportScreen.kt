@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -105,11 +106,35 @@ fun DailyReportScreen(
             
             HeartRateTrendCard(history = state.vitalsHistory)
             
-            Spacer(Modifier.height(24.dp))
-            
+            Spacer(Modifier.height(16.dp))
+
+            // --- SpO2 Card ---
+            val latestSpo2 = state.vitalsHistory.lastOrNull()?.spo2 ?: 0
+            if (latestSpo2 > 0) {
+                NeuCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Rounded.MonitorHeart,
+                            contentDescription = null,
+                            tint = SpO2Green,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Oxigenación SpO₂", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                            Text("$latestSpo2%", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = SpO2Green)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
             SleepMetricCardDaily(sleepData = state.sleepData)
             
-            Spacer(Modifier.height(96.dp)) // Espacio para Global Nav Bar
+            Spacer(Modifier.height(96.dp))
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.BluetoothConnected
 import androidx.compose.material.icons.automirrored.outlined.BluetoothSearching
+import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.WaterDrop
@@ -39,6 +40,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,8 +50,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.ita.vitalsense.data.ble.BleConnectionState
 import mx.ita.vitalsense.data.ble.BleDevice
@@ -86,22 +96,11 @@ fun DeviceScanScreen(
     onBack: () -> Unit,
     vm: DeviceViewModel = viewModel(),
 ) {
-    val devices       by vm.devices.collectAsStateWithLifecycle()
-    val isScanning    by vm.isScanning.collectAsStateWithLifecycle()
-    val connState     by vm.connectionState.collectAsStateWithLifecycle()
     val vitals        by vm.vitals.collectAsStateWithLifecycle()
-
-    // Limpiar al salir
-    DisposableEffect(Unit) {
-        onDispose { vm.stopScan() }
-    }
-
-    // Launcher de permisos BLE
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { granted ->
-        if (granted.values.all { it }) vm.startScan()
-    }
+    val isCodePaired  by vm.isCodePaired.collectAsStateWithLifecycle()
+    val codeError     by vm.codeError.collectAsStateWithLifecycle()
+    val connState     by vm.connectionState.collectAsStateWithLifecycle()
+    var pairingCode   by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -138,22 +137,106 @@ fun DeviceScanScreen(
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(40.dp))
 
-        when (val state = connState) {
-            is BleConnectionState.Connected -> ConnectedPanel(
-                deviceName = state.deviceName,
+        if (isCodePaired || connState is BleConnectionState.Connected) {
+            ConnectedPanel(
+                deviceName = vm.pairedDeviceName.collectAsState().value,
                 vitals = vitals,
-                onDisconnect = { vm.disconnect() },
+                onDisconnect = { vm.disconnectWatch(); vm.disconnect() },
             )
-            else -> ScanPanel(
-                devices = devices,
-                isScanning = isScanning,
-                isConnecting = connState is BleConnectionState.Connecting,
-                onStartScan = { permLauncher.launch(BLE_PERMISSIONS) },
-                onStopScan = { vm.stopScan() },
-                onConnect = { vm.connect(it) },
+        } else {
+            CodeEntryPanel(
+                code = pairingCode,
+                onCodeChange = { pairingCode = it.uppercase().take(8) },
+                isLoading = connState is BleConnectionState.Connecting,
+                errorMessage = codeError,
+                onPair = { vm.connectWithCode(pairingCode) },
             )
+        }
+    }
+}
+
+// ─── Panel de código de emparejamiento ───────────────────────────────────────
+
+@Composable
+private fun CodeEntryPanel(
+    code: String,
+    onCodeChange: (String) -> Unit,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onPair: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(OnboardingBlue.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Watch,
+                contentDescription = null,
+                tint = OnboardingBlue,
+                modifier = Modifier.size(40.dp),
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            text = "Ingresa el código que aparece en tu reloj",
+            fontFamily = Manrope,
+            fontSize = 14.sp,
+            color = TextGray,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        OutlinedTextField(
+            value = code,
+            onValueChange = onCodeChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Código de 8 caracteres", fontFamily = Manrope) },
+            placeholder = { Text("Ej. A1B2C3D4", fontFamily = Manrope, color = TextGray) },
+            singleLine = true,
+            enabled = !isLoading,
+            shape = RoundedCornerShape(14.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = OnboardingBlue,
+                unfocusedBorderColor = BorderCol,
+                focusedLabelColor = OnboardingBlue,
+            ),
+        )
+
+        if (errorMessage != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(errorMessage, color = Color(0xFFEF4444), fontFamily = Manrope, fontSize = 12.sp)
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Button(
+            onClick = onPair,
+            enabled = code.length == 8 && !isLoading,
+            modifier = Modifier.width(240.dp).height(50.dp),
+            shape = RoundedCornerShape(32.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = OnboardingBlue),
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Vinculando…", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
+            } else {
+                Text("Vincular Reloj", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
+            }
         }
     }
 }

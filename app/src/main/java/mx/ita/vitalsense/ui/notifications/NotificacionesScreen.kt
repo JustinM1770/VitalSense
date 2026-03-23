@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -112,7 +115,7 @@ fun NotificacionesScreen(
 
     var allAlerts by remember { mutableStateOf<List<NotifItem>>(emptyList()) }
     var showUnreadOnly by remember { mutableStateOf(false) }
-    var showTodayOnly by remember { mutableStateOf(false) }
+    var selectedDateFilter by remember { mutableStateOf<String?>(null) }
 
     // ── Firebase Listener ────────────────────────────────────────────────────
     DisposableEffect(userId) {
@@ -179,7 +182,7 @@ fun NotificacionesScreen(
     val filtered = allAlerts.let { list ->
         var result = list
         if (showUnreadOnly) result = result.filter { !it.isRead }
-        if (showTodayOnly) result = result.filter { dateLabel(it.timestamp) == "Hoy" }
+        if (selectedDateFilter != null) result = result.filter { dateLabel(it.timestamp) == selectedDateFilter }
         result
     }
 
@@ -249,7 +252,7 @@ fun NotificacionesScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "News",
+                            text = "Nuevos",
                             fontFamily = Manrope, fontSize = 12.sp,
                             color = if (showUnreadOnly) Color.White else DashBlue,
                             fontWeight = FontWeight.SemiBold,
@@ -272,32 +275,51 @@ fun NotificacionesScreen(
             Spacer(Modifier.height(24.dp))
 
             // ── Hoy filter + Mark All ────────────────────────────────────────
+            val allDistinctDates = allAlerts.map { dateLabel(it.timestamp) }.distinct()
+            val availableDates = allDistinctDates.sortedWith(
+                compareBy {
+                    when (it) {
+                        "Hoy" -> 0
+                        "Ayer" -> 1
+                        else -> 2
+                    }
+                }
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            if (showTodayOnly) DashBlue else DashBlue.copy(alpha = 0.12f)
-                        )
-                        .clickable { showTodayOnly = !showTodayOnly }
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "Hoy",
-                        fontFamily = Manrope,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        color = if (showTodayOnly) Color.White else DashBlue,
-                    )
+                    items(availableDates) { dateKey ->
+                        val isSelected = selectedDateFilter == dateKey
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (isSelected) DashBlue else DashBlue.copy(alpha = 0.12f))
+                                .clickable {
+                                    selectedDateFilter = if (isSelected) null else dateKey
+                                }
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                text = dateKey,
+                                fontFamily = Manrope,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = if (isSelected) Color.White else DashBlue,
+                            )
+                        }
+                    }
                 }
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(16.dp))
                 Text(
-                    text = "Mark all",
+                    text = "Marcar todo",
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,

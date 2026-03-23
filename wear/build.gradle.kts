@@ -51,4 +51,5 @@ dependencies {
     implementation(libs.androidx.health.services)
     implementation(libs.play.services.location)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation("com.google.zxing:core:3.5.3")
 }

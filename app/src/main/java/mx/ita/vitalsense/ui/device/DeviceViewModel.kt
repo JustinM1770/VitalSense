@@ -118,7 +118,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val upperCode = code.uppercase().trim()
-                val ref = db.getReference("pairing_codes").child(upperCode)
+                val ref = db.getReference("patients/pairing_codes").child(upperCode)
                 val userId = FirebaseAuth.getInstance().currentUser?.uid
                 val snapshot = ref.get().await()
 
@@ -148,6 +148,13 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         _isCodePaired.value = true
         _pairedDeviceName.value = deviceName
         repo.connectWithCode(code, deviceName)
+
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid != null) {
+            FirebaseDatabase.getInstance().getReference("patients/$uid/watch")
+                .setValue(mapOf("code" to code, "deviceName" to deviceName, "paired" to true))
+        }
+
         startWatchDataReading()
     }
 
@@ -157,13 +164,17 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val pairedCode = prefs.getString(KEY_PAIRED_CODE, null)
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId != null) {
+                    db.getReference("patients/$userId/watch").removeValue()
+                }
+
                 if (pairedCode != null) {
-                    db.getReference("pairing_codes").child(pairedCode)
+                    db.getReference("patients/pairing_codes").child(pairedCode)
                         .updateChildren(mapOf("paired" to false))
                         .await()
                 }
                 prefs.edit().putBoolean(KEY_CODE_PAIRED, false).remove(KEY_PAIRED_CODE).remove(KEY_PAIRED_DEVICE_NAME).apply()
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
                 if (userId != null) db.getReference("vitals/current/$userId").removeValue()
                 _isCodePaired.value = false
                 _pairedDeviceName.value = "Wearable"
@@ -195,7 +206,32 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
-            // 2. POLLING HEALTH CONNECT (Datos de Sueño cada 30 min)
+            // 2. POLLING HEALTH CONNECT — Signos vitales cada 60 segundos
+            launch {
+                val hcRepo = healthConnectRepo ?: return@launch
+                while (isActive) {
+                    try {
+                        if (hcRepo.hasPermissions()) {
+                            val hcVitals = hcRepo.readLatestVitals()
+                            val ble = BleVitals(
+                                heartRate = hcVitals.heartRate ?: 0,
+                                glucose   = hcVitals.glucose   ?: 0.0,
+                                spo2      = hcVitals.spo2?.toInt() ?: 0,
+                                timestamp = System.currentTimeMillis()
+                            )
+                            if ((ble.heartRate ?: 0) > 0) {
+                                repo.updateVitals(ble)
+                                writeVitalsToFirebase(ble)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "HC vitals poll error", e)
+                    }
+                    delay(60_000L)
+                }
+            }
+
+            // 3. POLLING HEALTH CONNECT — Datos de Sueño cada 30 min
             launch {
                 while (isActive) {
                     readAndSyncSleepData()
