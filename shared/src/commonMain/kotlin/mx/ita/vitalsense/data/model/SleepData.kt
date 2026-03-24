@@ -5,6 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SleepData(
     val score: Int = 0,
-    val horas: Double = 0.0,
+    val horas: Float = 0f,
     val estado: String = "",
 )

@@ -37,67 +37,45 @@ struct AuthFlow: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            if showingOnboarding {
-                OnboardingView(
-                    onGetStarted: {
-                        // User completed onboarding → go to login
-                        showingOnboarding = false
-                        navigationPath.append(AuthScreen.login)
-                    },
-                    onSkip: {
-                        // User skipped onboarding → go to login
-                        showingOnboarding = false
-                        navigationPath.append(AuthScreen.login)
-                    }
-                )
-            } else {
-                // Placeholder view - navigation will handle the rest
-                Color.clear
-                    .onAppear {
-                        // Ensure we navigate to login if path is empty
-                        if navigationPath.count == 0 {
+            Group {
+                if showingOnboarding {
+                    OnboardingView(
+                        onGetStarted: {
+                            showingOnboarding = false
+                            navigationPath.append(AuthScreen.login)
+                        },
+                        onSkip: {
+                            showingOnboarding = false
                             navigationPath.append(AuthScreen.login)
                         }
-                    }
+                    )
+                } else {
+                    Color.clear
+                        .onAppear {
+                            if navigationPath.count == 0 {
+                                navigationPath.append(AuthScreen.login)
+                            }
+                        }
+                }
             }
-        }
-        .navigationDestination(for: AuthScreen.self) { screen in
-            switch screen {
-            case .login:
-                LoginView(
-                    onLogin: {
-                        onAuthenticated()
-                    },
-                    onRegister: {
-                        navigationPath.append(AuthScreen.register)
-                    },
-                    onBack: {
-                        // Go back to onboarding
-                        if navigationPath.count > 0 {
+            .navigationDestination(for: AuthScreen.self) { screen in
+                switch screen {
+                case .login:
+                    LoginView(
+                        onLogin: { onAuthenticated() },
+                        onRegister: { navigationPath.append(AuthScreen.register) },
+                        onBack: {
                             navigationPath.removeLast()
+                            showingOnboarding = true
                         }
-                        showingOnboarding = true
-                    }
-                )
-
-            case .register:
-                RegisterView(
-                    onRegister: {
-                        onAuthenticated()
-                    },
-                    onBack: {
-                        // Go back to login
-                        if navigationPath.count > 0 {
-                            navigationPath.removeLast()
-                        }
-                    },
-                    onLogin: {
-                        // Go back to login
-                        if navigationPath.count > 0 {
-                            navigationPath.removeLast()
-                        }
-                    }
-                )
+                    )
+                case .register:
+                    RegisterView(
+                        onRegister: { onAuthenticated() },
+                        onBack: { navigationPath.removeLast() },
+                        onLogin: { navigationPath.removeLast() }
+                    )
+                }
             }
         }
     }
@@ -110,6 +88,9 @@ struct MainTabView: View {
         TabView {
             DashboardView()
                 .tabItem { Label("Inicio", systemImage: "heart.fill") }
+
+            WearableView()
+                .tabItem { Label("Wearable", systemImage: "applewatch") }
 
             ChatBotView()
                 .tabItem { Label("IA", systemImage: "brain") }

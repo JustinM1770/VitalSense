@@ -10,6 +10,7 @@ data class VitalsData(
     val glucose: Double = 0.0,
     val spo2: Int = 0,
     val timestamp: Long = 0L,
+    val sleep: SleepData? = null,
 )
 
 data class VitalAlert(

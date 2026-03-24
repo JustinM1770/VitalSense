@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import GoogleSignIn
 import Combine
 
 // MARK: - Auth State
@@ -58,9 +59,43 @@ class AuthViewModel: ObservableObject {
 
     // MARK: - Sign In with Google
     func signInWithGoogle() {
-        // TODO: Implement Google Sign-In with Credential Manager
-        // For now, show error
-        state = .error("Google Sign-In no implementado aún")
+        guard let rootViewController = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first?.windows.first?.rootViewController else {
+            state = .error("No se pudo obtener la ventana principal")
+            return
+        }
+
+        state = .loading
+
+        GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [weak self] result, error in
+            guard let self else { return }
+
+            if let error = error {
+                self.state = .error(error.localizedDescription)
+                return
+            }
+
+            guard let user = result?.user,
+                  let idToken = user.idToken?.tokenString else {
+                self.state = .error("No se obtuvo el token de Google")
+                return
+            }
+
+            let credential = GoogleAuthProvider.credential(
+                withIDToken: idToken,
+                accessToken: user.accessToken.tokenString
+            )
+
+            Auth.auth().signIn(with: credential) { [weak self] _, error in
+                guard let self else { return }
+                if let error = error {
+                    self.state = .error(error.localizedDescription)
+                } else {
+                    self.state = .success
+                }
+            }
+        }
     }
 
     // MARK: - Clear Error

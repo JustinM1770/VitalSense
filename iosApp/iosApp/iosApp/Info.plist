@@ -2,11 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>GIDClientID</key>
+	<string>576196499899-64b9179g789khvjv8q1idqvet829bpvj.apps.googleusercontent.com</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>manrope_medium.ttf</string>
 		<string>manrope_semibold.ttf</string>
 		<string>manrope_bold.ttf</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.576196499899-64b9179g789khvjv8q1idqvet829bpvj</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

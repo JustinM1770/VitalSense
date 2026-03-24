@@ -85,7 +85,6 @@ import mx.ita.vitalsense.data.model.computeAlerts
 import mx.ita.vitalsense.data.model.overallStatus
 import mx.ita.vitalsense.data.report.ReportGenerator
 import mx.ita.vitalsense.data.repository.VitalsRepository
-import mx.ita.vitalsense.data.test.TestDataSeeder
 import mx.ita.vitalsense.ui.components.ChartMetric
 import mx.ita.vitalsense.ui.components.NeuCard
 import mx.ita.vitalsense.ui.components.VitalsLineChart
@@ -122,8 +121,7 @@ class PatientDetailViewModel(patientId: String = "") : ViewModel() {
 
     val history: StateFlow<List<VitalsSnapshot>> = repo
         .observeHistory(patientId)
-        .map { list -> list.ifEmpty { TestDataSeeder.mockHistory(patientId) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TestDataSeeder.mockHistory(patientId))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // Expose patient name for Jonathan's Scaffold topBar
     val patientName: String
