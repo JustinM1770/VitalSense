@@ -1,0 +1,10 @@
+mx.ita.vitalsense.shared-pngs-0 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\build\generated\res\pngs\debug
+mx.ita.vitalsense.shared-updated_navigation_xml-1 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\build\generated\updated_navigation_xml\debug
+mx.ita.vitalsense.shared-mergeDebugResources-2 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\build\intermediates\incremental\debug\mergeDebugResources\merged.dir
+mx.ita.vitalsense.shared-mergeDebugResources-3 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\build\intermediates\incremental\debug\mergeDebugResources\stripped.dir
+mx.ita.vitalsense.shared-debug-4 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\build\intermediates\merged_res\debug\mergeDebugResources
+mx.ita.vitalsense.shared-debug-5 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\build\intermediates\packaged_res\debug\packageDebugResources
+mx.ita.vitalsense.shared-androidDebug-6 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\src\androidDebug\res
+mx.ita.vitalsense.shared-androidMain-7 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\src\androidMain\res
+mx.ita.vitalsense.shared-debug-8 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\src\debug\res
+mx.ita.vitalsense.shared-main-9 C:\Users\jonny\AndroidStudioProjects\VitalSense\shared\src\main\res

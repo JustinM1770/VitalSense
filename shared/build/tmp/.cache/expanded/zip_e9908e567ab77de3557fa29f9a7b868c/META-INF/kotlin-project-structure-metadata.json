@@ -1,0 +1,186 @@
+{
+  "projectStructure": {
+    "formatVersion": "0.3.3",
+    "isPublishedAsRoot": "true",
+    "variants": [
+      {
+        "name": "iosArm64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "iosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "iosSimulatorArm64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "iosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "iosX64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "iosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "macosArm64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "macosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "macosX64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "macosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "tvosArm64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "tvosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "tvosSimulatorArm64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "tvosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "tvosX64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "tvosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "watchosArm32ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "watchosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "watchosArm64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "watchosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "watchosSimulatorArm64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "watchosMain",
+          "darwinMain"
+        ]
+      },
+      {
+        "name": "watchosX64ApiElements",
+        "sourceSet": [
+          "commonMain",
+          "watchosMain",
+          "darwinMain"
+        ]
+      }
+    ],
+    "sourceSets": [
+      {
+        "name": "commonMain",
+        "dependsOn": [],
+        "moduleDependency": [
+          "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "org.jetbrains.kotlin:kotlin-stdlib-common",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "sourceSetCInteropMetadataDirectory": "commonMain-cinterop",
+        "binaryLayout": "klib",
+        "hostSpecific": "true"
+      },
+      {
+        "name": "darwinMain",
+        "dependsOn": [],
+        "moduleDependency": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlin:kotlin-stdlib-common",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "sourceSetCInteropMetadataDirectory": "darwinMain-cinterop",
+        "binaryLayout": "klib",
+        "hostSpecific": "true"
+      },
+      {
+        "name": "iosMain",
+        "dependsOn": [
+          "darwinMain"
+        ],
+        "moduleDependency": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlin:kotlin-stdlib-common",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "sourceSetCInteropMetadataDirectory": "iosMain-cinterop",
+        "binaryLayout": "klib",
+        "hostSpecific": "true"
+      },
+      {
+        "name": "macosMain",
+        "dependsOn": [
+          "darwinMain"
+        ],
+        "moduleDependency": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlin:kotlin-stdlib-common",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "sourceSetCInteropMetadataDirectory": "macosMain-cinterop",
+        "binaryLayout": "klib",
+        "hostSpecific": "true"
+      },
+      {
+        "name": "tvosMain",
+        "dependsOn": [
+          "darwinMain"
+        ],
+        "moduleDependency": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlin:kotlin-stdlib-common",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "sourceSetCInteropMetadataDirectory": "tvosMain-cinterop",
+        "binaryLayout": "klib",
+        "hostSpecific": "true"
+      },
+      {
+        "name": "watchosMain",
+        "dependsOn": [
+          "darwinMain"
+        ],
+        "moduleDependency": [
+          "io.ktor:ktor-client-core",
+          "org.jetbrains.kotlin:kotlin-stdlib-common",
+          "org.jetbrains.kotlinx:atomicfu"
+        ],
+        "sourceSetCInteropMetadataDirectory": "watchosMain-cinterop",
+        "binaryLayout": "klib",
+        "hostSpecific": "true"
+      }
+    ]
+  }
+}

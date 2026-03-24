@@ -37,7 +37,7 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <application
-        android:name=".HealthSensorApp"
+        android:name="mx.ita.vitalsense.HealthSensorApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -95,22 +95,28 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Commented out: PermissionController is not properly instantiatable
         <activity
             android:name="androidx.health.connect.client.PermissionController"
             android:exported="false" />
+        -->
 
         <!-- Service for Listening to SOS Events Globally -->
+        <!-- Commented out: EmergencyListenerService does not exist yet
         <service
             android:name=".service.EmergencyListenerService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        -->
 
         <!-- Reinicio de Servicio al prender el teléfono -->
+        <!-- Commented out: MobileBootReceiver does not exist yet
         <receiver android:name=".receiver.MobileBootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        -->
 
         <!-- FileProvider para compartir PDFs -->
         <provider
