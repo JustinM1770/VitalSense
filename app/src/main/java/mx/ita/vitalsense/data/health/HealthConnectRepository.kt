@@ -6,9 +6,11 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.BloodGlucoseRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import java.time.Instant
+import java.time.Duration
 import java.time.temporal.ChronoUnit
 
 data class HealthConnectVitals(
@@ -26,6 +28,7 @@ class HealthConnectRepository(private val context: Context) {
             HealthPermission.getReadPermission(HeartRateRecord::class),
             HealthPermission.getReadPermission(OxygenSaturationRecord::class),
             HealthPermission.getReadPermission(BloodGlucoseRecord::class),
+            HealthPermission.getReadPermission(SleepSessionRecord::class),
         )
 
         fun isAvailable(context: Context): Boolean =
@@ -85,7 +88,34 @@ class HealthConnectRepository(private val context: Context) {
     }
 
     suspend fun readSleepData(start: Instant, end: Instant, context: Context): mx.ita.vitalsense.data.model.SleepData? {
-        // Fallback mock or logic. We return a default since actual SleepSessionRecord requires more complex logic.
-        return mx.ita.vitalsense.data.model.SleepData(score = 85, horas = 7.5f, estado = "Bueno")
+        val response = client.readRecords(
+            ReadRecordsRequest(SleepSessionRecord::class, timeRangeFilter = TimeRangeFilter.between(start, end))
+        )
+
+        if (response.records.isEmpty()) {
+            return mx.ita.vitalsense.data.model.SleepData(score = 0, horas = 0f, estado = "No durmió")
+        }
+
+        val totalMinutes = response.records.sumOf { session ->
+            Duration.between(session.startTime, session.endTime).toMinutes().coerceAtLeast(0)
+        }
+
+        val hours = (totalMinutes / 60f)
+        if (hours <= 0f) {
+            return mx.ita.vitalsense.data.model.SleepData(score = 0, horas = 0f, estado = "No durmió")
+        }
+
+        val score = ((hours / 8f) * 100f).toInt().coerceIn(0, 100)
+        val estado = when {
+            hours < 5f -> "Malo"
+            hours < 7f -> "Regular"
+            else -> "Bueno"
+        }
+
+        return mx.ita.vitalsense.data.model.SleepData(
+            score = score,
+            horas = (kotlin.math.round(hours * 10f) / 10f),
+            estado = estado,
+        )
     }
 }

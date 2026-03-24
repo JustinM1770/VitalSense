@@ -68,6 +68,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.database)
     implementation(libs.firebase.auth)
+    implementation(libs.firebase.storage)
     implementation(libs.auth.manager)
     implementation(libs.auth.play.services)
     implementation(libs.googleid)

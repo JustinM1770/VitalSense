@@ -1,5 +1,8 @@
 package mx.ita.vitalsense.ui.dashboard
 
+import android.content.Context
+import android.content.SharedPreferences
+import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +36,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.AlertDialog
@@ -53,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -68,13 +74,16 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
+import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.model.Medication
 import mx.ita.vitalsense.data.model.SleepData
@@ -87,9 +96,24 @@ import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.DashCard
 import mx.ita.vitalsense.ui.theme.Manrope
 import mx.ita.vitalsense.ui.theme.SleepGreen
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
+
+private enum class LibreProfileMode(val key: String, val label: String) {
+    AUTO("auto", "Auto"),
+    GENERAL("general", "General"),
+    DIABETES("diabetes", "Diabetes"),
+}
+
+private enum class LibreContextMode(val key: String, val label: String) {
+    AUTO("auto", "Auto"),
+    AYUNO("ayuno", "Ayuno"),
+    POSTPRANDIAL("postprandial", "Postprandial"),
+}
 
 // ─── Figma / Image design tokens ──────────────────────────────────────────────
 private val BlueCardBg     = Color(0xFF90C2F9)
@@ -99,6 +123,8 @@ private val TextGray       = Color(0xFF7F8C8D)
 private val SuccessGreen   = Color(0xFF10B981)
 private val HeartRateCurve = Color(0xFFEF4444)
 
+private enum class MetricCardType { SLEEP, SPO2, HR, KCAL }
+
 @Composable
 fun DashboardScreen(
     onNavigateToNotifications: () -> Unit = {},
@@ -107,6 +133,8 @@ fun DashboardScreen(
     onNavigateToReports: () -> Unit = {},
     onNavigateToHome: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
+    onMedicationClick: () -> Unit = {},
+    onLibreScanClick: () -> Unit = {},
     onConnectDevice: () -> Unit = {},
     onPatientClick: (String) -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -125,8 +153,44 @@ fun DashboardScreen(
     var showSettingsDialog by remember { mutableStateOf(false) }
     val uiState by vm.uiState.collectAsState()
     val currentUser = FirebaseAuth.getInstance().currentUser
+    val context = LocalContext.current
+    val profilePrefs = remember { context.getSharedPreferences("vitalsense_profile", Context.MODE_PRIVATE) }
+    val uid = currentUser?.uid.orEmpty()
+    var libreGlucoseProfile by remember {
+        mutableStateOf(
+            if (uid.isNotEmpty()) profilePrefs.getString("libre_glucose_profile_$uid", "auto") ?: "auto" else "auto"
+        )
+    }
+    var libreGlucoseContext by remember {
+        mutableStateOf(
+            if (uid.isNotEmpty()) profilePrefs.getString("libre_glucose_context_$uid", "auto") ?: "auto" else "auto"
+        )
+    }
+
+    LaunchedEffect(uid) {
+        if (uid.isEmpty()) return@LaunchedEffect
+        try {
+            val snapshot = com.google.firebase.database.FirebaseDatabase.getInstance()
+                .getReference("patients/$uid/profile")
+                .get()
+                .await()
+            val remoteProfile = snapshot.child("glucoseProfileMode").getValue(String::class.java)
+            val remoteContext = snapshot.child("glucoseContextMode").getValue(String::class.java)
+            if (!remoteProfile.isNullOrBlank()) {
+                libreGlucoseProfile = remoteProfile
+                profilePrefs.edit().putString("libre_glucose_profile_$uid", remoteProfile).apply()
+            }
+            if (!remoteContext.isNullOrBlank()) {
+                libreGlucoseContext = remoteContext
+                profilePrefs.edit().putString("libre_glucose_context_$uid", remoteContext).apply()
+            }
+        } catch (_: Exception) {
+            // Keep local preferences if cloud is unavailable.
+        }
+    }
 
     val userName = currentUser?.displayName ?: "Usuario"
+    val userAvatarUri = if (uid.isNotEmpty()) profilePrefs.getString("avatar_uri_$uid", null) else null
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -140,29 +204,33 @@ fun DashboardScreen(
                 val sleepData = if (state is DashboardUiState.Success) state.sleepData else null
                 val vitalsHistory = if (state is DashboardUiState.Success) state.vitalsHistory else emptyList()
                 val medications = if (state is DashboardUiState.Success) state.medications else emptyList()
-                val isWatchPaired = state.isWatchPaired
-                val pairedDeviceName = if (state is DashboardUiState.Success) state.pairedDeviceName else "Wearable"
-
+                val libreLastGlucose = if (uid.isNotEmpty()) profilePrefs.getFloat("libre_last_glucose_$uid", 0f).toDouble() else 0.0
+                val libreLastTime = if (uid.isNotEmpty()) profilePrefs.getLong("libre_last_time_$uid", 0L) else 0L
+                val libreLastSource = if (uid.isNotEmpty()) profilePrefs.getString("libre_last_source_$uid", "") ?: "" else ""
                 DashboardContent(
                     userName = userName,
+                    userAvatarUri = userAvatarUri,
                     patients = patients,
                     sleepData = sleepData,
                     vitalsHistory = vitalsHistory,
                     medications = medications,
-                    isWatchPaired = isWatchPaired,
-                    pairedDeviceName = pairedDeviceName,
                     onPatientClick = onPatientClick,
                     onReportClick = onReportClick,
                     onProfileClick = { onNavigateToProfile(); onProfileClick() },
                     onNotifClick = { onNavigateToNotifications(); onNotifClick() },
                     onDetailedClick = onNavigateToDetailed,
+                    onMedicationClick = onMedicationClick,
+                    onLibreScanClick = onLibreScanClick,
+                    libreLastGlucose = libreLastGlucose,
+                    libreLastTime = libreLastTime,
+                    libreLastSource = libreLastSource,
+                    libreGlucoseProfile = libreGlucoseProfile,
+                    libreGlucoseContext = libreGlucoseContext,
                     snackbarHostState = snackbarHostState,
                     onSearchClick = {
                         coroutineScope.launch { snackbarHostState.showSnackbar("Función de búsqueda en desarrollo") }
                     },
-                    onConnectDevice = onConnectDevice,
                     onSettingsClick = { showSettingsDialog = true },
-                    onDisconnectWatch = { vm.disconnectWatch() },
                 )
             }
         }
@@ -188,13 +256,145 @@ fun DashboardScreen(
         if (showSettingsDialog) {
             SettingsDialog(
                 isWatchPaired = uiState.isWatchPaired,
+                libreProfileMode = libreGlucoseProfile,
+                libreContextMode = libreGlucoseContext,
                 onDismiss = { showSettingsDialog = false },
                 onWearableClick = {
                     showSettingsDialog = false
                     onConnectDevice()
+                },
+                onLibreClick = {
+                    showSettingsDialog = false
+                    onLibreScanClick()
+                },
+                onLibreModeChanged = { profileMode, contextMode ->
+                    if (uid.isNotEmpty()) {
+                        profilePrefs.edit()
+                            .putString("libre_glucose_profile_$uid", profileMode)
+                            .putString("libre_glucose_context_$uid", contextMode)
+                            .apply()
+                        com.google.firebase.database.FirebaseDatabase.getInstance()
+                            .getReference("patients/$uid/profile")
+                            .updateChildren(
+                                mapOf(
+                                    "glucoseProfileMode" to profileMode,
+                                    "glucoseContextMode" to contextMode,
+                                )
+                            )
+                    }
+                    libreGlucoseProfile = profileMode
+                    libreGlucoseContext = contextMode
+                },
+                onRestoreBackupClick = {
+                    if (uid.isBlank()) {
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Inicia sesión para restaurar respaldo") }
+                    } else {
+                        coroutineScope.launch {
+                            val result = restoreBackupFromFirebase(
+                                uid = uid,
+                                profilePrefs = profilePrefs,
+                                watchPrefs = context.getSharedPreferences("vitalsense_watch_prefs", Context.MODE_PRIVATE),
+                            )
+
+                            if (result.success) {
+                                result.profileMode?.let { libreGlucoseProfile = it }
+                                result.contextMode?.let { libreGlucoseContext = it }
+                            }
+
+                            snackbarHostState.showSnackbar(result.message)
+                        }
+                    }
                 }
             )
         }
+    }
+}
+
+private data class RestoreBackupResult(
+    val success: Boolean,
+    val message: String,
+    val profileMode: String? = null,
+    val contextMode: String? = null,
+)
+
+private suspend fun restoreBackupFromFirebase(
+    uid: String,
+    profilePrefs: SharedPreferences,
+    watchPrefs: SharedPreferences,
+): RestoreBackupResult {
+    return try {
+        val db = com.google.firebase.database.FirebaseDatabase.getInstance()
+
+        val profileSnapshot = db.getReference("patients/$uid/profile").get().await()
+        val patientSnapshot = db.getReference("patients/$uid").get().await()
+        val watchSnapshot = db.getReference("patients/$uid/watch").get().await()
+
+        val editor = profilePrefs.edit()
+
+        fun putStringIfExists(localKey: String, remoteKey: String) {
+            profileSnapshot.child(remoteKey).getValue(String::class.java)?.let { value ->
+                if (value.isNotBlank()) editor.putString("${localKey}_$uid", value)
+            }
+        }
+
+        putStringIfExists("nombre", "nombre")
+        putStringIfExists("apellidos", "apellidos")
+        putStringIfExists("nacimiento", "nacimiento")
+        putStringIfExists("celular", "celular")
+        putStringIfExists("genero", "genero")
+        putStringIfExists("frecuencia", "frecuencia")
+        profileSnapshot.child("tipoSangre").getValue(String::class.java)?.let { value ->
+            if (value.isNotBlank()) editor.putString("tipo_sangre_$uid", value)
+        }
+        profileSnapshot.child("avatarUri").getValue(String::class.java)?.let { value ->
+            if (value.isNotBlank()) editor.putString("avatar_uri_$uid", value)
+        }
+
+        val glucoseProfileMode = profileSnapshot.child("glucoseProfileMode").getValue(String::class.java)
+        val glucoseContextMode = profileSnapshot.child("glucoseContextMode").getValue(String::class.java)
+        if (!glucoseProfileMode.isNullOrBlank()) editor.putString("libre_glucose_profile_$uid", glucoseProfileMode)
+        if (!glucoseContextMode.isNullOrBlank()) editor.putString("libre_glucose_context_$uid", glucoseContextMode)
+
+        val documents = profileSnapshot.child("documents").children.mapNotNull { it.getValue(String::class.java) }
+        if (documents.isNotEmpty()) editor.putStringSet("documents_$uid", documents.toSet())
+
+        profileSnapshot.child("driveTreeUri").getValue(String::class.java)?.let { editor.putString("drive_tree_uri_$uid", it) }
+        profileSnapshot.child("driveFolderUrl").getValue(String::class.java)?.let { editor.putString("drive_folder_url_$uid", it) }
+
+        editor.putBoolean("cuestionario_completed_$uid", true)
+
+        patientSnapshot.child("glucose").getValue(Double::class.java)?.let { glucose ->
+            editor.putFloat("libre_last_glucose_$uid", glucose.toFloat())
+        }
+        patientSnapshot.child("timestamp").getValue(Long::class.java)?.let { ts ->
+            editor.putLong("libre_last_time_$uid", ts)
+        }
+        patientSnapshot.child("glucoseSource").getValue(String::class.java)?.let { src ->
+            editor.putString("libre_last_source_$uid", src)
+        }
+
+        editor.apply()
+
+        val watchPaired = watchSnapshot.child("paired").getValue(Boolean::class.java) ?: false
+        val watchCode = watchSnapshot.child("code").getValue(String::class.java).orEmpty()
+        val watchName = watchSnapshot.child("deviceName").getValue(String::class.java) ?: "Wearable"
+        watchPrefs.edit()
+            .putBoolean("code_paired", watchPaired)
+            .putString("paired_code", watchCode)
+            .putString("paired_device_name", watchName)
+            .apply()
+
+        RestoreBackupResult(
+            success = true,
+            message = "Respaldo restaurado desde Firebase",
+            profileMode = glucoseProfileMode,
+            contextMode = glucoseContextMode,
+        )
+    } catch (e: Exception) {
+        RestoreBackupResult(
+            success = false,
+            message = "No se pudo restaurar: ${e.message ?: "sin conexión"}",
+        )
     }
 }
 
@@ -203,22 +403,26 @@ fun DashboardScreen(
 @Composable
 private fun DashboardContent(
     userName: String,
+    userAvatarUri: String?,
     patients: List<VitalsData>,
     sleepData: SleepData?,
     vitalsHistory: List<VitalsData>,
     medications: List<Medication>,
-    isWatchPaired: Boolean,
-    pairedDeviceName: String = "Wearable",
     onPatientClick: (String) -> Unit,
     onReportClick: () -> Unit,
     onProfileClick: () -> Unit,
     onNotifClick: () -> Unit,
     onDetailedClick: () -> Unit,
+    onMedicationClick: () -> Unit,
+    onLibreScanClick: () -> Unit,
+    libreLastGlucose: Double,
+    libreLastTime: Long,
+    libreLastSource: String,
+    libreGlucoseProfile: String,
+    libreGlucoseContext: String,
     snackbarHostState: SnackbarHostState,
     onSearchClick: () -> Unit,
-    onConnectDevice: () -> Unit,
     onSettingsClick: () -> Unit,
-    onDisconnectWatch: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -231,6 +435,7 @@ private fun DashboardContent(
         // ── Header: avatar + saludo + campana ────────────────────────────────
         UserHeader(
             name = userName,
+            avatarUri = userAvatarUri,
             onNotificationClick = onNotifClick,
             onProfileClick = onProfileClick,
         )
@@ -245,19 +450,6 @@ private fun DashboardContent(
 
         Spacer(Modifier.height(24.dp))
 
-        // ── Device connection card (only if not paired) ───────────────────────
-        if (!isWatchPaired) {
-            DeviceConnectionCard(onClick = onConnectDevice)
-            Spacer(Modifier.height(24.dp))
-        } else {
-            WatchStatusCard(
-                deviceName = pairedDeviceName,
-                onDisconnect = onDisconnectWatch,
-                onClick = onConnectDevice,
-            )
-            Spacer(Modifier.height(24.dp))
-        }
-
         // ── Blue rounded container ────────────────────────────────────────────
         Column(
             modifier = Modifier
@@ -267,29 +459,71 @@ private fun DashboardContent(
                 .padding(24.dp)
         ) {
             // ── "Esta semana" — sleep / HR / Kcal pager ───────────────────────
-            SectionHeader(title = "Esta semana", showArrow = true)
+            val visibleCards = remember {
+                mutableStateListOf(MetricCardType.SLEEP, MetricCardType.SPO2)
+            }
+            val dashboardScope = rememberCoroutineScope()
+
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader(title = "Esta semana", showArrow = true)
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    modifier = Modifier.size(30.dp).clickable {
+                        val next = listOf(MetricCardType.HR, MetricCardType.KCAL)
+                            .firstOrNull { it !in visibleCards }
+                        if (next != null) {
+                            visibleCards.add(next)
+                        } else {
+                            dashboardScope.launch { snackbarHostState.showSnackbar("Ya agregaste todas las tarjetas") }
+                        }
+                    },
+                    shape = CircleShape,
+                    color = Color.White,
+                    shadowElevation = 2.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(text = "+", color = DashBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
 
-            val pagerState = rememberPagerState(pageCount = { 4 })
-            val sleepPct = sleepData?.score
-                ?: if (patients.isNotEmpty()) {
-                    ((patients.first().spo2 - 85).coerceIn(0, 15) * 100 / 15 + 60).coerceIn(0, 100)
-                } else 70
+            val pagerState = rememberPagerState(pageCount = { visibleCards.size })
 
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
             ) { page ->
-                when (page) {
-                    0 -> SleepMetricCard(sleepData = sleepData, pctFallback = sleepPct, onClick = onReportClick)
-                    1 -> HrMiniCard(patients)
-                    2 -> Spo2MiniCard(patients)
-                    else -> KcalMiniCard(patients)
+                when (visibleCards.getOrElse(page) { MetricCardType.SLEEP }) {
+                    MetricCardType.SLEEP -> SleepMetricCard(sleepData = sleepData, onClick = onReportClick)
+                    MetricCardType.SPO2 -> Spo2MiniCard(patients)
+                    MetricCardType.HR -> HrMiniCard(patients)
+                    MetricCardType.KCAL -> KcalMiniCard(patients)
                 }
             }
 
             Spacer(Modifier.height(12.dp))
-            PagerDots(count = 4, selected = pagerState.currentPage)
+            PagerDots(count = visibleCards.size, selected = pagerState.currentPage)
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── Libre resumen rápido ────────────────────────────────────────
+            LibreQuickCard(
+                glucose = libreLastGlucose,
+                timestamp = libreLastTime,
+                source = libreLastSource,
+                profileMode = libreGlucoseProfile,
+                contextMode = libreGlucoseContext,
+                onScanClick = onLibreScanClick,
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── Extra UX: acciones rápidas ─────────────────────────────────
+            QuickActionsCard(
+                onLibreScanClick = onLibreScanClick,
+                onMedicationClick = onMedicationClick,
+            )
 
             Spacer(Modifier.height(24.dp))
 
@@ -305,7 +539,7 @@ private fun DashboardContent(
             // ── Medicamentos ──────────────────────────────────────────────────
             MedicationsCard(
                 medications = medications,
-                onSeeAllClick = onReportClick,
+                onSeeAllClick = onMedicationClick,
             )
 
             Spacer(Modifier.height(24.dp))
@@ -320,6 +554,7 @@ private fun DashboardContent(
 @Composable
 private fun UserHeader(
     name: String,
+    avatarUri: String?,
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
 ) {
@@ -358,13 +593,22 @@ private fun UserHeader(
                 .clickable { onProfileClick() },
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = name.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
-                fontFamily = Manrope,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = Color.White,
-            )
+            if (!avatarUri.isNullOrBlank()) {
+                AsyncImage(
+                    model = Uri.parse(avatarUri),
+                    contentDescription = "Avatar",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text = name.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = Color.White,
+                )
+            }
         }
 
         Spacer(Modifier.width(12.dp))
@@ -558,9 +802,17 @@ private fun SectionHeader(title: String, showArrow: Boolean = false) {
 // ─── Sleep card ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun SleepMetricCard(sleepData: SleepData?, pctFallback: Int, onClick: () -> Unit) {
-    val progress = (sleepData?.score ?: pctFallback) / 100f
-    val scoreText = sleepData?.score?.toString() ?: "$pctFallback"
+private fun SleepMetricCard(sleepData: SleepData?, onClick: () -> Unit) {
+    val hasSleepData = sleepData != null && sleepData.horas > 0f
+    val score = if (hasSleepData) sleepData?.score?.coerceIn(0, 100) ?: 0 else 0
+    val progress = score / 100f
+    val scoreText = score.toString()
+    val sleepStatus = if (hasSleepData) {
+        sleepData?.estado?.takeIf { it.isNotBlank() } ?: "Regular"
+    } else {
+        "No durmió"
+    }
+    val sleepStatusColor = if (hasSleepData) SuccessGreen else TextGray
 
     WhiteCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
         Row(
@@ -585,10 +837,7 @@ private fun SleepMetricCard(sleepData: SleepData?, pctFallback: Int, onClick: ()
                     text = "${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }} ${today.year}",
                     fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A),
                 )
-                Text(sleepData?.estado ?: "Sin Datos", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
-            }
-            if (sleepData?.score != null) {
-                Text(text = "+10%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SleepGreen)
+                Text(sleepStatus, color = sleepStatusColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
             }
         }
     }
@@ -762,15 +1011,20 @@ private fun MedicationsCard(
 
 @Composable
 private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
-    val days = listOf("Sun", "Mon", "Tue", "Wed", "Thru", "Fri", "Sat")
-    // Agrupa el historial por día de la semana (0=Dom … 6=Sáb), promedia HR real
+    val zone = ZoneId.systemDefault()
+    val today = LocalDate.now(zone)
+    val last7Dates = (6 downTo 0).map { today.minusDays(it.toLong()) }
+    val dayLabels = last7Dates.map {
+        it.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es"))
+            .replaceFirstChar { c -> c.uppercase() }
+    }
+
     val grouped = vitalsHistory
         .filter { it.heartRate > 0 && it.timestamp > 0 }
         .groupBy {
-            java.util.Calendar.getInstance().apply { timeInMillis = it.timestamp }
-                .get(java.util.Calendar.DAY_OF_WEEK) - 1  // 0-indexed Sunday
+            java.time.Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate()
         }
-    val values = (0..6).map { day ->
+    val values = last7Dates.map { day ->
         grouped[day]?.map { it.heartRate }?.average()?.toInt() ?: 0
     }
     val hasData = values.any { it > 0 }
@@ -791,7 +1045,7 @@ private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
 
             // grid
             yLabels.forEach { y -> drawLine(Color(0xFFEEEEEE), Offset(0f, yOf(y)), Offset(w, yOf(y)), 1.dp.toPx()) }
-            days.indices.forEach { i -> drawLine(Color(0xFFEEEEEE), Offset(xOf(i), 0f), Offset(xOf(i), h), 0.5.dp.toPx()) }
+            dayLabels.indices.forEach { i -> drawLine(Color(0xFFEEEEEE), Offset(xOf(i), 0f), Offset(xOf(i), h), 0.5.dp.toPx()) }
 
             if (!hasData) return@Canvas
 
@@ -824,7 +1078,7 @@ private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
 
     // Day labels
     Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        listOf("0").plus(days).forEach { Text(it, fontFamily = Manrope, fontSize = 9.sp, color = Color(0xFFB0B0B0)) }
+        dayLabels.forEach { Text(it, fontFamily = Manrope, fontSize = 9.sp, color = Color(0xFFB0B0B0)) }
     }
 }
 
@@ -893,6 +1147,230 @@ fun WhiteCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Box(modifier = modifier.clip(RoundedCornerShape(20.dp)).background(DashCard)) { content() }
 }
 
+@Composable
+private fun LibreQuickCard(
+    glucose: Double,
+    timestamp: Long,
+    source: String,
+    profileMode: String,
+    contextMode: String,
+    onScanClick: () -> Unit,
+) {
+    val clinical = evaluateLibreClinicalStatus(
+        glucose = glucose,
+        timestamp = timestamp,
+        source = source,
+        profileMode = profileMode,
+        contextMode = contextMode,
+    )
+
+    WhiteCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = DashBlue)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Sensor de glucosa", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1A1A2E))
+                }
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DashBlue,
+                    modifier = Modifier.clickable { onScanClick() },
+                ) {
+                    Text(
+                        "Escanear",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = Color.White,
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(clinical.statusColor),
+                )
+                Text(
+                    text = clinical.statusText,
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    color = clinical.statusColor,
+                )
+            }
+
+            Text(
+                text = "Objetivo ${clinical.contextLabel}: ${clinical.targetRange}",
+                fontFamily = Manrope,
+                fontSize = 11.sp,
+                color = Color(0xFF6B7280),
+            )
+            Text(
+                text = "Perfil clinico: ${clinical.profileLabel}",
+                fontFamily = Manrope,
+                fontSize = 11.sp,
+                color = Color(0xFF6B7280),
+            )
+
+            Text(
+                text = if (glucose > 0.0) "${"%.0f".format(glucose)} mg/dL" else "Sin lectura reciente",
+                fontFamily = Manrope,
+                fontWeight = FontWeight.Bold,
+                fontSize = 26.sp,
+                color = if (glucose > 0.0) DashBlue else Color(0xFF8A8A8A),
+            )
+            Text(
+                text = if (timestamp > 0L) {
+                    "Actualizado: ${SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag("es")).format(Date(timestamp))}"
+                } else {
+                    "Acerca el sensor al telefono para guardar lectura"
+                },
+                fontFamily = Manrope,
+                fontSize = 12.sp,
+                color = Color(0xFF8A8A8A),
+            )
+            if (source.isNotBlank()) {
+                Text(
+                    text = "Fuente: $source",
+                    fontFamily = Manrope,
+                    fontSize = 11.sp,
+                    color = Color(0xFF6B7280),
+                )
+            }
+        }
+    }
+}
+
+private data class LibreClinicalStatus(
+    val statusText: String,
+    val statusColor: Color,
+    val targetRange: String,
+    val profileLabel: String,
+    val contextLabel: String,
+)
+
+private fun evaluateLibreClinicalStatus(
+    glucose: Double,
+    timestamp: Long,
+    source: String,
+    profileMode: String,
+    contextMode: String,
+): LibreClinicalStatus {
+    if (glucose <= 0.0) {
+        return LibreClinicalStatus(
+            statusText = "Sin lectura",
+            statusColor = Color(0xFF9CA3AF),
+            targetRange = "-",
+            profileLabel = "General",
+            contextLabel = "actual",
+        )
+    }
+
+    val resolvedProfile = when (profileMode.lowercase(Locale.ROOT)) {
+        "diabetes", "diabetico", "diabetica", "dm", "dm2", "dm1" -> "diabetes"
+        "general", "normal", "no_diabetes" -> "general"
+        else -> if (source.contains("libre", ignoreCase = true)) "diabetes" else "general"
+    }
+
+    val resolvedContext = when (contextMode.lowercase(Locale.ROOT)) {
+        "ayuno", "fasting", "preprandial" -> "ayuno"
+        "post", "postprandial", "despues_comer", "despues de comer" -> "postprandial"
+        else -> inferGlucoseContext(timestamp)
+    }
+
+    val profileLabel = if (resolvedProfile == "diabetes") "Diabetes" else "General"
+    val contextLabel = if (resolvedContext == "postprandial") "postprandial" else "ayuno"
+
+    val (targetMin, targetMax) = when {
+        resolvedProfile == "diabetes" && resolvedContext == "postprandial" -> Pair(70.0, 180.0)
+        resolvedProfile == "diabetes" -> Pair(80.0, 130.0)
+        resolvedContext == "postprandial" -> Pair(70.0, 140.0)
+        else -> Pair(70.0, 99.0)
+    }
+
+    val isCriticalHigh = glucose >= if (resolvedProfile == "diabetes") 300.0 else 250.0
+    val isCriticalLow = glucose < 54.0
+
+    val (statusText, statusColor) = when {
+        isCriticalLow -> Pair("Hipoglucemia severa", Color(0xFFB91C1C))
+        glucose < 70.0 -> Pair("Bajo", Color(0xFFEF4444))
+        glucose in targetMin..targetMax -> Pair("En rango", Color(0xFF10B981))
+        isCriticalHigh -> Pair("Muy alto", Color(0xFFB91C1C))
+        glucose > targetMax -> Pair("Alto", Color(0xFFF59E0B))
+        else -> Pair("Vigilar", Color(0xFFF59E0B))
+    }
+
+    return LibreClinicalStatus(
+        statusText = statusText,
+        statusColor = statusColor,
+        targetRange = "${targetMin.toInt()}-${targetMax.toInt()} mg/dL",
+        profileLabel = profileLabel,
+        contextLabel = contextLabel,
+    )
+}
+
+private fun inferGlucoseContext(timestamp: Long): String {
+    if (timestamp <= 0L) return "ayuno"
+    val calendar = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
+    val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+    return if (hour in 10..21) "postprandial" else "ayuno"
+}
+
+@Composable
+private fun QuickActionsCard(
+    onLibreScanClick: () -> Unit,
+    onMedicationClick: () -> Unit,
+) {
+    WhiteCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Acciones rápidas",
+                fontFamily = Manrope,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = Color(0xFF1A1A2E),
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(
+                    modifier = Modifier.weight(1f).clickable { onLibreScanClick() },
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFE8F1FF),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.MonitorHeart, null, tint = DashBlue)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Escanear glucosa", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DashBlue)
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.weight(1f).clickable { onMedicationClick() },
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFFFF4E5),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Medication, null, tint = Color(0xFFB45309))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Agregar medicamento", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFFB45309))
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Keep DashWhiteCard as alias for backward compatibility
 @Composable
 fun DashWhiteCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) = WhiteCard(modifier, content)
@@ -902,12 +1380,19 @@ fun DashWhiteCard(modifier: Modifier = Modifier, content: @Composable () -> Unit
 @Composable
 fun SettingsDialog(
     isWatchPaired: Boolean,
+    libreProfileMode: String,
+    libreContextMode: String,
     onDismiss: () -> Unit,
-    onWearableClick: () -> Unit
+    onWearableClick: () -> Unit,
+    onLibreClick: () -> Unit,
+    onLibreModeChanged: (String, String) -> Unit,
+    onRestoreBackupClick: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("vitalsense_watch_prefs", android.content.Context.MODE_PRIVATE) }
     var requireBiometric by remember { mutableStateOf(prefs.getBoolean("require_biometric", false)) }
+    var selectedProfile by remember { mutableStateOf(libreProfileMode) }
+    var selectedContext by remember { mutableStateOf(libreContextMode) }
 
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
@@ -958,6 +1443,19 @@ fun SettingsDialog(
                     }
                 }
 
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                    onRestoreBackupClick()
+                }) {
+                    Box(modifier = Modifier.size(40.dp).background(Color(0xFFEEF2FF), CircleShape), contentAlignment = Alignment.Center) {
+                        Text("R", color = PrimaryBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Restaurar respaldo", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text("Forzar sincronización desde Firebase", fontSize = 12.sp, color = TextGray)
+                    }
+                }
+
                 // Biometrics
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(40.dp).background(Color(0xFFE0E0E0), CircleShape), contentAlignment = Alignment.Center) {
@@ -976,6 +1474,79 @@ fun SettingsDialog(
                         },
                         colors = SwitchDefaults.colors(checkedThumbColor = PrimaryBlue, checkedTrackColor = PrimaryBlue.copy(alpha = 0.5f))
                     )
+                }
+
+                // Libre NFC
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                    onLibreClick()
+                }) {
+                    Box(modifier = Modifier.size(40.dp).background(Color(0xFFFFF3E0), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = Color(0xFFF57C00), modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Escanear glucosa", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
+                        Text("Lectura NFC sin app del fabricante", fontSize = 12.sp, color = TextGray)
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Objetivo clínico de glucosa", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextDark)
+                    Text(
+                        "Define como interpretar lecturas: perfil del paciente y momento de medicion.",
+                        fontSize = 11.sp,
+                        color = TextGray,
+                    )
+
+                    Text("Perfil", fontSize = 12.sp, color = TextGray)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    ) {
+                        LibreProfileMode.entries.forEach { mode ->
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = if (selectedProfile == mode.key) PrimaryBlue else Color(0xFFEAF2FF),
+                                modifier = Modifier.clickable {
+                                    selectedProfile = mode.key
+                                    onLibreModeChanged(selectedProfile, selectedContext)
+                                },
+                            ) {
+                                Text(
+                                    text = mode.label,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    color = if (selectedProfile == mode.key) Color.White else PrimaryBlue,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
+
+                    Text("Contexto de lectura", fontSize = 12.sp, color = TextGray)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    ) {
+                        LibreContextMode.entries.forEach { mode ->
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = if (selectedContext == mode.key) PrimaryBlue else Color(0xFFEAF2FF),
+                                modifier = Modifier.clickable {
+                                    selectedContext = mode.key
+                                    onLibreModeChanged(selectedProfile, selectedContext)
+                                },
+                            ) {
+                                Text(
+                                    text = mode.label,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    color = if (selectedContext == mode.key) Color.White else PrimaryBlue,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         },

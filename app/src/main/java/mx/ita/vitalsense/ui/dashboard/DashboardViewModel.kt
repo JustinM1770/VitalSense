@@ -188,6 +188,37 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             // Seguir escuchando Firebase en background (cuando llegue reemplaza el mock)
             repository.observePatients().collect { result -> applyResult(result) }
         }
+        
+        // Observar datos del reloj en vitals/current/<userId>
+        viewModelScope.launch {
+            val userId = auth.currentUser?.uid ?: return@launch
+            val vitalsRef = db.getReference("vitals/current/$userId")
+            
+            vitalsRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    try {
+                        val vitals = snapshot.getValue(VitalsData::class.java) ?: return
+                        if (vitals.heartRate > 0 || vitals.spo2 > 0) {
+                            // Sincronizar los datos del reloj al historial
+                            repository.saveSnapshot(userId, vitals)
+                            // Agregar al historial actual en memoria
+                            val current = _uiState.value
+                            if (current is DashboardUiState.Success) {
+                                val updated = current.vitalsHistory.toMutableList()
+                                updated.add(vitals.copy(patientId = userId, timestamp = System.currentTimeMillis()))
+                                // Mantener solo últimas 100 entradas
+                                val trimmed = if (updated.size > 100) updated.drop(updated.size - 100) else updated
+                                _uiState.value = current.copy(vitalsHistory = trimmed)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Ignorar errores de parseo
+                    }
+                }
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+            })
+        }
+        
         // Observar datos de sueño en tiempo real para el día actual
         viewModelScope.launch {
             val userId = auth.currentUser?.uid ?: return@launch

@@ -13,6 +13,7 @@
     <!-- Image picker / cropper permissions -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Health Connect Permissions -->
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
@@ -34,7 +35,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
         android:maxSdkVersion="30" />
 
+    <uses-permission android:name="android.permission.NFC" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <application
         android:name="mx.ita.vitalsense.HealthSensorApp"
@@ -66,6 +70,13 @@
                     android:scheme="vitalsense"
                     android:host="emergency" />
             </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.nfc.action.TECH_DISCOVERED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.action.TECH_DISCOVERED"
+                android:resource="@xml/nfc_tech_filter" />
         </activity>
 
         <!-- Image Cropper Activity -->
@@ -117,7 +128,6 @@
             </intent-filter>
         </receiver>
         -->
-
         <!-- FileProvider para compartir PDFs -->
         <provider
             android:name="androidx.core.content.FileProvider"

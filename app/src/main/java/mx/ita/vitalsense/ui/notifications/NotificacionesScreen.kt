@@ -26,6 +26,10 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -103,6 +107,9 @@ private fun dateLabel(timestamp: Long): String {
 // ── Main Composable ──────────────────────────────────────────────────────────
 @Composable
 fun NotificacionesScreen(
+    initialAlertId: String? = null,
+    initialLat: Double = 0.0,
+    initialLng: Double = 0.0,
     onBack: () -> Unit = {},
     onHomeClick: () -> Unit = {},
     onHealthClick: () -> Unit = {},
@@ -116,6 +123,7 @@ fun NotificacionesScreen(
     var allAlerts by remember { mutableStateOf<List<NotifItem>>(emptyList()) }
     var showUnreadOnly by remember { mutableStateOf(false) }
     var selectedDateFilter by remember { mutableStateOf<String?>(null) }
+    var selectedItem by remember { mutableStateOf<NotifItem?>(null) }
 
     // ── Firebase Listener ────────────────────────────────────────────────────
     DisposableEffect(userId) {
@@ -188,6 +196,17 @@ fun NotificacionesScreen(
 
     val unreadCount = allAlerts.count { !it.isRead }
     val grouped = filtered.groupBy { dateLabel(it.timestamp) }
+
+    androidx.compose.runtime.LaunchedEffect(allAlerts, initialAlertId) {
+        val targetId = initialAlertId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        if (selectedItem?.firebaseKey == targetId) return@LaunchedEffect
+
+        val matched = allAlerts.firstOrNull { it.firebaseKey == targetId }
+            ?: allAlerts.firstOrNull { initialLat != 0.0 && initialLng != 0.0 && it.lat == initialLat && it.lng == initialLng }
+        if (matched != null) {
+            selectedItem = matched
+        }
+    }
 
     // ── Mark all as read ─────────────────────────────────────────────────────
     val markAllRead = {
@@ -376,7 +395,15 @@ fun NotificacionesScreen(
                     }
 
                     items.forEach { item ->
-                        NotifRow(item = item)
+                        NotifRow(
+                            item = item,
+                            onClick = {
+                                if (item.firebaseKey.isNotEmpty()) {
+                                    database.getReference("alerts").child(userId).child(item.firebaseKey).child("read").setValue(true)
+                                }
+                                selectedItem = item.copy(isRead = true, isHighlighted = false)
+                            }
+                        )
                     }
                 }
             }
@@ -394,12 +421,70 @@ fun NotificacionesScreen(
             },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        val detail = selectedItem
+        if (detail != null) {
+            AlertDialog(
+                onDismissRequest = { selectedItem = null },
+                title = {
+                    Text(
+                        text = detail.title,
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.Bold,
+                        color = DashBlue,
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(detail.body, fontFamily = Manrope, fontSize = 14.sp)
+                        Text(
+                            text = "Fecha: ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.forLanguageTag("es")).format(Date(detail.timestamp))}",
+                            fontFamily = Manrope,
+                            fontSize = 12.sp,
+                            color = Color(0xFF6B7280),
+                        )
+                        if (detail.lat != 0.0 && detail.lng != 0.0) {
+                            Text(
+                                text = "Ubicacion: ${detail.lat}, ${detail.lng}",
+                                fontFamily = Manrope,
+                                fontSize = 12.sp,
+                                color = Color(0xFF6B7280),
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            selectedItem = null
+                            if (detail.lat != 0.0 && detail.lng != 0.0) {
+                                val uri = "geo:${detail.lat},${detail.lng}?q=${detail.lat},${detail.lng}(SOS)"
+                                val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
+                                    setPackage("com.google.android.apps.maps")
+                                }
+                                context.startActivity(mapIntent)
+                            }
+                        },
+                        enabled = detail.lat != 0.0 && detail.lng != 0.0,
+                        colors = ButtonDefaults.buttonColors(containerColor = DashBlue),
+                    ) {
+                        Text("Abrir en Maps", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { selectedItem = null }) {
+                        Text("Cerrar", color = DashBlue)
+                    }
+                },
+                containerColor = Color.White,
+            )
+        }
     }
 }
 
 // ── Notification Row ─────────────────────────────────────────────────────────
 @Composable
-private fun NotifRow(item: NotifItem) {
+private fun NotifRow(item: NotifItem, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -408,7 +493,7 @@ private fun NotifRow(item: NotifItem) {
                 else Color.Transparent
             )
             .padding(horizontal = 20.dp, vertical = 20.dp)
-            .clickable { /* Handle click */ },
+            .clickable { onClick() },
         verticalAlignment = Alignment.Top,
     ) {
         Box(

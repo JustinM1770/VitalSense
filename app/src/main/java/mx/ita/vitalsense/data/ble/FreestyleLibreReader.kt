@@ -2,6 +2,7 @@ package mx.ita.vitalsense.data.ble
 
 import android.app.Activity
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -12,9 +13,27 @@ import android.os.Build
 
 class FreestyleLibreReader(private val context: Context) {
 
+    fun isNfcSupported(): Boolean {
+        return NfcAdapter.getDefaultAdapter(context) != null
+    }
+
+    fun isNfcEnabled(): Boolean {
+        val nfcAdapter = NfcAdapter.getDefaultAdapter(context) ?: return false
+        return nfcAdapter.isEnabled
+    }
+
     fun isNfcAvailable(): Boolean {
-        val nfcAdapter = NfcAdapter.getDefaultAdapter(context)
-        return nfcAdapter != null && nfcAdapter.isEnabled
+        return isNfcSupported() && isNfcEnabled()
+    }
+
+    fun openNfcSettings() {
+        val intent = Intent(android.provider.Settings.ACTION_NFC_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            val fallback = Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(fallback)
+        }
     }
 
     fun enableNfcReading(activity: Activity) {

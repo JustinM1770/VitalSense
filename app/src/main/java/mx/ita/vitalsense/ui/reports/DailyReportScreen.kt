@@ -36,6 +36,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.cos
 import kotlin.math.sin
+import java.util.Locale
 
 @Composable
 fun DailyReportScreen(
@@ -60,12 +61,19 @@ fun DailyReportScreen(
                 .padding(horizontal = 20.dp)
         ) {
             Spacer(Modifier.height(16.dp))
-            
-            // --- Date Selector (Timeline) ---
-            DateStrip(
-                selectedDate = state.selectedDate,
-                onDateSelected = { vm.onDateSelected(it) }
+
+            ReportRangeFilterRow(
+                selectedFilter = state.selectedFilter,
+                onFilterSelected = { vm.onFilterSelected(it) }
             )
+
+            if (state.selectedFilter == ReportRangeFilter.SELECTED_DAY) {
+                Spacer(Modifier.height(12.dp))
+                DateStrip(
+                    selectedDate = state.selectedDate,
+                    onDateSelected = { vm.onDateSelected(it) }
+                )
+            }
             
             Spacer(Modifier.height(24.dp))
             
@@ -81,9 +89,19 @@ fun DailyReportScreen(
             val sleepPct = (state.sleepData?.score ?: 0) / 100f
             val glucosePct = latestVitals?.glucose?.toFloat()?.div(140f)?.coerceIn(0f, 1f) ?: 0.6f
             val oxigenoPct = latestVitals?.spo2?.toFloat()?.div(100f)?.coerceIn(0f, 1f) ?: 0.9f
-            val presionPct = 0.7f // mock for now
+            val presionPct = latestVitals?.heartRate?.toFloat()?.div(160f)?.coerceIn(0f, 1f) ?: 0f
+
+            val hrValues = state.vitalsHistory.map { it.heartRate }.filter { it > 0 }
+            val spo2Values = state.vitalsHistory.map { it.spo2 }.filter { it > 0 }
+            val glucoseValues = state.vitalsHistory.map { it.glucose }.filter { it > 0.0 }
+
+            val avgHeartRate = if (hrValues.isNotEmpty()) hrValues.average() else 0.0
+            val avgSpo2 = if (spo2Values.isNotEmpty()) spo2Values.average() else 0.0
+            val avgGlucose = if (glucoseValues.isNotEmpty()) glucoseValues.average() else 0.0
+            val rangeLabel = vm.getRangeLabel(state)
             
             HealthRadarCard(
+                reportLabel = rangeLabel,
                 score = state.sleepData?.score ?: 0,
                 status = state.sleepData?.estado ?: "Sin datos",
                 grade = vm.scoreToGrade(state.sleepData?.score ?: 0),
@@ -92,6 +110,16 @@ fun DailyReportScreen(
                 presionPct = presionPct,
                 oxigenoPct = oxigenoPct,
                 onNavigate = onNavigateToDetailed
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            PeriodAverageCard(
+                rangeLabel = rangeLabel,
+                avgHeartRate = avgHeartRate,
+                avgSpo2 = avgSpo2,
+                avgGlucose = avgGlucose,
+                avgSleepScore = state.sleepData?.score ?: 0,
             )
             
             Spacer(Modifier.height(24.dp))
@@ -132,9 +160,46 @@ fun DailyReportScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            SleepMetricCardDaily(sleepData = state.sleepData)
+            SleepMetricCardDaily(
+                sleepData = state.sleepData,
+                rangeLabel = rangeLabel,
+                onClick = {
+                    onNavigateToSleepDetail(
+                        state.sleepData?.score ?: 0,
+                        state.sleepData?.horas ?: 0f,
+                        state.sleepData?.estado ?: "Sin Datos",
+                    )
+                },
+            )
             
             Spacer(Modifier.height(96.dp))
+        }
+    }
+}
+
+@Composable
+private fun ReportRangeFilterRow(
+    selectedFilter: ReportRangeFilter,
+    onFilterSelected: (ReportRangeFilter) -> Unit,
+) {
+    val filters = listOf(
+        ReportRangeFilter.TODAY,
+        ReportRangeFilter.YESTERDAY,
+        ReportRangeFilter.LAST_7_DAYS,
+        ReportRangeFilter.THIS_MONTH,
+        ReportRangeFilter.SELECTED_DAY,
+    )
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 4.dp)
+    ) {
+        items(filters) { filter ->
+            FilterChip(
+                selected = selectedFilter == filter,
+                onClick = { onFilterSelected(filter) },
+                label = { Text(filter.label) },
+            )
         }
     }
 }
@@ -179,12 +244,8 @@ private fun DateStrip(
         items(dates) { date ->
             val isToday = date == LocalDate.now()
             val isSelected = date == selectedDate
-            val formatter = DateTimeFormatter.ofPattern("d")
-            val dayName = if (isToday) "Hoy, " else ""
-            val monthName = if (isToday) " " + date.format(DateTimeFormatter.ofPattern("MMM")) else ""
-            
-            val displayText = if (isToday) "Hoy, ${date.dayOfMonth} ${date.format(DateTimeFormatter.ofPattern("MMM"))}" 
-                              else date.format(formatter)
+            val monthEs = date.format(DateTimeFormatter.ofPattern("MMM", Locale.forLanguageTag("es")))
+                .replaceFirstChar { it.uppercase() }
 
             Box(
                 modifier = Modifier
@@ -195,7 +256,7 @@ private fun DateStrip(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (isToday) "Hoy, ${date.dayOfMonth} ${date.format(DateTimeFormatter.ofPattern("MMM"))}" else date.dayOfMonth.toString(),
+                    text = if (isToday) "Hoy, ${date.dayOfMonth} $monthEs" else date.dayOfMonth.toString(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     color = if (isSelected) Color.White else TextSecondary
@@ -207,6 +268,7 @@ private fun DateStrip(
 
 @Composable
 private fun HealthRadarCard(
+    reportLabel: String,
     score: Int,
     status: String,
     grade: String,
@@ -250,7 +312,11 @@ private fun HealthRadarCard(
                     }
                 }
                 
-                Text("Feb, 2025", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text(
+                    reportLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted,
+                )
             }
             
             Spacer(Modifier.height(24.dp))
@@ -267,6 +333,48 @@ private fun HealthRadarCard(
             )
             
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun PeriodAverageCard(
+    rangeLabel: String,
+    avgHeartRate: Double,
+    avgSpo2: Double,
+    avgGlucose: Double,
+    avgSleepScore: Int,
+) {
+    NeuCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Promedios: $rangeLabel",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "HR ${if (avgHeartRate > 0) "%.0f".format(avgHeartRate) else "--"}",
+                    color = HeartRateRed,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "SpO2 ${if (avgSpo2 > 0) "%.0f%%".format(avgSpo2) else "--"}",
+                    color = SpO2Green,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Glu ${if (avgGlucose > 0) "%.0f".format(avgGlucose) else "--"}",
+                    color = PrimaryBlue,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Sueno $avgSleepScore%",
+                    color = Color(0xFF10B981),
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }
@@ -411,12 +519,14 @@ fun LineChart(modifier: Modifier = Modifier, color: Color, points: List<Float>) 
 
 @Composable
 fun SleepMetricCardDaily(
-    sleepData: mx.ita.vitalsense.data.model.SleepData?
+    sleepData: mx.ita.vitalsense.data.model.SleepData?,
+    rangeLabel: String,
+    onClick: () -> Unit,
 ) {
     val progress = (sleepData?.score ?: 0) / 100f
     val scoreText = sleepData?.score?.toString() ?: "0"
 
-    mx.ita.vitalsense.ui.components.NeuCard(modifier = Modifier.fillMaxWidth()) {
+    mx.ita.vitalsense.ui.components.NeuCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -436,7 +546,7 @@ fun SleepMetricCardDaily(
             Text("Sueño", color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
-                Text("Promedio de Hoy", fontSize = 11.sp, color = TextSecondary)
+                Text("Promedio: $rangeLabel", fontSize = 11.sp, color = TextSecondary)
                 Text(sleepData?.estado ?: "Sin Datos", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }

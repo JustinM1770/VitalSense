@@ -1,5 +1,6 @@
 package mx.ita.vitalsense.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -43,7 +44,6 @@ import mx.ita.vitalsense.ui.onboarding.OnboardingScreen
 import mx.ita.vitalsense.ui.patient.PatientDetailScreen
 import mx.ita.vitalsense.ui.profile.ProfileScreen
 import mx.ita.vitalsense.ui.register.RegisterScreen
-import mx.ita.vitalsense.ui.report.ReporteDiarioScreen
 import mx.ita.vitalsense.ui.reports.DailyReportScreen
 import mx.ita.vitalsense.ui.splash.SplashScreen
 import mx.ita.vitalsense.ui.chat.ChatBotScreen
@@ -51,6 +51,9 @@ import mx.ita.vitalsense.ui.components.GlobalBottomNavigationBar
 import mx.ita.vitalsense.ui.emergency.EmergencyQrScreen
 import mx.ita.vitalsense.ui.emergency.EmergencyQrViewModel
 import mx.ita.vitalsense.ui.emergency.EmergencyViewerScreen
+import mx.ita.vitalsense.ui.libre.LibreScanScreen
+import mx.ita.vitalsense.ui.medications.AddMedicationScreen
+import mx.ita.vitalsense.MainActivity
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -79,6 +82,8 @@ object Route {
     const val DATOS_IMPORTANTES     = "datos_importantes"
     const val DOCUMENTOS            = "documentos"
     const val CHAT                  = "chat"
+    const val ADD_MEDICATION        = "add_medication"
+    const val LIBRE_SCAN            = "libre_scan"
     // ── Emergencia ──────────────────────────────────────────────────────────
     const val EMERGENCY_QR          = "emergency_qr"
     const val EMERGENCY_VIEWER      = "emergency_viewer"   // + /{tokenId}
@@ -95,6 +100,7 @@ fun AppNavigation() {
 
     // Manejo del deep link vitalsense://emergency/{tokenId} cuando la app se abre desde el QR
     val context = LocalContext.current
+    val mainActivity = context as? MainActivity
     LaunchedEffect(Unit) {
         val activity = context as? android.app.Activity ?: return@LaunchedEffect
         val uri = activity.intent?.data ?: return@LaunchedEffect
@@ -106,6 +112,17 @@ fun AppNavigation() {
         }
     }
 
+    val openNotificationRequest = mainActivity?.pendingNotificationOpen
+    LaunchedEffect(openNotificationRequest) {
+        val request = openNotificationRequest ?: return@LaunchedEffect
+        val alertId = Uri.encode(request.alertId)
+        val target = "${Route.NOTIFICACIONES}?alertId=$alertId&lat=${request.lat}&lng=${request.lng}"
+        navController.navigate(target) {
+            launchSingleTop = true
+        }
+        mainActivity.consumePendingNotificationOpen()
+    }
+
     val bottomBarRoutes = listOf(
         Route.DASHBOARD,
         Route.DAILY_REPORT,
@@ -113,6 +130,7 @@ fun AppNavigation() {
         Route.DETAILED_REPORT,
         Route.REPORTE_DETALLADO,
         Route.NOTIFICACIONES,
+        "${Route.NOTIFICACIONES}?alertId={alertId}&lat={lat}&lng={lng}",
         Route.NOTIFICATIONS,
         Route.PROFILE,
         Route.EDITAR_PERFIL,
@@ -268,6 +286,8 @@ fun AppNavigation() {
                         onNavigateToProfile = { navController.navigate(Route.PROFILE) },
                         onNavigateToHome = { /* Already here */ },
                         onNavigateToChat = { navController.navigate(Route.CHAT) },
+                        onMedicationClick = { navController.navigate(Route.ADD_MEDICATION) },
+                        onLibreScanClick = { navController.navigate(Route.LIBRE_SCAN) },
                         onEmergency = { vitals ->
                             // La IA detectó anomalía crítica → preparar QR y navegar
                             val anomalyType = when {
@@ -280,6 +300,7 @@ fun AppNavigation() {
                             emergencyVm.onAnomalyDetected(anomalyType, vitals.heartRate)
                             navController.navigate(Route.EMERGENCY_QR) {
                                 launchSingleTop = true
+                                popUpTo(Route.DASHBOARD) { inclusive = true }
                             }
                         },
                     )
@@ -340,15 +361,12 @@ fun AppNavigation() {
                 }
 
                 composable(Route.REPORTE_DIARIO) {
-                    ReporteDiarioScreen(
-                        onBack         = { navController.popBackStack() },
-                        onProfileClick = { navController.navigate(Route.PROFILE) },
-                        onHomeClick    = {
-                            navController.navigate(Route.DASHBOARD) {
-                                popUpTo(Route.DASHBOARD) { inclusive = false }
-                            }
-                        },
-                        onNotifClick   = { navController.navigate(Route.NOTIFICACIONES) },
+                    DailyReportScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
+                        onNavigateToSleepDetail = { score, horas, estado ->
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&horas=$horas&estado=$estado")
+                        }
                     )
                 }
 
@@ -383,10 +401,21 @@ fun AppNavigation() {
                 }
 
                 composable(
-                    route = Route.NOTIFICACIONES,
+                    route = "${Route.NOTIFICACIONES}?alertId={alertId}&lat={lat}&lng={lng}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("alertId") { defaultValue = ""; type = androidx.navigation.NavType.StringType },
+                        androidx.navigation.navArgument("lat") { defaultValue = 0.0; type = androidx.navigation.NavType.FloatType },
+                        androidx.navigation.navArgument("lng") { defaultValue = 0.0; type = androidx.navigation.NavType.FloatType },
+                    ),
                     deepLinks = listOf(androidx.navigation.navDeepLink { uriPattern = "vitalsense://notifications" })
-                ) {
+                ) { backStackEntry ->
+                    val alertId = backStackEntry.arguments?.getString("alertId")
+                    val lat = backStackEntry.arguments?.getFloat("lat")?.toDouble() ?: 0.0
+                    val lng = backStackEntry.arguments?.getFloat("lng")?.toDouble() ?: 0.0
                     NotificacionesScreen(
+                        initialAlertId = alertId,
+                        initialLat = lat,
+                        initialLng = lng,
                         onBack         = { navController.popBackStack() },
                         onHomeClick    = {
                             navController.navigate(Route.DASHBOARD) {
@@ -434,6 +463,7 @@ fun AppNavigation() {
                             }
                         },
                         onHealthClick = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onChatClick   = { navController.navigate(Route.CHAT) },
                         onNotifClick  = { navController.navigate(Route.NOTIFICACIONES) },
                     )
                 }
@@ -463,12 +493,28 @@ fun AppNavigation() {
                     )
                 }
 
+                composable(Route.ADD_MEDICATION) {
+                    AddMedicationScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
+                composable(Route.LIBRE_SCAN) {
+                    LibreScanScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
                 // ── Pantalla de QR de emergencia (paciente) ───────────────────
                 composable(Route.EMERGENCY_QR) {
                     EmergencyQrScreen(
                         vm       = emergencyVm,
                         onResolve = {
-                            navController.popBackStack()
+                            // Navegar de vuelta a DASHBOARD después de resolver emergencia
+                            navController.navigate(Route.DASHBOARD) {
+                                popUpTo(Route.DASHBOARD) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         },
                     )
                 }

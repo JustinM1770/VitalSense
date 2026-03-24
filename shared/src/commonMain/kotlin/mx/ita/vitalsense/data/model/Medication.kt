@@ -6,7 +6,10 @@ import kotlinx.serialization.Serializable
 data class Medication(
     val id: String = "",
     val nombre: String = "",
+    val cadaCuanto: String = "",
+    val duracion: String = "",
     val dosis: String = "",
     val horario: String = "",
     val activo: Boolean = true,
+    val createdAt: Long = 0L,
 )

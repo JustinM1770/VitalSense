@@ -1,5 +1,7 @@
 package mx.ita.vitalsense.ui.documentos
 
+import android.content.Context
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,14 +27,19 @@ import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
 import mx.ita.vitalsense.ui.theme.DashBg
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
@@ -46,6 +53,15 @@ fun DocumentosScreen(
     emergencyPhone: String = "+52 449 1004533",
     onBack: () -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    val prefs = remember { context.getSharedPreferences("vitalsense_profile", Context.MODE_PRIVATE) }
+    val avatarUri = if (uid.isNotEmpty()) prefs.getString("avatar_uri_$uid", null) else null
+    val uploadedDocs = remember(uid) {
+        if (uid.isNotEmpty()) prefs.getStringSet("documents_$uid", emptySet())?.toList()?.sorted() ?: emptyList()
+        else emptyList()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -93,13 +109,22 @@ fun DocumentosScreen(
                             .background(DashBlue),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = patientName.split(" ").mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("").take(2),
-                            fontFamily = Manrope,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = Color.White,
-                        )
+                        if (!avatarUri.isNullOrBlank()) {
+                            AsyncImage(
+                                model = Uri.parse(avatarUri),
+                                contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Text(
+                                text = patientName.split(" ").mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("").take(2),
+                                fontFamily = Manrope,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = Color.White,
+                            )
+                        }
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {
@@ -187,9 +212,21 @@ fun DocumentosScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                DocFileRow(filename = "CURP.pdf")
-                Spacer(Modifier.height(10.dp))
-                DocFileRow(filename = "INE.pdf")
+                if (uploadedDocs.isEmpty()) {
+                    Text(
+                        text = "Sin documentos subidos",
+                        fontFamily = Manrope,
+                        fontSize = 13.sp,
+                        color = Color(0xFF8A8A8A),
+                    )
+                } else {
+                    uploadedDocs.forEachIndexed { idx, filename ->
+                        DocFileRow(filename = filename)
+                        if (idx != uploadedDocs.lastIndex) {
+                            Spacer(Modifier.height(10.dp))
+                        }
+                    }
+                }
 
                 Spacer(Modifier.height(20.dp))
 

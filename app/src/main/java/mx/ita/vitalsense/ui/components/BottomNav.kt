@@ -19,14 +19,13 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import mx.ita.vitalsense.ui.theme.DashBlue
@@ -40,42 +39,53 @@ fun BottomNav(
     onSelect: (BottomNavTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(DashBlue)
             .navigationBarsPadding()
-            .padding(vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .height(72.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = DashBlue,
+        shadowElevation = 8.dp,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(72.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            NavItem(
-                icon = Icons.Outlined.Home,
-                label = "Inicio",
-                selected = selected == BottomNavTab.HOME,
-                onClick = { onSelect(BottomNavTab.HOME) },
-            )
-            NavItem(
-                icon = Icons.Outlined.FavoriteBorder,
-                label = "Salud",
-                selected = selected == BottomNavTab.HEALTH,
-                onClick = { onSelect(BottomNavTab.HEALTH) },
-            )
-            NavItem(
-                icon = Icons.Outlined.ChatBubbleOutline,
-                label = "Chat",
-                selected = selected == BottomNavTab.CHAT,
-                onClick = { onSelect(BottomNavTab.CHAT) },
-            )
-            NavItem(
-                icon = Icons.Outlined.PersonOutline,
-                label = "Perfil",
-                selected = selected == BottomNavTab.PROFILE,
-                onClick = { onSelect(BottomNavTab.PROFILE) },
-            )
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                NavItem(
+                    icon = Icons.Outlined.Home,
+                    label = "Inicio",
+                    selected = selected == BottomNavTab.HOME,
+                    onClick = { onSelect(BottomNavTab.HOME) },
+                )
+            }
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                NavItem(
+                    icon = Icons.Outlined.FavoriteBorder,
+                    label = "Salud",
+                    selected = selected == BottomNavTab.HEALTH,
+                    onClick = { onSelect(BottomNavTab.HEALTH) },
+                )
+            }
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                NavItem(
+                    icon = Icons.Outlined.ChatBubbleOutline,
+                    label = "Chat",
+                    selected = selected == BottomNavTab.CHAT,
+                    onClick = { onSelect(BottomNavTab.CHAT) },
+                )
+            }
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                NavItem(
+                    icon = Icons.Outlined.PersonOutline,
+                    label = "Perfil",
+                    selected = selected == BottomNavTab.PROFILE,
+                    onClick = { onSelect(BottomNavTab.PROFILE) },
+                )
+            }
         }
     }
 }
@@ -90,7 +100,7 @@ private fun NavItem(
     Column(
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
@@ -103,17 +113,10 @@ private fun NavItem(
         if (selected) {
             Box(
                 modifier = Modifier
-                    .size(width = 20.dp, height = 3.dp)
+                    .padding(top = 4.dp)
+                    .size(width = 16.dp, height = 2.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color.White),
-            )
-        } else {
-            Text(
-                text = label,
-                fontFamily = Manrope,
-                fontWeight = FontWeight.Normal,
-                fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.7f),
             )
         }
     }

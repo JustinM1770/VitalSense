@@ -53,7 +53,13 @@ private const val KEY_PAIRING_CODE = "pairing_code"
 private const val KEY_USER_ID = "user_id"
 
 @Composable
-fun WearApp(isAmbient: Boolean = false) {
+fun WearApp(
+    isAmbient: Boolean = false,
+    openSosFromNotification: Boolean = false,
+    initialSosId: String? = null,
+    initialSosUserId: String? = null,
+    onSosNotificationConsumed: () -> Unit = {},
+) {
     val context = LocalContext.current
     val database = remember { FirebaseDatabase.getInstance(DB_URL) }
     val auth = remember { FirebaseAuth.getInstance() }
@@ -85,6 +91,8 @@ fun WearApp(isAmbient: Boolean = false) {
     var pairingCode by remember { mutableStateOf(prefs.getString(KEY_PAIRING_CODE, "") ?: "") }
     var isAuthenticated by remember { mutableStateOf(auth.currentUser != null) }
     var showSuccessScreen by remember { mutableStateOf(false) }
+    var forcedSosId by remember { mutableStateOf<String?>(null) }
+    var forcedSosUserId by remember { mutableStateOf<String?>(null) }
     
     // Auth Anónima
     LaunchedEffect(Unit) {
@@ -178,6 +186,14 @@ fun WearApp(isAmbient: Boolean = false) {
         }
     }
 
+    LaunchedEffect(openSosFromNotification, initialSosId, initialSosUserId) {
+        if (openSosFromNotification) {
+            forcedSosId = initialSosId
+            forcedSosUserId = initialSosUserId
+            onSosNotificationConsumed()
+        }
+    }
+
     val triggerSosUI = {
         if (!sosSent) {
             sosSent = true
@@ -210,11 +226,15 @@ fun WearApp(isAmbient: Boolean = false) {
                 SuccessScreen()
             } else if (!hasPermission) {
                 PermissionScreen { launcher.launch(permissions) }
-            } else if (activeSosId != null) {
+            } else if (activeSosId != null || forcedSosId != null) {
                 SosQrScreen(
-                    sosId = activeSosId!!,
-                    userId = prefs.getString(KEY_USER_ID, "global") ?: "global",
-                    onDismiss = { vitalSignsService?.clearSos() }
+                    sosId = activeSosId ?: forcedSosId.orEmpty(),
+                    userId = forcedSosUserId ?: (prefs.getString(KEY_USER_ID, "global") ?: "global"),
+                    onDismiss = {
+                        forcedSosId = null
+                        forcedSosUserId = null
+                        vitalSignsService?.clearSos()
+                    }
                 )
             } else {
                 MonitoringScreen(
@@ -553,19 +573,33 @@ fun MonitoringScreen(isAmbient: Boolean, heartRate: Int, sosSent: Boolean, onSos
 @Composable
 fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
     val database = remember { FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com") }
-    val qrBitmap = remember(sosId) { generateZxingQr("vitalsense://sos/$sosId") }
+    var driveFolderUrl by remember(userId) { mutableStateOf<String?>(null) }
+    val qrData = driveFolderUrl?.takeIf { it.isNotBlank() } ?: "vitalsense://sos/$sosId"
+    val qrBitmap = remember(qrData) { generateZxingQr(qrData) }
 
     LaunchedEffect(sosId, userId) {
         val ref = database.getReference("alerts").child(userId).child(sosId)
+        val profileRef = database.getReference("patients/$userId/profile/driveFolderUrl")
+
+        val profileListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                driveFolderUrl = snapshot.getValue(String::class.java)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        profileRef.addValueEventListener(profileListener)
+
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (!snapshot.exists()) {
+                    profileRef.removeEventListener(profileListener)
                     onDismiss()
                     return
                 }
                 val read = snapshot.child("read").getValue(Boolean::class.java) ?: false
                 val status = snapshot.child("status").getValue(String::class.java) ?: "active"
                 if (read || status == "accepted" || status == "resolved") {
+                    profileRef.removeEventListener(profileListener)
                     onDismiss()
                 }
             }
@@ -592,7 +626,11 @@ fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Esperando ayuda...", color = Color.Black, fontSize = 12.sp)
+            Text(
+                if (driveFolderUrl.isNullOrBlank()) "Esperando ayuda..." else "Carpeta Drive",
+                color = Color.Black,
+                fontSize = 12.sp,
+            )
         }
     }
 }
