@@ -1,31 +1,29 @@
 package mx.ita.vitalsense.ui.register
 
+import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -42,7 +40,7 @@ import mx.ita.vitalsense.ui.theme.Manrope
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 private val TextDark   = Color(0xFF221F1F)
-private val InputBg    = Color(0xFFF0F2F5)
+private val InputBg    = Color(0xFFF9F9FB)
 private val PrimaryBtn = Color(0xFF1169FF)
 private val IconTint   = Color(0xFFB0B8C4)
 
@@ -54,6 +52,7 @@ fun RegisterScreen(
     vm: RegisterViewModel = viewModel(),
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     var name            by remember { mutableStateOf("") }
     var email           by remember { mutableStateOf("") }
@@ -61,7 +60,6 @@ fun RegisterScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var termsAccepted   by remember { mutableStateOf(false) }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState) {
@@ -72,23 +70,13 @@ fun RegisterScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFFF0F4FF), Color.White),
-                    startY = 0f,
-                    endY = 600f
-                )
-            )
-            .imePadding()
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)
                 .verticalScroll(rememberScrollState())
-                .padding(top = 52.dp),
+                .padding(top = 52.dp, bottom = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // ── Header ───────────────────────────────────────────────────────
@@ -121,11 +109,11 @@ fun RegisterScreen(
 
             Spacer(Modifier.height(37.dp))
 
-            // ── Form fields ──────────────────────────────────────────────────
+            // ── Form fields ───────────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 FigmaTextField(
@@ -198,16 +186,15 @@ fun RegisterScreen(
                 )
             }
 
-            Spacer(Modifier.weight(1f))
             Spacer(Modifier.height(40.dp))
 
-            // ── Register Button ──────────────────────────────────────────────
+            // ── Botón Registrate ──────────────────────────────────────────────
             Button(
                 onClick = { vm.registerWithEmail(name, email, password) },
                 enabled = uiState !is RegisterUiState.Loading && termsAccepted,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
+                    .padding(horizontal = 24.dp)
                     .height(56.dp),
                 shape = RoundedCornerShape(32.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -255,10 +242,10 @@ fun RegisterScreen(
                 onClick = { vm.signInWithGoogle(context) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
+                    .padding(horizontal = 24.dp)
                     .height(52.dp),
                 shape = RoundedCornerShape(32.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5E5E5)),
+                border = BorderStroke(1.dp, Color(0xFFE5E5E5)),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
             ) {
                 Text("Regístrate con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
@@ -280,10 +267,10 @@ fun RegisterScreen(
                 onClick = { vm.signInWithFacebook(context) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
+                    .padding(horizontal = 24.dp)
                     .height(52.dp),
                 shape = RoundedCornerShape(32.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5E5E5)),
+                border = BorderStroke(1.dp, Color(0xFFE5E5E5)),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
             ) {
                 Text("Regístrate con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
@@ -305,9 +292,7 @@ fun RegisterScreen(
                 },
                 fontFamily = Manrope,
                 fontSize = 14.sp,
-                modifier = Modifier
-                    .clickable(onClick = onLoginClick)
-                    .padding(bottom = 40.dp),
+                modifier = Modifier.clickable(onClick = onLoginClick)
             )
         }
 

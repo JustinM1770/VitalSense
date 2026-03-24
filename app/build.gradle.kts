@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.gms.google-services")
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -11,11 +11,14 @@ android {
     defaultConfig {
         applicationId = "mx.ita.vitalsense"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val claudeApiKey = project.findProperty("CLAUDE_API_KEY")?.toString() ?: ""
+        buildConfigField("String", "CLAUDE_API_KEY", "\"$claudeApiKey\"")
     }
 
     buildTypes {
@@ -34,12 +37,11 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
-    coreLibraryDesugaring(libs.desugar.jdk.libs)
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -51,29 +53,12 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.lifecycle.viewmodel.compose)
-    implementation(libs.navigation.compose)
-    implementation(libs.core.splashscreen)
-
-    // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.database)
     implementation(libs.firebase.auth)
-    implementation(libs.firebase.messaging)
-
-    // Auth
     implementation(libs.auth.manager)
     implementation(libs.auth.play.services)
     implementation(libs.googleid)
-
-    // Facebook Login
-    implementation("com.facebook.android:facebook-login:latest.release")
-
-    // Health Connect
-    implementation("androidx.health.connect:connect-client:1.1.0-alpha11")
-
-    // Biometrics and Fragment compatibility
-    implementation("androidx.biometric:biometric:1.1.0")
-    implementation("androidx.fragment:fragment-ktx:1.6.2")
 
     // Shared KMP module
     implementation(project(":shared"))
@@ -81,8 +66,17 @@ dependencies {
     // QR Code generation
     implementation("com.google.zxing:core:3.5.3")
 
-    // Charts & Utils
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.firebase.messaging)
+    implementation(libs.navigation.compose)
+    implementation(libs.core.splashscreen)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(libs.okhttp)
+    implementation(libs.facebook.android.sdk)
+    implementation(libs.androidx.health.connect)
+    implementation(libs.androidx.biometric)
+    implementation(libs.android.image.cropper)
+    implementation(libs.coil.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -22,7 +22,7 @@ object SosManager {
         ))
 
         // También crear notificación en el historial
-        db.getReference("users/$userId/notificaciones").push().setValue(mapOf(
+        db.getReference("patients/$userId/notificaciones").push().setValue(mapOf(
             "titulo" to "🆘 SOS Activado",
             "descripcion" to "$patientName necesita ayuda inmediata",
             "tipo" to "SOS",

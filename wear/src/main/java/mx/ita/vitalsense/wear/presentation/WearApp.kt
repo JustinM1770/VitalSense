@@ -14,6 +14,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -92,10 +94,44 @@ fun WearApp(isAmbient: Boolean = false) {
     }
 
     // Código Aleatorio
-    if (pairingCode.isEmpty() && !isPaired) {
-        val chars = ('A'..'Z') + ('0'..'9')
-        pairingCode = (1..8).map { chars.random() }.joinToString("")
-        prefs.edit().putString(KEY_PAIRING_CODE, pairingCode).apply()
+    if (!isPaired) {
+        val currentTime = System.currentTimeMillis()
+        val lastCodeTime = prefs.getLong("last_code_time", 0L)
+        if (pairingCode.isEmpty() || currentTime - lastCodeTime > 5 * 60 * 1000L) {
+            val oldCode = pairingCode
+            val chars = ('A'..'Z') + ('0'..'9')
+            pairingCode = (1..8).map { chars.random() }.joinToString("")
+            prefs.edit()
+                .putString("pairing_code", pairingCode)
+                .putLong("last_code_time", currentTime)
+                .apply()
+            
+            if (oldCode.isNotEmpty() && isAuthenticated) {
+                database.getReference("patients/pairing_codes").child(oldCode).removeValue()
+            }
+        }
+    }
+
+    LaunchedEffect(isPaired, isAuthenticated) {
+        if (!isPaired) {
+            while (true) {
+                kotlinx.coroutines.delay(60_000L) // Verificar cada minuto
+                val currentTime = System.currentTimeMillis()
+                val lastCodeTime = prefs.getLong("last_code_time", 0L)
+                if (currentTime - lastCodeTime > 5 * 60 * 1000L) {
+                    val oldCode = pairingCode
+                    val chars = ('A'..'Z') + ('0'..'9')
+                    pairingCode = (1..8).map { chars.random() }.joinToString("")
+                    prefs.edit()
+                        .putString("pairing_code", pairingCode)
+                        .putLong("last_code_time", currentTime)
+                        .apply()
+                    if (oldCode.isNotEmpty() && isAuthenticated) {
+                        database.getReference("patients/pairing_codes").child(oldCode).removeValue()
+                    }
+                }
+            }
+        }
     }
 
     // Lógica de Servicio
@@ -113,6 +149,7 @@ fun WearApp(isAmbient: Boolean = false) {
     // --- 3. Heart Rate Binding ---
     var vitalSignsService by remember { mutableStateOf<VitalSignsService?>(null) }
     val currentHeartRate by (vitalSignsService?.currentHeartRate?.collectAsState() ?: remember { mutableStateOf(0.0) })
+    val activeSosId by (vitalSignsService?.activeSosId?.collectAsState() ?: remember { mutableStateOf(null) })
 
     DisposableEffect(context) {
         val connection = object : ServiceConnection {
@@ -173,6 +210,12 @@ fun WearApp(isAmbient: Boolean = false) {
                 SuccessScreen()
             } else if (!hasPermission) {
                 PermissionScreen { launcher.launch(permissions) }
+            } else if (activeSosId != null) {
+                SosQrScreen(
+                    sosId = activeSosId!!,
+                    userId = prefs.getString(KEY_USER_ID, "global") ?: "global",
+                    onDismiss = { vitalSignsService?.clearSos() }
+                )
             } else {
                 MonitoringScreen(
                     isAmbient = isAmbient,
@@ -187,7 +230,7 @@ fun WearApp(isAmbient: Boolean = false) {
     // Vinculación mejorada con persistencia de USER_ID
     LaunchedEffect(pairingCode, isAuthenticated) {
         if (isAuthenticated && pairingCode.isNotEmpty()) {
-            val ref = database.getReference("pairing_codes").child(pairingCode)
+            val ref = database.getReference("patients/pairing_codes").child(pairingCode)
             
             // Si no está emparejado, inicializamos el código en Firebase
             if (!isPaired) {
@@ -504,5 +547,68 @@ fun MonitoringScreen(isAmbient: Boolean, heartRate: Int, sosSent: Boolean, onSos
                 )
             }
         }
+    }
+}
+
+@Composable
+fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
+    val database = remember { FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com") }
+    val qrBitmap = remember(sosId) { generateZxingQr("vitalsense://sos/$sosId") }
+
+    LaunchedEffect(sosId, userId) {
+        val ref = database.getReference("alerts").child(userId).child(sosId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) {
+                    onDismiss()
+                    return
+                }
+                val read = snapshot.child("read").getValue(Boolean::class.java) ?: false
+                val status = snapshot.child("status").getValue(String::class.java) ?: "active"
+                if (read || status == "accepted" || status == "resolved") {
+                    onDismiss()
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        ref.addValueEventListener(listener)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("SOS Activo", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            if (qrBitmap != null) {
+                Image(
+                    bitmap = qrBitmap.asImageBitmap(),
+                    contentDescription = "SOS QR",
+                    modifier = Modifier.size(120.dp).background(Color.White)
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("Esperando ayuda...", color = Color.Black, fontSize = 12.sp)
+        }
+    }
+}
+
+fun generateZxingQr(data: String, size: Int = 300): android.graphics.Bitmap? {
+    return try {
+        val writer = com.google.zxing.qrcode.QRCodeWriter()
+        val bitMatrix = writer.encode(data, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
+        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.RGB_565)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            }
+        }
+        bitmap
+    } catch (e: Exception) {
+        null
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,13 +41,13 @@ import kotlin.math.sin
 fun DailyReportScreen(
     onBack: () -> Unit,
     onNavigateToDetailed: () -> Unit,
-    onNavigateToSleepDetail: (mx.ita.vitalsense.data.model.SleepData?) -> Unit,
+    onNavigateToSleepDetail: (Int, Float, String) -> Unit = { _, _, _ -> },
     vm: DailyReportViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
 
     Scaffold(
-        containerColor = NeomorphicBackground,
+        containerColor = Color.White,
         topBar = {
             DailyReportTopBar(onBack = onBack)
         }
@@ -103,44 +104,37 @@ fun DailyReportScreen(
             )
             Spacer(Modifier.height(16.dp))
             
-            HeartRateTrendCard(
-                history = state.vitalsHistory,
-                currentBpm = state.currentVitals.heartRate
-            )
+            HeartRateTrendCard(history = state.vitalsHistory)
             
             Spacer(Modifier.height(16.dp))
-            
-            // --- SpO2 and Glucose Cards ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                VitalMetricCard(
-                    modifier = Modifier.weight(1f),
-                    title = "SpO₂",
-                    value = if (state.currentVitals.spo2 > 0) "${state.currentVitals.spo2}%" else "—",
-                    subtitle = "Oxígeno en sangre",
-                    color = Color(0xFF10B981),
-                    icon = "🫁"
-                )
-                VitalMetricCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Glucosa",
-                    value = if (state.currentVitals.glucose > 0) "%.0f".format(state.currentVitals.glucose) else "—",
-                    subtitle = "mg/dL",
-                    color = Color(0xFFFF9800),
-                    icon = "🩸"
-                )
+
+            // --- SpO2 Card ---
+            val latestSpo2 = state.vitalsHistory.lastOrNull()?.spo2 ?: 0
+            if (latestSpo2 > 0) {
+                NeuCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Rounded.MonitorHeart,
+                            contentDescription = null,
+                            tint = SpO2Green,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Oxigenación SpO₂", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                            Text("$latestSpo2%", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = SpO2Green)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
+
+            SleepMetricCardDaily(sleepData = state.sleepData)
             
-            Spacer(Modifier.height(24.dp))
-            
-            SleepMetricCardDaily(
-                sleepData = state.sleepData,
-                onClick = { onNavigateToSleepDetail(state.sleepData) }
-            )
-            
-            Spacer(Modifier.height(96.dp)) // Espacio para Global Nav Bar
+            Spacer(Modifier.height(96.dp))
         }
     }
 }
@@ -349,11 +343,8 @@ private fun HealthRadarChart(
 }
 
 @Composable
-private fun HeartRateTrendCard(
-    history: List<mx.ita.vitalsense.data.model.VitalsData>,
-    currentBpm: Int = 0
-) {
-    val latestBpm = if (currentBpm > 0) currentBpm else (history.lastOrNull()?.heartRate ?: 0)
+private fun HeartRateTrendCard(history: List<mx.ita.vitalsense.data.model.VitalsData>) {
+    val latestBpm = history.lastOrNull()?.heartRate ?: 0
     
     NeuCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -420,17 +411,12 @@ fun LineChart(modifier: Modifier = Modifier, color: Color, points: List<Float>) 
 
 @Composable
 fun SleepMetricCardDaily(
-    sleepData: mx.ita.vitalsense.data.model.SleepData?,
-    onClick: () -> Unit
+    sleepData: mx.ita.vitalsense.data.model.SleepData?
 ) {
     val progress = (sleepData?.score ?: 0) / 100f
     val scoreText = sleepData?.score?.toString() ?: "0"
 
-    mx.ita.vitalsense.ui.components.NeuCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    ) {
+    mx.ita.vitalsense.ui.components.NeuCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -453,44 +439,6 @@ fun SleepMetricCardDaily(
                 Text("Promedio de Hoy", fontSize = 11.sp, color = TextSecondary)
                 Text(sleepData?.estado ?: "Sin Datos", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
-        }
-    }
-}
-
-@Composable
-private fun VitalMetricCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    value: String,
-    subtitle: String,
-    color: Color,
-    icon: String
-) {
-    NeuCard(modifier = modifier) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(icon, fontSize = 28.sp)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = value,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = color
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
-            )
         }
     }
 }

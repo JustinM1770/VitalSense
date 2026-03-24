@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -122,12 +123,13 @@ fun DashboardScreen(
         }
     }
 
+    var showSettingsDialog by remember { mutableStateOf(false) }
     val uiState by vm.uiState.collectAsState()
     val currentUser = FirebaseAuth.getInstance().currentUser
+
     val userName = currentUser?.displayName ?: "Usuario"
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var showSettingsDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(DashBg)) {
         when (val state = uiState) {
@@ -269,8 +271,11 @@ private fun DashboardContent(
             SectionHeader(title = "Esta semana", showArrow = true)
             Spacer(Modifier.height(16.dp))
 
-            val pagerState = rememberPagerState(pageCount = { 3 })
-            val sleepPct = sleepData?.score ?: 0
+            val pagerState = rememberPagerState(pageCount = { 4 })
+            val sleepPct = sleepData?.score
+                ?: if (patients.isNotEmpty()) {
+                    ((patients.first().spo2 - 85).coerceIn(0, 15) * 100 / 15 + 60).coerceIn(0, 100)
+                } else 70
 
             HorizontalPager(
                 state = pagerState,
@@ -279,12 +284,13 @@ private fun DashboardContent(
                 when (page) {
                     0 -> SleepMetricCard(sleepData = sleepData, pctFallback = sleepPct, onClick = onReportClick)
                     1 -> HrMiniCard(patients)
+                    2 -> Spo2MiniCard(patients)
                     else -> KcalMiniCard(patients)
                 }
             }
 
             Spacer(Modifier.height(12.dp))
-            PagerDots(count = 3, selected = pagerState.currentPage)
+            PagerDots(count = 4, selected = pagerState.currentPage)
 
             Spacer(Modifier.height(24.dp))
 
@@ -302,6 +308,8 @@ private fun DashboardContent(
                 medications = medications,
                 onSeeAllClick = onReportClick,
             )
+
+            Spacer(Modifier.height(24.dp))
 
             Spacer(Modifier.height(16.dp))
         }
@@ -326,6 +334,7 @@ private fun UserHeader(
         val listener = object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                 hasUnread = snapshot.children.any { child ->
+                    @Suppress("UNCHECKED_CAST")
                     val data = child.value as? Map<String, Any>
                     data != null && data["read"] != true
                 }
@@ -335,7 +344,6 @@ private fun UserHeader(
         ref.addValueEventListener(listener)
         onDispose { ref.removeEventListener(listener) }
     }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -382,14 +390,14 @@ private fun UserHeader(
                     tint = TextDark
                 )
             }
-            // Red dot – only if there are unread alerts
+            // Red dot
             if (hasUnread) {
                 Box(
                     modifier = Modifier
-                        .size(10.dp)
+                        .size(8.dp)
                         .background(Color.Red, CircleShape)
                         .align(Alignment.TopEnd)
-                        .offset(x = (-8).dp, y = 8.dp)
+                        .offset(x = (-10).dp, y = 10.dp)
                 )
             }
         }
@@ -575,7 +583,7 @@ private fun SleepMetricCard(sleepData: SleepData?, pctFallback: Int, onClick: ()
                 Text("Sueño", color = SleepGreen, fontWeight = FontWeight.Bold, fontSize = 18.sp, fontFamily = Manrope)
                 val today = LocalDate.now()
                 Text(
-                    text = "${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL, Locale("es")).replaceFirstChar { it.uppercase() }} ${today.year}",
+                    text = "${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }} ${today.year}",
                     fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A),
                 )
                 Text(sleepData?.estado ?: "Sin Datos", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
@@ -608,6 +616,21 @@ private fun KcalMiniCard(patients: List<VitalsData>) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("--", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 36.sp, color = Color(0xFF1A1A2E))
             Text("Kcal hoy", fontFamily = Manrope, fontSize = 14.sp, color = Color(0xFF8A8A8A))
+        }
+    }
+}
+
+@Composable
+private fun Spo2MiniCard(patients: List<VitalsData>) {
+    val spo2 = patients.firstOrNull()?.spo2 ?: 98
+    WhiteCard(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = mx.ita.vitalsense.ui.theme.SpO2Green, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("SpO₂", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
+                Text("$spo2%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF1A1A2E))
+            }
         }
     }
 }
@@ -824,7 +847,7 @@ private fun DateStrip() {
             ) {
                 if (isToday) {
                     Text(
-                        text = "Today, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale("es")).replaceFirstChar { it.uppercase() }}",
+                        text = "Today, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}",
                         fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1A1A2E),
                     )
                 } else {
@@ -887,20 +910,14 @@ fun SettingsDialog(
     val prefs = remember { context.getSharedPreferences("vitalsense_watch_prefs", android.content.Context.MODE_PRIVATE) }
     var requireBiometric by remember { mutableStateOf(prefs.getBoolean("require_biometric", false)) }
 
-    val hcViewModel: mx.ita.vitalsense.ui.device.HealthConnectViewModel = viewModel()
-    val errorMessage by hcViewModel.errorMessage.collectAsState()
-
-    androidx.compose.runtime.LaunchedEffect(errorMessage) {
-        if (!errorMessage.isNullOrEmpty()) {
-            android.widget.Toast.makeText(context, errorMessage, android.widget.Toast.LENGTH_LONG).show()
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        if (granted.containsAll(mx.ita.vitalsense.data.health.HealthConnectRepository.PERMISSIONS)) {
+            android.widget.Toast.makeText(context, "Health Connect vinculado exitosamente", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            android.widget.Toast.makeText(context, "Permisos de Health Connect denegados", android.widget.Toast.LENGTH_SHORT).show()
         }
-    }
-
-    val permissionContract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
-    val hcLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        permissionContract
-    ) { _ ->
-        hcViewModel.loadHealthConnectData()
     }
 
     AlertDialog(
@@ -926,7 +943,11 @@ fun SettingsDialog(
 
                 // Health Connect
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
-                    hcViewModel.checkAndRequestPermissions(hcLauncher)
+                    if (mx.ita.vitalsense.data.health.HealthConnectRepository.isAvailable(context)) {
+                        permissionLauncher.launch(mx.ita.vitalsense.data.health.HealthConnectRepository.PERMISSIONS)
+                    } else {
+                        android.widget.Toast.makeText(context, "Health Connect no disponible en este dispositivo", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }) {
                     Box(modifier = Modifier.size(40.dp).background(SuccessGreen.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
                         Icon(Icons.Rounded.Favorite, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(24.dp))

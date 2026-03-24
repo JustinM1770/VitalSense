@@ -7,7 +7,6 @@ data class VitalsData(
     val spo2: Int = 0,
     val timestamp: Long = 0L,
     val patientName: String = "Paciente",
-    val sleep: SleepData? = null
 )
 
 // ── Umbrales y alertas IA ───────────────────────────────────────────────────

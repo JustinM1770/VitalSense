@@ -34,6 +34,9 @@ class VitalSignsService : Service() {
     private val _currentHeartRate = MutableStateFlow(0.0)
     val currentHeartRate: StateFlow<Double> = _currentHeartRate.asStateFlow()
 
+    private val _activeSosId = MutableStateFlow<String?>(null)
+    val activeSosId: StateFlow<String?> = _activeSosId.asStateFlow()
+
     private var syncJob: Job? = null
     private var sleepJob: Job? = null
 
@@ -116,6 +119,11 @@ class VitalSignsService : Service() {
     }
 
     fun triggerSosAlert() {
+        if (_activeSosId.value != null) {
+            Log.d("VitalSense", "Ignorando SOS: ya hay una alerta activa (${_activeSosId.value})")
+            return
+        }
+
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         val prefs = getSharedPreferences("vitalsense_wear_prefs", Context.MODE_PRIVATE)
         val remoteUid = prefs.getString("user_id", "global") ?: "global"
@@ -134,6 +142,7 @@ class VitalSignsService : Service() {
                     fusedLocationClient.removeLocationUpdates(this)
                     val loc = result.lastLocation
                     val alertRef = database.getReference("alerts").child(remoteUid).push()
+                    _activeSosId.value = alertRef.key
                     alertRef.setValue(mapOf(
                         "timestamp" to System.currentTimeMillis(),
                         "type" to "SOS",
@@ -150,11 +159,16 @@ class VitalSignsService : Service() {
             )
         } else {
             val alertRef = database.getReference("alerts").child(remoteUid).push()
+            _activeSosId.value = alertRef.key
             alertRef.setValue(mapOf(
                 "timestamp" to System.currentTimeMillis(),
                 "type" to "SOS",
                 "status" to "active"
             ))
         }
+    }
+
+    fun clearSos() {
+        _activeSosId.value = null
     }
 }

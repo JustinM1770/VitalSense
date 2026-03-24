@@ -66,5 +66,15 @@ class LoginViewModel : ViewModel() {
         }
     }
 
+    /** Called after biometric passes — re-uses existing Firebase session if any. */
+    fun signInWithBiometric(onSuccess: () -> Unit) {
+        val current = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        if (current != null) {
+            onSuccess()
+        } else {
+            _state.value = LoginUiState.Error("No hay sesión guardada. Inicia sesión primero.")
+        }
+    }
+
     fun clearError() { _state.value = LoginUiState.Idle }
 }

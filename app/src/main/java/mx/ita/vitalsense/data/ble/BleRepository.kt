@@ -18,12 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.util.UUID
-import mx.ita.vitalsense.data.model.SleepData
 
 // ─── UUIDs del dispositivo VitalSense (ESP32) ────────────────────────────────
 //  Para cambiarlos: edita estas constantes para que coincidan con el firmware.
@@ -56,7 +51,6 @@ data class BleVitals(
     val glucose: Double? = null,
     val spo2: Int? = null,
     val timestamp: Long? = null,
-    val sleep: SleepData? = null
 )
 
 sealed interface BleConnectionState {
@@ -124,8 +118,6 @@ class BleRepository(private val context: Context) {
         _vitals.value = BleVitals()
     }
 
-    // ── Métodos de control de estado (para ViewModel) ────────────────────────
-
     fun setConnecting() {
         _connectionState.value = BleConnectionState.Connecting
     }
@@ -138,14 +130,13 @@ class BleRepository(private val context: Context) {
         _connectionState.value = BleConnectionState.Connected(deviceName)
     }
 
-    fun updateVitals(newVitals: BleVitals) {
-        _vitals.value = newVitals
+    fun connectWithCode(code: String, deviceName: String) {
+        // Mock connection associated with pairing code
+        _connectionState.value = BleConnectionState.Connected(deviceName)
     }
 
-    // ── Conexión por Código (ahora validada por Firebase en ViewModel) ───────
-
-    fun connectWithCode(code: String, deviceName: String) {
-        _connectionState.value = BleConnectionState.Connected(deviceName)
+    fun updateVitals(vitals: BleVitals) {
+        _vitals.value = vitals
     }
 
     // ── GATT Callbacks ────────────────────────────────────────────────────────

@@ -51,7 +51,7 @@ import mx.ita.vitalsense.ui.theme.OnboardingDotInactive
 private data class OnboardingPage(
     val title: String,
     val body: String,
-    @DrawableRes val illustration: Int?,
+    @param:DrawableRes val illustration: Int?,
 )
 
 private val pages = listOf(

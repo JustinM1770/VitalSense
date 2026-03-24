@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Image picker / cropper permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <!-- Health Connect Permissions -->
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
@@ -64,6 +67,11 @@
                     android:host="emergency" />
             </intent-filter>
         </activity>
+
+        <!-- Image Cropper Activity -->
+        <activity
+            android:name="com.canhub.cropper.CropImageActivity"
+            android:theme="@style/Base.Theme.AppCompat" />
 
         <!-- Health Connect Rationale Intent -->
         <activity-alias

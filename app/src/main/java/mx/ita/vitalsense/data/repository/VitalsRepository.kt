@@ -17,6 +17,7 @@ class VitalsRepository {
 
     private fun getVitalsRef() = db.getReference("vitals/current/${auth.currentUser?.uid ?: "global"}")
 
+
     // ── Multiusuario: todos los pacientes bajo "patients/" ──────────────────
     fun observePatients(): Flow<Result<List<VitalsData>>> = callbackFlow {
         val ref = db.getReference("patients")
@@ -107,7 +108,6 @@ class VitalsRepository {
                 trySend(Result.failure(error.toException()))
             }
         }
-
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }

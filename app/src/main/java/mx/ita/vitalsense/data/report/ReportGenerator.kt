@@ -20,8 +20,8 @@ import java.util.Locale
 
 object ReportGenerator {
 
-    private val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "MX"))
-    private val dateOnly   = SimpleDateFormat("dd/MM/yyyy",       Locale("es", "MX"))
+    private val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.Builder().setLanguage("es").setRegion("MX").build())
+    private val dateOnly   = SimpleDateFormat("dd/MM/yyyy",       Locale.Builder().setLanguage("es").setRegion("MX").build())
 
     fun generate(
         context: Context,

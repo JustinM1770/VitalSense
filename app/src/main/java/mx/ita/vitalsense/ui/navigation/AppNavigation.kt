@@ -3,18 +3,28 @@ package mx.ita.vitalsense.ui.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.navigation.compose.NavHost
+import mx.ita.vitalsense.ui.profile.ProfileScreen
+import mx.ita.vitalsense.ui.forgotpassword.ForgotPasswordScreen
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -23,6 +33,8 @@ import mx.ita.vitalsense.ui.archivos.DatosImportantesScreen
 import mx.ita.vitalsense.ui.cuestionario.CuestionarioScreen
 import mx.ita.vitalsense.ui.dashboard.DashboardScreen
 import mx.ita.vitalsense.ui.device.DeviceScanScreen
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import mx.ita.vitalsense.ui.documentos.DocumentosScreen
 import mx.ita.vitalsense.ui.forgotpassword.ForgotPasswordScreen
 import mx.ita.vitalsense.ui.login.LoginScreen
@@ -39,6 +51,11 @@ import mx.ita.vitalsense.ui.components.GlobalBottomNavigationBar
 import mx.ita.vitalsense.ui.emergency.EmergencyQrScreen
 import mx.ita.vitalsense.ui.emergency.EmergencyQrViewModel
 import mx.ita.vitalsense.ui.emergency.EmergencyViewerScreen
+import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 object Route {
     const val SPLASH                = "splash"
@@ -104,7 +121,8 @@ fun AppNavigation() {
     val showBottomBar = currentRoute in bottomBarRoutes
 
     Scaffold(
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
+        modifier = Modifier.systemBarsPadding()
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             NavHost(
@@ -123,6 +141,11 @@ fun AppNavigation() {
                             navController.navigate(Route.DASHBOARD) {
                                 popUpTo(Route.SPLASH) { inclusive = true }
                             }
+                        },
+                        onNavigateToCuestionario = {
+                            navController.navigate(Route.CUESTIONARIO) {
+                                popUpTo(Route.SPLASH) { inclusive = true }
+                            }
                         }
                     )
                 }
@@ -135,11 +158,47 @@ fun AppNavigation() {
                 }
 
                 composable(Route.LOGIN) {
+                    val context = LocalContext.current
                     LoginScreen(
                         onBack = { navController.popBackStack() },
                         onLoginSuccess = {
-                            navController.navigate(Route.DASHBOARD) {
-                                popUpTo(0) { inclusive = true }
+                            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                            val prefs = context.getSharedPreferences("vitalsense_profile", Context.MODE_PRIVATE)
+                            if (prefs.getBoolean("cuestionario_completed_$uid", false)) {
+                                // Local data present → go directly to dashboard
+                                navController.navigate(Route.DASHBOARD) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else {
+                                // No local data — check Firebase (reinstall scenario)
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val completedInCloud = try {
+                                        uid.isNotEmpty() &&
+                                        FirebaseDatabase.getInstance()
+                                            .getReference("patients/$uid/profile/cuestionarioCompleted")
+                                            .get().await().getValue(Boolean::class.java) == true
+                                    } catch (_: Exception) { false }
+                                    if (completedInCloud) {
+                                        prefs.edit().putBoolean("cuestionario_completed_$uid", true).apply()
+                                        
+                                        // Also restore watch state if available
+                                        try {
+                                            val watchSnap = FirebaseDatabase.getInstance().getReference("patients/$uid/watch").get().await()
+                                            if (watchSnap.exists() && watchSnap.child("paired").getValue(Boolean::class.java) == true) {
+                                                val watchPrefs = context.getSharedPreferences("vitalsense_watch_prefs", Context.MODE_PRIVATE)
+                                                watchPrefs.edit()
+                                                    .putBoolean("code_paired", true)
+                                                    .putString("paired_code", watchSnap.child("code").getValue(String::class.java) ?: "")
+                                                    .putString("paired_device_name", watchSnap.child("deviceName").getValue(String::class.java) ?: "Wearable")
+                                                    .apply()
+                                            }
+                                        } catch (_: Exception) {}
+                                    }
+                                    val dest = if (completedInCloud) Route.DASHBOARD else Route.CUESTIONARIO
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        navController.navigate(dest) { popUpTo(0) { inclusive = true } }
+                                    }
+                                }
                             }
                         },
                         onRegisterClick = { navController.navigate(Route.REGISTER) },
@@ -157,13 +216,21 @@ fun AppNavigation() {
                         }
                     )
                 }
-
                 composable(Route.REGISTER) {
+                    val context = LocalContext.current
                     RegisterScreen(
                         onBack = { navController.popBackStack() },
                         onRegisterSuccess = {
-                            navController.navigate(Route.CUESTIONARIO) {
-                                popUpTo(0) { inclusive = true }
+                            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                            val prefs = context.getSharedPreferences("vitalsense_profile", Context.MODE_PRIVATE)
+                            if (prefs.getBoolean("cuestionario_completed_$uid", false)) {
+                                navController.navigate(Route.DASHBOARD) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else {
+                                navController.navigate(Route.CUESTIONARIO) {
+                                    popUpTo(0) { inclusive = true }
+                                }
                             }
                         },
                         onLoginClick = { navController.navigate(Route.LOGIN) },
@@ -172,7 +239,12 @@ fun AppNavigation() {
 
                 composable(Route.CUESTIONARIO) {
                     CuestionarioScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate(Route.LOGIN) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
                         onNext = {
                             navController.navigate(Route.DASHBOARD) {
                                 popUpTo(0) { inclusive = true }
@@ -284,10 +356,7 @@ fun AppNavigation() {
                     DailyReportScreen(
                         onBack = { navController.popBackStack() },
                         onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
-                        onNavigateToSleepDetail = { sleepData ->
-                            val score = sleepData?.score ?: 0
-                            val horas = sleepData?.horas ?: 0f
-                            val estado = sleepData?.estado ?: "Sin Datos"
+                        onNavigateToSleepDetail = { score, horas, estado ->
                             navController.navigate("${Route.SLEEP_DETAIL}?score=$score&horas=$horas&estado=$estado")
                         }
                     )
@@ -309,10 +378,14 @@ fun AppNavigation() {
                         horas = horas,
                         estado = estado,
                         onBack = { navController.navigateUp() }
+
                     )
                 }
 
-                composable(Route.NOTIFICACIONES) {
+                composable(
+                    route = Route.NOTIFICACIONES,
+                    deepLinks = listOf(androidx.navigation.navDeepLink { uriPattern = "vitalsense://notifications" })
+                ) {
                     NotificacionesScreen(
                         onBack         = { navController.popBackStack() },
                         onHomeClick    = {
@@ -430,6 +503,8 @@ fun AppNavigation() {
                     )
                 }
             }
+            
+            GlobalSosOverlay()
         }
     }
 }

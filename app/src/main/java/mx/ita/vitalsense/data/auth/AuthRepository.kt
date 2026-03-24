@@ -46,7 +46,7 @@ class AuthRepository {
 
     // ── Google Sign-In (Credential Manager API) ───────────────────────────────
 
-    suspend fun signInWithGoogle(activityContext: Context): Result<FirebaseUser> {
+    suspend fun signInWithGoogle(activityContext: Context): Result<FirebaseUser> = runCatching {
         val activity = activityContext.findActivity()
             ?: throw IllegalStateException("Contexto no es una Activity")
 
@@ -62,17 +62,12 @@ class AuthRepository {
             .addCredentialOption(googleIdOption)
             .build()
 
-        return runCatching {
-            val result = credentialManager.getCredential(activity, request)
-            val googleIdToken = GoogleIdTokenCredential
-                .createFrom(result.credential.data)
-                .idToken
-            val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-            auth.signInWithCredential(firebaseCredential).await().user!!
-        }.recoverCatching { e ->
-            if (e is GetCredentialCancellationException) throw e
-            throw e
-        }
+        val result = credentialManager.getCredential(activity, request)
+        val googleIdToken = GoogleIdTokenCredential
+            .createFrom(result.credential.data)
+            .idToken
+        val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
+        auth.signInWithCredential(firebaseCredential).await().user!!
     }
 
     // ── Facebook Sign-In ──────────────────────────────────────────────────────
@@ -109,8 +104,9 @@ class AuthRepository {
                 }
             )
 
-            loginManager.logInWithReadPermissions(
-                activity as android.app.Activity,
+            loginManager.logIn(
+                activity as androidx.activity.result.ActivityResultRegistryOwner,
+                callbackManager,
                 listOf("public_profile")
             )
         }

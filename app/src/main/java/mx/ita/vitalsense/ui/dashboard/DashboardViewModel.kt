@@ -11,8 +11,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -30,6 +28,9 @@ import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
 import mx.ita.vitalsense.data.model.computeAlerts
 import mx.ita.vitalsense.data.repository.VitalsRepository
+import mx.ita.vitalsense.data.test.TestDataSeeder
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -86,6 +87,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     init {
         observePatients()
         loadAdditionalData()
+        // Ensure paired state is always up to date
+        val isPaired = prefs.getBoolean("code_paired", false)
+        viewModelScope.launch {
+            val current = _uiState.value
+            if (current is DashboardUiState.Success && current.isWatchPaired != isPaired) {
+                _uiState.value = current.copy(isWatchPaired = isPaired)
+            }
+        }
     }
 
     fun disconnectWatch() {
@@ -120,11 +129,15 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val sleepSnapshot = db.getReference("sleep/$userId/$dateKey").get().await()
                 val sleep = sleepSnapshot.getValue(SleepData::class.java)
 
-                // 2. Vitals History
+                // 2. Vitals History (last 10)
+                val vitalsSnapshot = db.getReference("patients").limitToFirst(1).get().await()
+                val patientId = vitalsSnapshot.children.firstOrNull()?.key
                 val historyList = mutableListOf<VitalsData>()
-                val userHistorySnapshot = db.getReference("patients/$userId/history").limitToLast(10).get().await()
-                userHistorySnapshot.children.forEach {
-                    it.getValue(VitalsData::class.java)?.let { v -> historyList.add(v) }
+                if (patientId != null) {
+                    val historySnapshot = db.getReference("patients/$patientId/history").limitToLast(10).get().await()
+                    historySnapshot.children.forEach {
+                        it.getValue(VitalsData::class.java)?.let { v -> historyList.add(v) }
+                    }
                 }
 
                 // 3. Medications
@@ -160,7 +173,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             val firstEmit = withTimeoutOrNull(5_000) {
                 repository.observePatients().collect { result ->
                     applyResult(result)
-                    return@collect
+                    return@collect // sale del collect en cuanto llega el primer valor
                 }
             }
             if (firstEmit == null) {
@@ -175,7 +188,6 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             // Seguir escuchando Firebase en background (cuando llegue reemplaza el mock)
             repository.observePatients().collect { result -> applyResult(result) }
         }
-
         // Observar datos de sueño en tiempo real para el día actual
         viewModelScope.launch {
             val userId = auth.currentUser?.uid ?: return@launch
@@ -227,7 +239,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val key = "${patient.patientId}:${patient.timestamp}"
                 if (!notifiedPatients.contains(key)) {
                     notifiedPatients.add(key)
-                    sendAlertNotification(patient, alerts.first().title)
+                    // Only alert if we already had previous data, avoiding alerts on initial load
+                    if (!patient.patientId.startsWith("demo_") && previous != null) {
+                        sendAlertNotification(patient, alerts.first().title)
+                    }
                 }
             }
             // Anomalía crítica → disparar pantalla de QR de emergencia
@@ -260,8 +275,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             ) return
         }
 
-        val intent = Intent(ctx, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("vitalsense://notifications"), ctx, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             ctx, 0, intent,
