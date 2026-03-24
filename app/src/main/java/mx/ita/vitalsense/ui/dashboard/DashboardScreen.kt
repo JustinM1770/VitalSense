@@ -48,12 +48,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import mx.ita.vitalsense.data.model.VitalsData
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,8 +112,16 @@ fun DashboardScreen(
     onProfileClick: () -> Unit = {},
     onReportClick: () -> Unit = {},
     onNotifClick: () -> Unit = {},
+    onEmergency: (VitalsData) -> Unit = {},
     vm: DashboardViewModel = viewModel(),
 ) {
+    // Observar anomalías críticas detectadas por el ViewModel y disparar la pantalla de QR
+    LaunchedEffect(vm) {
+        vm.emergencyTrigger.collect { vitals ->
+            onEmergency(vitals)
+        }
+    }
+
     val uiState by vm.uiState.collectAsState()
     val currentUser = FirebaseAuth.getInstance().currentUser
     val userName = currentUser?.displayName ?: "Usuario"
@@ -130,6 +140,7 @@ fun DashboardScreen(
                 val vitalsHistory = if (state is DashboardUiState.Success) state.vitalsHistory else emptyList()
                 val medications = if (state is DashboardUiState.Success) state.medications else emptyList()
                 val isWatchPaired = state.isWatchPaired
+                val pairedDeviceName = if (state is DashboardUiState.Success) state.pairedDeviceName else "Wearable"
 
                 DashboardContent(
                     userName = userName,
@@ -138,6 +149,7 @@ fun DashboardScreen(
                     vitalsHistory = vitalsHistory,
                     medications = medications,
                     isWatchPaired = isWatchPaired,
+                    pairedDeviceName = pairedDeviceName,
                     onPatientClick = onPatientClick,
                     onReportClick = onReportClick,
                     onProfileClick = { onNavigateToProfile(); onProfileClick() },
@@ -195,6 +207,7 @@ private fun DashboardContent(
     vitalsHistory: List<VitalsData>,
     medications: List<Medication>,
     isWatchPaired: Boolean,
+    pairedDeviceName: String = "Wearable",
     onPatientClick: (String) -> Unit,
     onReportClick: () -> Unit,
     onProfileClick: () -> Unit,
@@ -237,6 +250,7 @@ private fun DashboardContent(
             Spacer(Modifier.height(24.dp))
         } else {
             WatchStatusCard(
+                deviceName = pairedDeviceName,
                 onDisconnect = onDisconnectWatch,
                 onClick = onConnectDevice,
             )
@@ -256,10 +270,7 @@ private fun DashboardContent(
             Spacer(Modifier.height(16.dp))
 
             val pagerState = rememberPagerState(pageCount = { 3 })
-            val sleepPct = sleepData?.score
-                ?: if (patients.isNotEmpty()) {
-                    ((patients.first().spo2 - 85).coerceIn(0, 15) * 100 / 15 + 60).coerceIn(0, 100)
-                } else 70
+            val sleepPct = sleepData?.score ?: 0
 
             HorizontalPager(
                 state = pagerState,
@@ -289,44 +300,8 @@ private fun DashboardContent(
             // ── Medicamentos ──────────────────────────────────────────────────
             MedicationsCard(
                 medications = medications,
-                patients = patients,
                 onSeeAllClick = onReportClick,
             )
-
-            Spacer(Modifier.height(24.dp))
-
-            // ── Patients list ─────────────────────────────────────────────────
-            if (patients.isNotEmpty()) {
-                patients.forEach { patient ->
-                    WhiteCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPatientClick(patient.patientId) },
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier.size(44.dp).clip(CircleShape).background(DashBlue.copy(0.15f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = patient.patientName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                    fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = DashBlue,
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(patient.patientName, fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1A1A2E))
-                                Text("❤️ ${patient.heartRate} BPM · SpO₂ ${patient.spo2}%", fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A))
-                            }
-                            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Color(0xFFB0B0B0), modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
 
             Spacer(Modifier.height(16.dp))
         }
@@ -502,6 +477,7 @@ private fun DeviceConnectionCard(onClick: () -> Unit) {
 
 @Composable
 private fun WatchStatusCard(
+    deviceName: String,
     onDisconnect: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -526,7 +502,7 @@ private fun WatchStatusCard(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Galaxy Watch 4 vinculado",
+                    "$deviceName vinculado",
                     color = SuccessGreen,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp
@@ -604,21 +580,23 @@ private fun SleepMetricCard(sleepData: SleepData?, pctFallback: Int, onClick: ()
                 )
                 Text(sleepData?.estado ?: "Sin Datos", color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
             }
-            Text(text = "+10%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SleepGreen)
+            if (sleepData?.score != null) {
+                Text(text = "+10%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SleepGreen)
+            }
         }
     }
 }
 
 @Composable
 private fun HrMiniCard(patients: List<VitalsData>) {
-    val hr = patients.firstOrNull()?.heartRate ?: 80
+    val hr = patients.firstOrNull()?.heartRate?.takeIf { it > 0 }
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateCurve, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("Ritmo cardiaco", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
-                Text("$hr BPM", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF1A1A2E))
+                Text(if (hr != null) "$hr BPM" else "-- BPM", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF1A1A2E))
             }
         }
     }
@@ -626,10 +604,9 @@ private fun HrMiniCard(patients: List<VitalsData>) {
 
 @Composable
 private fun KcalMiniCard(patients: List<VitalsData>) {
-    val kcal = if (patients.isNotEmpty()) 800 + patients.sumOf { it.heartRate } * 2 else 1038
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("%,d".format(kcal), fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 36.sp, color = Color(0xFF1A1A2E))
+            Text("--", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 36.sp, color = Color(0xFF1A1A2E))
             Text("Kcal hoy", fontFamily = Manrope, fontSize = 14.sp, color = Color(0xFF8A8A8A))
         }
     }
@@ -675,7 +652,7 @@ private fun HealthMetricsGraphCard(
             Spacer(Modifier.height(16.dp))
 
             // Chart using Canvas (bezier implementation)
-            WeeklyHrChart(patients = patients)
+            WeeklyHrChart(vitalsHistory = vitalsHistory)
 
             // Tooltip overlay
             if (displayBpm > 0) {
@@ -697,7 +674,6 @@ private fun HealthMetricsGraphCard(
 @Composable
 private fun MedicationsCard(
     medications: List<Medication>,
-    patients: List<VitalsData>,
     onSeeAllClick: () -> Unit,
 ) {
     WhiteCard(modifier = Modifier.fillMaxWidth().clickable { onSeeAllClick() }) {
@@ -735,16 +711,8 @@ private fun MedicationsCard(
             Spacer(Modifier.height(20.dp))
 
             if (medications.isEmpty()) {
-                val kcal = if (patients.isNotEmpty()) 800 + patients.sumOf { it.heartRate } * 2 else 1038
                 Text(
-                    text = "%,d Kcal".format(kcal),
-                    fontFamily = Manrope,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 36.sp,
-                    color = Color(0xFF1A1A2E),
-                )
-                Text(
-                    text = "Total del dia",
+                    text = "Sin medicamentos activos",
                     fontFamily = Manrope,
                     fontSize = 13.sp,
                     color = Color(0xFF8A8A8A),
@@ -771,13 +739,19 @@ private fun MedicationsCard(
 // ─── Weekly HR Chart ──────────────────────────────────────────────────────────
 
 @Composable
-private fun WeeklyHrChart(patients: List<VitalsData>) {
-    val baseHr = patients.firstOrNull()?.heartRate ?: 80
+private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
     val days = listOf("Sun", "Mon", "Tue", "Wed", "Thru", "Fri", "Sat")
-    val values = listOf(
-        baseHr - 2, baseHr + 15, baseHr + 18, baseHr + 8,
-        baseHr - 3, baseHr + 10, baseHr + 5,
-    ).map { it.coerceIn(50, 180) }
+    // Agrupa el historial por día de la semana (0=Dom … 6=Sáb), promedia HR real
+    val grouped = vitalsHistory
+        .filter { it.heartRate > 0 && it.timestamp > 0 }
+        .groupBy {
+            java.util.Calendar.getInstance().apply { timeInMillis = it.timestamp }
+                .get(java.util.Calendar.DAY_OF_WEEK) - 1  // 0-indexed Sunday
+        }
+    val values = (0..6).map { day ->
+        grouped[day]?.map { it.heartRate }?.average()?.toInt() ?: 0
+    }
+    val hasData = values.any { it > 0 }
     val yLabels = listOf(100, 110, 120, 130, 140)
 
     Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
@@ -789,40 +763,40 @@ private fun WeeklyHrChart(patients: List<VitalsData>) {
         }
         Canvas(modifier = Modifier.weight(1f).height(100.dp)) {
             val w = size.width; val h = size.height
-            val min = 95f; val max = 145f
+            val min = 50f; val max = 180f
             fun xOf(i: Int) = i * w / (values.size - 1)
-            fun yOf(v: Int) = h - (v - min) / (max - min) * h
+            fun yOf(v: Int) = h - ((v - min) / (max - min) * h).coerceIn(0f, h)
 
             // grid
             yLabels.forEach { y -> drawLine(Color(0xFFEEEEEE), Offset(0f, yOf(y)), Offset(w, yOf(y)), 1.dp.toPx()) }
-            // vertical grid lines
             days.indices.forEach { i -> drawLine(Color(0xFFEEEEEE), Offset(xOf(i), 0f), Offset(xOf(i), h), 0.5.dp.toPx()) }
 
+            if (!hasData) return@Canvas
+
+            val nonZeroIndices = values.indices.filter { values[it] > 0 }
+            if (nonZeroIndices.size < 2) return@Canvas
+
             val path = Path().apply {
-                moveTo(xOf(0), yOf(values[0]))
-                for (i in 1 until values.size) {
-                    val cx = (xOf(i - 1) + xOf(i)) / 2f
-                    cubicTo(cx, yOf(values[i - 1]), cx, yOf(values[i]), xOf(i), yOf(values[i]))
+                var started = false
+                values.forEachIndexed { i, v ->
+                    if (v > 0) {
+                        if (!started) { moveTo(xOf(i), yOf(v)); started = true }
+                        else lineTo(xOf(i), yOf(v))
+                    }
                 }
             }
-            // fill
             drawPath(Path().apply {
-                addPath(path); lineTo(xOf(values.size - 1), h); lineTo(0f, h); close()
+                addPath(path)
+                lineTo(xOf(nonZeroIndices.last()), h); lineTo(xOf(nonZeroIndices.first()), h); close()
             }, Brush.verticalGradient(listOf(ChartRed.copy(0.25f), Color.Transparent), 0f, h))
-            // line
             drawPath(path, ChartRed, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
-            // active dot on Fri (index 5)
-            val dotX = xOf(5); val dotY = yOf(values[5])
+
+            // Dot en el último día con dato real
+            val lastIdx = nonZeroIndices.last()
+            val dotX = xOf(lastIdx); val dotY = yOf(values[lastIdx])
             drawCircle(ChartRed, 6.dp.toPx(), Offset(dotX, dotY))
             drawCircle(Color.White, 3.dp.toPx(), Offset(dotX, dotY))
             drawLine(ChartRed.copy(0.4f), Offset(dotX, dotY), Offset(dotX, h), 1.dp.toPx())
-
-            // Tooltip bubble (rounded rect)
-            val tooltipW = 68.dp.toPx(); val tooltipH = 36.dp.toPx()
-            val tx = (dotX - tooltipW / 2).coerceIn(0f, w - tooltipW)
-            val ty = dotY - tooltipH - 10.dp.toPx()
-            drawRoundRect(Color.White, Offset(tx, ty), Size(tooltipW, tooltipH), CornerRadius(8.dp.toPx()),
-                style = Stroke(1.dp.toPx()))
         }
     }
 

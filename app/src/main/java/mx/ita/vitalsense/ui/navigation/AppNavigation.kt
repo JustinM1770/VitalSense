@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -33,6 +36,9 @@ import mx.ita.vitalsense.ui.reports.DailyReportScreen
 import mx.ita.vitalsense.ui.splash.SplashScreen
 import mx.ita.vitalsense.ui.chat.ChatBotScreen
 import mx.ita.vitalsense.ui.components.GlobalBottomNavigationBar
+import mx.ita.vitalsense.ui.emergency.EmergencyQrScreen
+import mx.ita.vitalsense.ui.emergency.EmergencyQrViewModel
+import mx.ita.vitalsense.ui.emergency.EmergencyViewerScreen
 
 object Route {
     const val SPLASH                = "splash"
@@ -56,6 +62,9 @@ object Route {
     const val DATOS_IMPORTANTES     = "datos_importantes"
     const val DOCUMENTOS            = "documentos"
     const val CHAT                  = "chat"
+    // ── Emergencia ──────────────────────────────────────────────────────────
+    const val EMERGENCY_QR          = "emergency_qr"
+    const val EMERGENCY_VIEWER      = "emergency_viewer"   // + /{tokenId}
 }
 
 @Composable
@@ -63,6 +72,22 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    // ViewModel de emergencia con scope del NavHost (sobrevive cambios de pantalla)
+    val emergencyVm: EmergencyQrViewModel = viewModel()
+
+    // Manejo del deep link vitalsense://emergency/{tokenId} cuando la app se abre desde el QR
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        val activity = context as? android.app.Activity ?: return@LaunchedEffect
+        val uri = activity.intent?.data ?: return@LaunchedEffect
+        if (uri.scheme == "vitalsense" && uri.host == "emergency") {
+            val tokenId = uri.lastPathSegment ?: return@LaunchedEffect
+            navController.navigate("${Route.EMERGENCY_VIEWER}/$tokenId") {
+                launchSingleTop = true
+            }
+        }
+    }
 
     val bottomBarRoutes = listOf(
         Route.DASHBOARD,
@@ -171,6 +196,20 @@ fun AppNavigation() {
                         onNavigateToProfile = { navController.navigate(Route.PROFILE) },
                         onNavigateToHome = { /* Already here */ },
                         onNavigateToChat = { navController.navigate(Route.CHAT) },
+                        onEmergency = { vitals ->
+                            // La IA detectó anomalía crítica → preparar QR y navegar
+                            val anomalyType = when {
+                                vitals.heartRate > 130              -> "Taquicardia severa (${vitals.heartRate} BPM)"
+                                vitals.heartRate in 1..39           -> "Bradicardia severa (${vitals.heartRate} BPM)"
+                                vitals.spo2 in 1..84                -> "Hipoxia crítica (SpO₂ ${vitals.spo2}%)"
+                                vitals.glucose > 300.0              -> "Hiperglucemia grave (${"%.0f".format(vitals.glucose)} mg/dL)"
+                                else                                -> "Anomalía detectada"
+                            }
+                            emergencyVm.onAnomalyDetected(anomalyType, vitals.heartRate)
+                            navController.navigate(Route.EMERGENCY_QR) {
+                                launchSingleTop = true
+                            }
+                        },
                     )
                 }
 
@@ -348,6 +387,25 @@ fun AppNavigation() {
                 composable(Route.CHAT) {
                     ChatBotScreen(
                         onBack = { navController.popBackStack() }
+                    )
+                }
+
+                // ── Pantalla de QR de emergencia (paciente) ───────────────────
+                composable(Route.EMERGENCY_QR) {
+                    EmergencyQrScreen(
+                        vm       = emergencyVm,
+                        onResolve = {
+                            navController.popBackStack()
+                        },
+                    )
+                }
+
+                // ── Pantalla de visualización del perfil (paramédico) ─────────
+                composable("${Route.EMERGENCY_VIEWER}/{tokenId}") { backStackEntry ->
+                    val tokenId = backStackEntry.arguments?.getString("tokenId") ?: return@composable
+                    EmergencyViewerScreen(
+                        tokenId = tokenId,
+                        onBack  = { navController.popBackStack() },
                     )
                 }
             }

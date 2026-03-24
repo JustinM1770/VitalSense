@@ -13,8 +13,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -27,7 +30,6 @@ import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
 import mx.ita.vitalsense.data.model.computeAlerts
 import mx.ita.vitalsense.data.repository.VitalsRepository
-import mx.ita.vitalsense.data.test.TestDataSeeder
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -41,6 +43,7 @@ sealed interface DashboardUiState {
         val sleepData: SleepData? = null,
         val medications: List<Medication> = emptyList(),
         val isWatchPaired: Boolean = false,
+        val pairedDeviceName: String = "Wearable",
         val currentVitals: VitalsData = VitalsData(),
         val isLoading: Boolean = false,
         val error: String? = null,
@@ -68,6 +71,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
+
+    /**
+     * Emite un VitalsData cuando la IA detecta una anomalía crítica que requiere
+     * mostrar el QR de emergencia. Buffer = 1 para no perder el evento si la UI
+     * aún no está suscrita.
+     */
+    private val _emergencyTrigger = MutableSharedFlow<VitalsData>(extraBufferCapacity = 1)
+    val emergencyTrigger: SharedFlow<VitalsData> = _emergencyTrigger.asSharedFlow()
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseDatabase.getInstance()
@@ -130,7 +141,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                         medications = medsList,
                     )
                     else -> DashboardUiState.Success(
-                        patients = TestDataSeeder.mockPatients,
+                        patients = emptyList(),
                         sleepData = sleep,
                         vitalsHistory = historyList,
                         medications = medsList,
@@ -153,12 +164,11 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             if (firstEmit == null) {
-                // Timeout: Firebase sin respuesta → mostrar mock inmediatamente
-                val mock = TestDataSeeder.mockPatients
-                mock.forEach { processPatientUpdate(it) }
+                // Timeout: Firebase sin respuesta → mostrar lista vacía
                 _uiState.value = DashboardUiState.Success(
-                    patients = mock,
+                    patients = emptyList(),
                     isWatchPaired = prefs.getBoolean("code_paired", false),
+                    pairedDeviceName = prefs.getString("paired_device_name", "Wearable") ?: "Wearable",
                 )
             }
 
@@ -192,16 +202,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             else -> Triple(null, emptyList(), emptyList())
         }
         val isWatchPaired = prefs.getBoolean("code_paired", false)
+        val deviceName = prefs.getString("paired_device_name", "Wearable") ?: "Wearable"
         _uiState.value = result.fold(
             onSuccess = { patients ->
-                val finalList = patients.ifEmpty { TestDataSeeder.mockPatients }
-                finalList.forEach { processPatientUpdate(it) }
-                DashboardUiState.Success(finalList, history, sleep, meds, isWatchPaired)
+                patients.forEach { processPatientUpdate(it) }
+                DashboardUiState.Success(patients, history, sleep, meds, isWatchPaired, deviceName)
             },
-            onFailure = {
-                val mock = TestDataSeeder.mockPatients
-                mock.forEach { processPatientUpdate(it) }
-                DashboardUiState.Success(mock, history, sleep, meds, isWatchPaired)
+            onFailure = { e ->
+                DashboardUiState.Error(e.message ?: "Error al cargar pacientes")
             },
         )
     }
@@ -222,9 +230,27 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     sendAlertNotification(patient, alerts.first().title)
                 }
             }
+            // Anomalía crítica → disparar pantalla de QR de emergencia
+            if (patient.isCriticalEmergency()) {
+                _emergencyTrigger.tryEmit(patient)
+            }
             lastKnownVitals[patient.patientId] = patient
         }
     }
+
+    /**
+     * Umbrales críticos que justifican mostrar el QR de emergencia.
+     * Son más extremos que los umbrales de notificación para evitar falsos positivos.
+     *   - Taquicardia severa  : HR > 130 BPM
+     *   - Bradicardia severa  : HR entre 1 y 39 BPM
+     *   - Hipoxia crítica     : SpO2 entre 1 % y 84 %
+     *   - Hiperglucemia grave : Glucosa > 300 mg/dL
+     */
+    private fun VitalsData.isCriticalEmergency(): Boolean =
+        heartRate > 130 ||
+        heartRate in 1..39 ||
+        (spo2 in 1..84) ||
+        glucose > 300.0
 
     private fun sendAlertNotification(patient: VitalsData, alertTitle: String) {
         val ctx = getApplication<Application>()
