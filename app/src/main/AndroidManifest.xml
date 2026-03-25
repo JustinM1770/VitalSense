@@ -61,7 +61,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Deep link para el QR de emergencia: vitalsense://emergency/{tokenId} -->
+            <!-- Deep link QR emergencia médica: vitalsense://emergency/{tokenId} -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -69,6 +69,16 @@
                 <data
                     android:scheme="vitalsense"
                     android:host="emergency" />
+            </intent-filter>
+
+            <!-- Deep link QR SOS del reloj: vitalsense://sos/{userId}/{sosId} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="vitalsense"
+                    android:host="sos" />
             </intent-filter>
 
             <intent-filter>

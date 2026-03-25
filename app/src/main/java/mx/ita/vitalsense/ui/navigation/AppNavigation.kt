@@ -51,6 +51,7 @@ import mx.ita.vitalsense.ui.components.GlobalBottomNavigationBar
 import mx.ita.vitalsense.ui.emergency.EmergencyQrScreen
 import mx.ita.vitalsense.ui.emergency.EmergencyQrViewModel
 import mx.ita.vitalsense.ui.emergency.EmergencyViewerScreen
+import mx.ita.vitalsense.ui.emergency.SosViewerScreen
 import mx.ita.vitalsense.ui.libre.LibreScanScreen
 import mx.ita.vitalsense.ui.medications.AddMedicationScreen
 import mx.ita.vitalsense.MainActivity
@@ -87,6 +88,7 @@ object Route {
     // ── Emergencia ──────────────────────────────────────────────────────────
     const val EMERGENCY_QR          = "emergency_qr"
     const val EMERGENCY_VIEWER      = "emergency_viewer"   // + /{tokenId}
+    const val SOS_VIEWER            = "sos_viewer"         // + /{userId}/{sosId}
 }
 
 @Composable
@@ -98,16 +100,29 @@ fun AppNavigation() {
     // ViewModel de emergencia con scope del NavHost (sobrevive cambios de pantalla)
     val emergencyVm: EmergencyQrViewModel = viewModel()
 
-    // Manejo del deep link vitalsense://emergency/{tokenId} cuando la app se abre desde el QR
+    // Manejo de deep links vitalsense:// cuando la app se abre desde el QR
     val context = LocalContext.current
     val mainActivity = context as? MainActivity
     LaunchedEffect(Unit) {
         val activity = context as? android.app.Activity ?: return@LaunchedEffect
         val uri = activity.intent?.data ?: return@LaunchedEffect
-        if (uri.scheme == "vitalsense" && uri.host == "emergency") {
-            val tokenId = uri.lastPathSegment ?: return@LaunchedEffect
-            navController.navigate("${Route.EMERGENCY_VIEWER}/$tokenId") {
-                launchSingleTop = true
+        when (uri.host) {
+            "emergency" -> {
+                val tokenId = uri.lastPathSegment ?: return@LaunchedEffect
+                navController.navigate("${Route.EMERGENCY_VIEWER}/$tokenId") {
+                    launchSingleTop = true
+                }
+            }
+            "sos" -> {
+                // vitalsense://sos/{userId}/{sosId}
+                val segments = uri.pathSegments
+                if (segments.size >= 2) {
+                    val userId = segments[0]
+                    val sosId  = segments[1]
+                    navController.navigate("sos_viewer/$userId/$sosId") {
+                        launchSingleTop = true
+                    }
+                }
             }
         }
     }
@@ -525,6 +540,17 @@ fun AppNavigation() {
                     EmergencyViewerScreen(
                         tokenId = tokenId,
                         onBack  = { navController.popBackStack() },
+                    )
+                }
+
+                // ── Pantalla SOS del socorrista (abre desde QR del reloj) ─────
+                composable("${Route.SOS_VIEWER}/{userId}/{sosId}") { backStackEntry ->
+                    val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
+                    val sosId  = backStackEntry.arguments?.getString("sosId")  ?: return@composable
+                    SosViewerScreen(
+                        userId = userId,
+                        sosId  = sosId,
+                        onBack = { navController.popBackStack() },
                     )
                 }
             }

@@ -613,8 +613,8 @@ fun MonitoringScreen(isAmbient: Boolean, heartRate: Int, sosSent: Boolean, onSos
 @Composable
 fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
     val database = remember { FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com") }
-    // El QR siempre codifica el deep link SOS — el teléfono del socorrista abre la app directamente
-    val qrData   = "vitalsense://sos/$sosId"
+    // El QR codifica userId + sosId para que el socorrista pueda ver los datos de la alerta
+    val qrData   = "vitalsense://sos/$userId/$sosId"
     val qrBitmap = remember(qrData) { generateZxingQr(qrData) }
 
     LaunchedEffect(sosId, userId) {
