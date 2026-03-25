@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,9 +62,12 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import mx.ita.vitalsense.data.emergency.StorageDoc
 import mx.ita.vitalsense.ui.components.BottomNav
 import mx.ita.vitalsense.ui.components.BottomNavTab
 import mx.ita.vitalsense.ui.theme.DashBg
@@ -93,6 +97,9 @@ fun DatosImportantesScreen(
     var driveFolderUrl by remember { mutableStateOf(if (uid.isNotEmpty()) profilePrefs.getString("drive_folder_url_$uid", "") ?: "" else "") }
     var driveFolderId by remember { mutableStateOf(if (uid.isNotEmpty()) profilePrefs.getString("drive_folder_id_$uid", "") ?: "" else "") }
     val documents = remember { mutableStateListOf<String>() }
+    val storageDocuments = remember { mutableStateListOf<StorageDoc>() }
+    var isUploading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     var driveAccount by remember { mutableStateOf<GoogleSignInAccount?>(null) }
@@ -169,6 +176,22 @@ fun DatosImportantesScreen(
                         }
                     }
             }
+
+            // Cargar documentos de Firebase Storage
+            FirebaseDatabase.getInstance().getReference("patients/$uid/profile/storageDocuments")
+                .get()
+                .addOnSuccessListener { snap ->
+                    val docs = snap.children.mapNotNull { child ->
+                        val nombre = child.child("nombre").getValue(String::class.java) ?: return@mapNotNull null
+                        val url    = child.child("url").getValue(String::class.java)    ?: return@mapNotNull null
+                        val tipo   = child.child("tipo").getValue(String::class.java)   ?: "pdf"
+                        StorageDoc(nombre = nombre, url = url, tipo = tipo)
+                    }
+                    if (docs.isNotEmpty()) {
+                        storageDocuments.clear()
+                        storageDocuments.addAll(docs)
+                    }
+                }
         }
     }
 
@@ -333,113 +356,38 @@ fun DatosImportantesScreen(
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { fileUri ->
         if (fileUri == null) return@rememberLauncherForActivityResult
-
-        // Modo Drive API (opción 2): subir por API al folderId
-        if (driveFolderId.isNotBlank()) {
-            val account = driveAccount ?: DriveAuthHelper.getLastSignedInAccount(context)
-            if (account == null) {
-                Toast.makeText(context, "Inicia sesión con Google para usar Drive", Toast.LENGTH_LONG).show()
-                driveSignInLauncher.launch(DriveAuthHelper.getSignInIntent(context))
-                return@rememberLauncherForActivityResult
-            }
-
-            val targetName = queryDisplayName(context, fileUri) ?: "documento_${System.currentTimeMillis()}.pdf"
-            val mime = context.contentResolver.getType(fileUri) ?: "application/octet-stream"
-            Toast.makeText(context, "Subiendo a Drive...", Toast.LENGTH_SHORT).show()
-
-            coroutineScope.launch {
-                isDriveLoading = true
-                val tokenResult = withContext(Dispatchers.IO) { DriveAuthHelper.getAccessToken(context, account) }
-                when (tokenResult) {
-                    is DriveAuthResult.Token -> {
-                        try {
-                            val input = context.contentResolver.openInputStream(fileUri)
-                            if (input == null) {
-                                Toast.makeText(context, "No se pudo leer el archivo", Toast.LENGTH_LONG).show()
-                            } else {
-                                input.use {
-                                    val uploaded = withContext(Dispatchers.IO) {
-                                        DriveRestClient.uploadFileToFolder(
-                                            accessToken = tokenResult.accessToken,
-                                            folderId = driveFolderId,
-                                            fileName = targetName,
-                                            mimeType = mime,
-                                            inputStream = it,
-                                        )
-                                    }
-                                    driveFilesCache = driveFilesCache + uploaded
-                                    if (!documents.contains(uploaded.name)) documents.add(uploaded.name)
-                                    if (uid.isNotEmpty()) {
-                                        profilePrefs.edit().putStringSet("documents_$uid", documents.toSet()).apply()
-                                        FirebaseDatabase.getInstance().getReference("patients/$uid/profile/documents")
-                                            .setValue(documents)
-                                    }
-                                    Toast.makeText(context, "Documento subido a Drive", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Error al subir: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                        }
-                    }
-
-                    is DriveAuthResult.NeedsUserConsent -> {
-                        pendingAccountForConsent = account
-                        driveConsentLauncher.launch(tokenResult.consentIntent)
-                    }
-
-                    is DriveAuthResult.Error -> {
-                        Toast.makeText(context, tokenResult.message, Toast.LENGTH_LONG).show()
-                    }
-                }
-                isDriveLoading = false
-            }
-
+        if (uid.isEmpty()) {
+            Toast.makeText(context, "Debes iniciar sesión para subir documentos", Toast.LENGTH_LONG).show()
             return@rememberLauncherForActivityResult
         }
-
-        // Modo SAF (fallback): copiar con DocumentFile a TreeUri
-        if (driveTreeUri.isBlank()) {
-            Toast.makeText(context, "Selecciona primero una carpeta", Toast.LENGTH_LONG).show()
-            return@rememberLauncherForActivityResult
-        }
-
-        if (!isGoogleDriveTreeUri(Uri.parse(driveTreeUri))) {
-            Toast.makeText(
-                context,
-                "La carpeta actual no es de Google Drive. Vuelve a seleccionar una carpeta de Drive.",
-                Toast.LENGTH_LONG,
-            ).show()
-            return@rememberLauncherForActivityResult
-        }
-
-        val targetName = queryDisplayName(context, fileUri) ?: "documento_${System.currentTimeMillis()}.pdf"
-        try {
-            // Intentar copiar a DocumentFile primero
-            val success = copyDocumentToTree(context, fileUri, Uri.parse(driveTreeUri), targetName)
-
-            if (success) {
-                if (!documents.contains(targetName)) documents.add(targetName)
-                if (uid.isNotEmpty()) {
-                    profilePrefs.edit().putStringSet("documents_$uid", documents.toSet()).apply()
-                    FirebaseDatabase.getInstance().getReference("patients/$uid/profile/documents")
-                        .setValue(documents)
+        val fileName = queryDisplayName(context, fileUri) ?: "documento_${System.currentTimeMillis()}"
+        val mime = context.contentResolver.getType(fileUri) ?: "application/octet-stream"
+        val tipo = if (mime.startsWith("image/")) "imagen" else "pdf"
+        scope.launch {
+            isUploading = true
+            try {
+                val stream = context.contentResolver.openInputStream(fileUri)
+                    ?: run {
+                        Toast.makeText(context, "No se pudo leer el archivo", Toast.LENGTH_SHORT).show()
+                        isUploading = false
+                        return@launch
+                    }
+                val storageRef = FirebaseStorage.getInstance().reference.child("documents/$uid/$fileName")
+                storageRef.putStream(stream).await()
+                val downloadUrl = storageRef.downloadUrl.await().toString()
+                val newDoc = StorageDoc(nombre = fileName, url = downloadUrl, tipo = tipo)
+                storageDocuments.add(newDoc)
+                val docsToSave = storageDocuments.map {
+                    mapOf("nombre" to it.nombre, "url" to it.url, "tipo" to it.tipo)
                 }
-                Toast.makeText(context, "Documento subido a la carpeta", Toast.LENGTH_SHORT).show()
-            } else {
-                // Si falla con DocumentFile, intentar con intent directo
-                Toast.makeText(context, "Integrando documento...", Toast.LENGTH_SHORT).show()
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(driveTreeUri)).apply {
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                }
-                try {
-                    context.startActivity(intent)
-                    Toast.makeText(context, "Abre la carpeta en Drive y copia el archivo manualmente", Toast.LENGTH_LONG).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Error al subir: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                }
+                FirebaseDatabase.getInstance().getReference("patients/$uid/profile/storageDocuments")
+                    .setValue(docsToSave).await()
+                Toast.makeText(context, "Documento subido correctamente", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error al subir: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            } finally {
+                isUploading = false
             }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -817,6 +765,70 @@ fun DatosImportantesScreen(
 
                     Spacer(Modifier.height(22.dp))
 
+                    // — Documentos en la nube (Firebase Storage) —
+                    Text(
+                        text = "Documentos en la nube",
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        color = Color(0xFF1A1A2E),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    if (isUploading) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = DashBlue,
+                            )
+                            Text(
+                                text = "Subiendo documento...",
+                                fontFamily = Manrope,
+                                fontSize = 13.sp,
+                                color = Color(0xFF4B5563),
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    if (storageDocuments.isEmpty() && !isUploading) {
+                        Text(
+                            text = "No hay documentos en la nube",
+                            fontFamily = Manrope,
+                            fontSize = 13.sp,
+                            color = Color(0xFF8A8A8A),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            storageDocuments.forEachIndexed { index, doc ->
+                                StorageDocCard(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    doc = doc,
+                                    onDelete = {
+                                        storageDocuments.removeAt(index)
+                                        if (uid.isNotEmpty()) {
+                                            val docsToSave = storageDocuments.map {
+                                                mapOf("nombre" to it.nombre, "url" to it.url, "tipo" to it.tipo)
+                                            }
+                                            FirebaseDatabase.getInstance()
+                                                .getReference("patients/$uid/profile/storageDocuments")
+                                                .setValue(docsToSave)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(22.dp))
+
                     if (qrBitmap != null) {
                         Text(
                             text = "QR Carpeta Drive",
@@ -956,6 +968,95 @@ private fun DocumentCard(
                     fontSize = 11.sp,
                     color = Color(0xFFE53935),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageDocCard(
+    modifier: Modifier = Modifier,
+    doc: StorageDoc,
+    onDelete: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    Box(
+        modifier = modifier
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+            .padding(14.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (doc.tipo == "imagen") {
+                AsyncImage(
+                    model = doc.url,
+                    contentDescription = doc.nombre,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (doc.tipo == "imagen") Color(0xFFE3F2FD) else Color(0xFFFFEBEE)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (doc.tipo == "imagen") "IMG" else "PDF",
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 7.sp,
+                        color = if (doc.tipo == "imagen") Color(0xFF1565C0) else Color(0xFFE53935),
+                    )
+                }
+                Text(
+                    text = doc.nombre,
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = Color(0xFF1A1A2E),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(doc.url))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.weight(1f).height(32.dp),
+                    shape = RoundedCornerShape(6.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1169FF)),
+                ) {
+                    Text(
+                        text = "Ver",
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        color = Color.White,
+                    )
+                }
+                Button(
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f).height(32.dp),
+                    shape = RoundedCornerShape(6.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEBEE)),
+                ) {
+                    Text(
+                        text = "Eliminar",
+                        fontFamily = Manrope,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        color = Color(0xFFE53935),
+                    )
+                }
             }
         }
     }

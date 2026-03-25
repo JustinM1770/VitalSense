@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
@@ -45,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import mx.ita.vitalsense.data.emergency.EmergencyTokenData
 import mx.ita.vitalsense.data.emergency.EmergencyTokenRepository
 
@@ -261,7 +265,69 @@ private fun ProfileView(data: EmergencyTokenData, onBack: () -> Unit) {
                 }
             }
 
+            // — Documentos médicos —
+            if (data.documentos.isNotEmpty()) {
+                MedicalDocumentsSection(documentos = data.documentos)
+            }
+
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+// ─── Sección de documentos médicos ───────────────────────────────────────────
+
+@Composable
+private fun MedicalDocumentsSection(documentos: List<Map<String, String>>) {
+    val context = LocalContext.current
+    Card(
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = SectionBg),
+        elevation = CardDefaults.cardElevation(2.dp),
+    ) {
+        Column(
+            modifier            = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text       = "Documentos médicos",
+                fontSize   = 13.sp,
+                color      = TextGray,
+                fontWeight = FontWeight.Medium,
+            )
+            documentos.forEach { doc ->
+                val nombre = doc["nombre"] ?: "Documento"
+                val url    = doc["url"]    ?: return@forEach
+                val tipo   = doc["tipo"]   ?: "pdf"
+                if (tipo == "imagen") {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        AsyncImage(
+                            model              = url,
+                            contentDescription = nombre,
+                            contentScale       = ContentScale.Crop,
+                            modifier           = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                        )
+                        Text(nombre, fontSize = 12.sp, color = TextDark)
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            context.startActivity(intent)
+                        },
+                        colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF1169FF)),
+                        shape    = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.Description, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(nombre, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
         }
     }
 }

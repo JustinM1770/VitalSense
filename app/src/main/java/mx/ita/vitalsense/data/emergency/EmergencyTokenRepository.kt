@@ -10,14 +10,40 @@ import java.util.UUID
  * Datos que se almacenan en emergency_tokens/{tokenId} de Firebase.
  * Son un snapshot del perfil médico en el momento de la emergencia.
  *
- * Firebase Security Rules requeridas:
+ * Firebase Realtime Database Security Rules requeridas:
  * "emergency_tokens": {
  *   "$tokenId": {
  *     ".read": true,
  *     ".write": "auth != null && auth.uid === newData.child('userId').val()"
  *   }
  * }
+ *
+ * Firebase Storage Security Rules requeridas:
+ * rules_version = '2';
+ * service firebase.storage {
+ *   match /b/{bucket}/o {
+ *     match /documents/{userId}/{filename} {
+ *       // Lectura pública para acceso de paramédicos desde QR (NOM-024-SSA3-2012)
+ *       allow read: if true;
+ *       // Solo el propietario autenticado puede subir sus documentos
+ *       allow write: if request.auth != null && request.auth.uid == userId;
+ *     }
+ *   }
+ * }
  */
+
+/**
+ * Documento médico almacenado en Firebase Storage.
+ * @param nombre  Nombre del archivo (ej. "radiografia.jpg")
+ * @param url     Download URL de Firebase Storage
+ * @param tipo    "pdf" o "imagen"
+ */
+data class StorageDoc(
+    val nombre: String = "",
+    val url: String = "",
+    val tipo: String = "",
+)
+
 data class EmergencyTokenData(
     val tokenId: String = "",
     val userId: String = "",
@@ -34,6 +60,7 @@ data class EmergencyTokenData(
     val createdAt: Long = 0L,
     val expiresAt: Long = 0L,
     val active: Boolean = true,
+    val documentos: List<Map<String, String>> = emptyList(),
 )
 
 class EmergencyTokenRepository {
@@ -59,6 +86,15 @@ class EmergencyTokenRepository {
         val profileSnap = db.getReference("users/$userId/datosMedicos").get().await()
         val profile = profileSnap.getValue(MedicalProfile::class.java) ?: MedicalProfile()
 
+        // 1b. Leer documentos de Firebase Storage
+        val storageDocsSnap = db.getReference("patients/$userId/profile/storageDocuments").get().await()
+        val storageDocsList = storageDocsSnap.children.mapNotNull { child ->
+            val nombre = child.child("nombre").getValue(String::class.java) ?: return@mapNotNull null
+            val url    = child.child("url").getValue(String::class.java)    ?: return@mapNotNull null
+            val tipo   = child.child("tipo").getValue(String::class.java)   ?: "pdf"
+            mapOf("nombre" to nombre, "url" to url, "tipo" to tipo)
+        }
+
         // 2. Generar UUID como token
         val tokenId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
@@ -80,6 +116,7 @@ class EmergencyTokenRepository {
             "createdAt"          to now,
             "expiresAt"          to (now + ttlMs),
             "active"             to true,
+            "documentos"         to storageDocsList,
         )
 
         // 4. Escribir en Firebase
@@ -102,6 +139,13 @@ class EmergencyTokenRepository {
         val expiresAt = snap.child("expiresAt").getValue(Long::class.java) ?: 0L
         check(System.currentTimeMillis() < expiresAt) { "El QR de emergencia ha expirado" }
 
+        val documentos = snap.child("documentos").children.mapNotNull { child ->
+            val nombre = child.child("nombre").getValue(String::class.java) ?: return@mapNotNull null
+            val url    = child.child("url").getValue(String::class.java)    ?: return@mapNotNull null
+            val tipo   = child.child("tipo").getValue(String::class.java)   ?: "pdf"
+            mapOf("nombre" to nombre, "url" to url, "tipo" to tipo)
+        }
+
         EmergencyTokenData(
             tokenId            = tokenId,
             userId             = snap.child("userId").getValue(String::class.java) ?: "",
@@ -118,6 +162,7 @@ class EmergencyTokenRepository {
             createdAt          = snap.child("createdAt").getValue(Long::class.java) ?: 0L,
             expiresAt          = expiresAt,
             active             = active,
+            documentos         = documentos,
         )
     }
 
