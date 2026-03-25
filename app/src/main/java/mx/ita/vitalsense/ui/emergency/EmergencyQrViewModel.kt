@@ -1,7 +1,8 @@
 package mx.ita.vitalsense.ui.emergency
 
+import android.app.Application
 import android.graphics.Bitmap
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -16,15 +17,19 @@ import mx.ita.vitalsense.data.emergency.TwilioEmergencyService
 // ─── Estado de la pantalla de QR de emergencia ────────────────────────────────
 
 sealed interface EmergencyQrState {
-    data object Idle : EmergencyQrState
+    data object Idle    : EmergencyQrState
     data object Loading : EmergencyQrState
     data class Active(
         val qrBitmap: Bitmap,
+        /** QR data: URL local si hay WiFi, deep link si no */
+        val qrUrl: String,
         val tokenId: String,
         val pin: String,
         val expiresAt: Long,
         val anomalyType: String,
         val heartRate: Int,
+        /** true si el QR apunta al servidor local (sin internet) */
+        val isLocalServer: Boolean,
     ) : EmergencyQrState
     data class Expired(val anomalyType: String) : EmergencyQrState
     data class Error(val message: String, val anomalyType: String, val heartRate: Int) : EmergencyQrState
@@ -32,53 +37,60 @@ sealed interface EmergencyQrState {
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
-class EmergencyQrViewModel : ViewModel() {
+class EmergencyQrViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val repository = EmergencyTokenRepository()
+    private val repository    = EmergencyTokenRepository()
     private val twilioService = TwilioEmergencyService()
 
     private val _state = MutableStateFlow<EmergencyQrState>(EmergencyQrState.Idle)
     val state: StateFlow<EmergencyQrState> = _state.asStateFlow()
 
-    // Cuenta regresiva en segundos para la UI
     private val _remainingSecs = MutableStateFlow(0)
     val remainingSecs: StateFlow<Int> = _remainingSecs.asStateFlow()
 
-    private var expiryJob: Job? = null
+    private var expiryJob:    Job? = null
     private var countdownJob: Job? = null
 
     /**
      * Punto de entrada principal.
      * Llamado desde DashboardScreen cuando la IA detecta una anomalía crítica.
-     *
-     * @param anomalyType  Descripción legible de la anomalía (ej. "Taquicardia severa")
-     * @param heartRate    BPM en el momento de la alerta
      */
     fun onAnomalyDetected(anomalyType: String, heartRate: Int) {
-        // Evitar generar un QR nuevo si ya hay uno activo
         if (_state.value is EmergencyQrState.Active) return
 
         viewModelScope.launch {
             _state.value = EmergencyQrState.Loading
 
-            repository.createToken(anomalyType, heartRate)
+            repository.createToken(anomalyType, heartRate, getApplication())
                 .onSuccess { created ->
-                    val deepLink = "vitalsense://emergency/${created.tokenId}"
-                    val bitmap = QrCodeGenerator.generate(deepLink)
                     val expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L
 
+                    // Si hay servidor local, el QR apunta a él → funciona sin internet/app
+                    // Si no, usa el deep link vitalsense:// como fallback
+                    val localBase   = created.localUrl
+                    val isLocal     = localBase != null
+                    val qrUrl = if (isLocal) {
+                        // URL de la página de ingreso de PIN
+                        "$localBase/"
+                    } else {
+                        "vitalsense://emergency/${created.tokenId}"
+                    }
+
+                    val bitmap = QrCodeGenerator.generate(qrUrl)
+
                     _state.value = EmergencyQrState.Active(
-                        qrBitmap    = bitmap,
-                        tokenId     = created.tokenId,
-                        pin         = created.pin,
-                        expiresAt   = expiresAt,
-                        anomalyType = anomalyType,
-                        heartRate   = heartRate,
+                        qrBitmap      = bitmap,
+                        qrUrl         = qrUrl,
+                        tokenId       = created.tokenId,
+                        pin           = created.pin,
+                        expiresAt     = expiresAt,
+                        anomalyType   = anomalyType,
+                        heartRate     = heartRate,
+                        isLocalServer = isLocal,
                     )
                     startExpiry(created.tokenId, expiresAt, anomalyType)
                     startCountdown(expiresAt)
 
-                    // Llamada Twilio: IA operadora anuncia la alerta + PIN al contacto de emergencia
                     twilioService.triggerEmergencyCall(
                         tokenId     = created.tokenId,
                         anomalyType = anomalyType,
@@ -96,30 +108,19 @@ class EmergencyQrViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Cierra el QR y revoca el token. Llamar cuando el médico resuelve la emergencia
-     * o cuando el usuario cierra manualmente la pantalla.
-     */
     fun resolveEmergency() {
         val current = _state.value as? EmergencyQrState.Active ?: return
         expiryJob?.cancel()
         countdownJob?.cancel()
         viewModelScope.launch {
             repository.revokeToken(current.tokenId)
+            repository.stopLocalServer()
             _state.value = EmergencyQrState.Idle
         }
     }
 
-    /**
-     * Reintenta generar un nuevo QR después de un error o expiración.
-     */
-    fun retry(anomalyType: String, heartRate: Int) {
-        onAnomalyDetected(anomalyType, heartRate)
-    }
+    fun retry(anomalyType: String, heartRate: Int) = onAnomalyDetected(anomalyType, heartRate)
 
-    // ─── Privados ────────────────────────────────────────────────────────────
-
-    /** Espera hasta el TTL y transiciona a Expired si el QR sigue activo. */
     private fun startExpiry(tokenId: String, expiresAt: Long, anomalyType: String) {
         expiryJob?.cancel()
         expiryJob = viewModelScope.launch {
@@ -127,12 +128,12 @@ class EmergencyQrViewModel : ViewModel() {
             if (remaining > 0) delay(remaining)
             if (_state.value is EmergencyQrState.Active) {
                 repository.revokeToken(tokenId)
+                repository.stopLocalServer()
                 _state.value = EmergencyQrState.Expired(anomalyType)
             }
         }
     }
 
-    /** Actualiza el contador de segundos restantes cada segundo para la UI. */
     private fun startCountdown(expiresAt: Long) {
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
@@ -147,5 +148,6 @@ class EmergencyQrViewModel : ViewModel() {
         super.onCleared()
         expiryJob?.cancel()
         countdownJob?.cancel()
+        repository.stopLocalServer()
     }
 }

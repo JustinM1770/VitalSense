@@ -1,13 +1,24 @@
 package mx.ita.vitalsense.data.emergency
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.data.model.MedicalProfile
 import java.util.UUID
 
-/** Resultado de crear un token: tokenId + PIN de 4 dígitos para el paramédico. */
-data class EmergencyCreated(val tokenId: String, val pin: String)
+/**
+ * Resultado de crear un token de emergencia.
+ * @param tokenId  UUID del token en Firebase
+ * @param pin      PIN de 4 dígitos para el paramédico
+ * @param localUrl URL del servidor local (ej. "http://192.168.1.5:8080/emergency/{pin}")
+ *                 null si no hay red WiFi disponible
+ */
+data class EmergencyCreated(
+    val tokenId: String,
+    val pin: String,
+    val localUrl: String? = null,
+)
 
 /**
  * Datos que se almacenan en emergency_tokens/{tokenId} de Firebase.
@@ -70,21 +81,30 @@ data class EmergencyTokenData(
 
 class EmergencyTokenRepository {
 
-    private val db = FirebaseDatabase.getInstance()
+    private val db   = FirebaseDatabase.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
     /** Duración del token: 30 minutos */
     private val ttlMs = 30 * 60 * 1000L
 
+    /** Servidor HTTP local — sirve el perfil médico sin internet. */
+    private var localServer: LocalEmergencyServer? = null
+
     /**
      * Lee el MedicalProfile del usuario autenticado desde Firebase, crea un token temporal
      * en emergency_tokens/{uuid} con un PIN de 4 dígitos, escribe el nodo activeEmergency
-     * para que el reloj muestre el QR automáticamente, y devuelve [EmergencyCreated].
+     * para que el reloj muestre el QR automáticamente, arranca el servidor HTTP local y
+     * devuelve [EmergencyCreated] con tokenId, pin y localUrl.
      *
      * @param anomalyType  Descripción de la anomalía (ej. "Taquicardia")
      * @param heartRate    Frecuencia cardíaca en el momento de la alerta
+     * @param context      Necesario para arrancar el servidor local y obtener la IP
      */
-    suspend fun createToken(anomalyType: String, heartRate: Int): Result<EmergencyCreated> = runCatching {
+    suspend fun createToken(
+        anomalyType: String,
+        heartRate: Int,
+        context: Context? = null,
+    ): Result<EmergencyCreated> = runCatching {
         val userId = auth.currentUser?.uid
             ?: error("Usuario no autenticado — no se puede crear token de emergencia")
 
@@ -143,7 +163,25 @@ class EmergencyTokenRepository {
             )
         ).await()
 
-        EmergencyCreated(tokenId = tokenId, pin = pin)
+        // 6. Arrancar servidor HTTP local (para QR sin internet)
+        val localUrl: String? = if (context != null) {
+            val localData = LocalEmergencyData(
+                nombre             = profile.nombre,
+                apellidos          = profile.apellidos,
+                tipoSangre         = profile.tipoSangre,
+                alergias           = profile.alergias,
+                padecimientos      = profile.padecimientos,
+                medicamentos       = profile.medicamentos,
+                contactoEmergencia = profile.contactoEmergencia,
+                telefonoEmergencia = profile.telefonoEmergencia,
+                anomalyType        = anomalyType,
+                heartRate          = heartRate,
+                pin                = pin,
+            )
+            startLocalServer(context, localData)
+        } else null
+
+        EmergencyCreated(tokenId = tokenId, pin = pin, localUrl = localUrl)
     }
 
     /**
@@ -221,4 +259,32 @@ class EmergencyTokenRepository {
     /** Calcula los segundos que quedan hasta que expire el token. */
     fun remainingSeconds(expiresAt: Long): Int =
         ((expiresAt - System.currentTimeMillis()) / 1000L).toInt().coerceAtLeast(0)
+
+    // ─── Servidor HTTP local ──────────────────────────────────────────────────
+
+    /**
+     * Arranca el servidor HTTP local con los datos del paciente.
+     * El QR puede codificar http://{localIp}:8080/ en lugar del deep link,
+     * permitiendo que cualquier teléfono acceda sin app ni internet.
+     *
+     * @return URL base del servidor, ej. "http://192.168.1.5:8080"
+     *         null si no fue posible obtener la IP.
+     */
+    fun startLocalServer(context: Context, data: LocalEmergencyData): String? {
+        stopLocalServer()
+        return try {
+            val ip = LocalEmergencyServer.getLocalIpAddress(context) ?: return null
+            localServer = LocalEmergencyServer(context).also {
+                it.emergencyData = data
+                it.start(5_000, false)
+            }
+            "http://$ip:${LocalEmergencyServer.PORT}"
+        } catch (_: Exception) { null }
+    }
+
+    /** Detiene el servidor local si estaba corriendo. */
+    fun stopLocalServer() {
+        localServer?.stop()
+        localServer = null
+    }
 }

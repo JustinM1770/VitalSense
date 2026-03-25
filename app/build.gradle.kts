@@ -79,6 +79,9 @@ dependencies {
     // QR Code generation
     implementation("com.google.zxing:core:3.5.3")
 
+    // Servidor HTTP local (funciona sin internet — paramédico escanea QR y abre navegador)
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.firebase.messaging)
     implementation(libs.navigation.compose)

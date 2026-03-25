@@ -245,6 +245,17 @@ private fun ActiveContent(
             }
         }
 
+        // — Indicador de modo (local vs deep link) —
+        Text(
+            text = if (state.isLocalServer)
+                "🌐 Servidor local activo — funciona sin internet"
+            else
+                "📱 Requiere app VitalSense instalada",
+            color     = if (state.isLocalServer) Color(0xFF80CBC4) else EmergencyLightRed,
+            fontSize  = 11.sp,
+            textAlign = TextAlign.Center,
+        )
+
         // — Instrucción —
         Text(
             text      = "Muestra este QR al paramédico.\nEscanéalo e ingresa el PIN para ver el perfil médico.",
