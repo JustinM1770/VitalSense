@@ -85,6 +85,7 @@ dependencies {
     implementation(libs.core.splashscreen)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.okhttp)
+    implementation("com.google.android.gms:play-services-auth:21.4.0")
     implementation(libs.facebook.android.sdk)
     implementation(libs.androidx.health.connect)
     implementation(libs.androidx.biometric)

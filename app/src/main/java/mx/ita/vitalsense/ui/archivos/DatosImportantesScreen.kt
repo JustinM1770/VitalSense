@@ -59,6 +59,11 @@ import androidx.documentfile.provider.DocumentFile
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mx.ita.vitalsense.ui.components.BottomNav
 import mx.ita.vitalsense.ui.components.BottomNavTab
 import mx.ita.vitalsense.ui.theme.DashBg
@@ -86,7 +91,17 @@ fun DatosImportantesScreen(
 
     var driveTreeUri by remember { mutableStateOf(if (uid.isNotEmpty()) profilePrefs.getString("drive_tree_uri_$uid", "") ?: "" else "") }
     var driveFolderUrl by remember { mutableStateOf(if (uid.isNotEmpty()) profilePrefs.getString("drive_folder_url_$uid", "") ?: "" else "") }
+    var driveFolderId by remember { mutableStateOf(if (uid.isNotEmpty()) profilePrefs.getString("drive_folder_id_$uid", "") ?: "" else "") }
     val documents = remember { mutableStateListOf<String>() }
+
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    var driveAccount by remember { mutableStateOf<GoogleSignInAccount?>(null) }
+    var driveFolders by remember { mutableStateOf<List<DriveFolder>>(emptyList()) }
+    var driveFilesCache by remember { mutableStateOf<List<DriveFileItem>>(emptyList()) }
+    var isDriveLoading by remember { mutableStateOf(false) }
+    var showDriveFolderList by remember { mutableStateOf(false) }
+    var pendingAccountForConsent by remember { mutableStateOf<GoogleSignInAccount?>(null) }
+    var pendingConsentIntent by remember { mutableStateOf<Intent?>(null) }
 
     LaunchedEffect(uid) {
         documents.clear()
@@ -125,6 +140,23 @@ fun DatosImportantesScreen(
                 loadFilesFromDriveFolder(context, driveTreeUri, documents)
             }
 
+            if (driveFolderId.isBlank()) {
+                FirebaseDatabase.getInstance().getReference("patients/$uid/profile/driveFolderId")
+                    .get()
+                    .addOnSuccessListener { snap ->
+                        val remoteId = snap.getValue(String::class.java).orEmpty()
+                        if (remoteId.isNotBlank()) {
+                            driveFolderId = remoteId
+                            val url = "https://drive.google.com/drive/folders/$remoteId"
+                            driveFolderUrl = url
+                            profilePrefs.edit()
+                                .putString("drive_folder_id_$uid", remoteId)
+                                .putString("drive_folder_url_$uid", url)
+                                .apply()
+                        }
+                    }
+            }
+
             // fallback: recover folder URL from Firebase profile if local is empty
             if (driveFolderUrl.isBlank()) {
                 FirebaseDatabase.getInstance().getReference("patients/$uid/profile/driveFolderUrl")
@@ -140,29 +172,148 @@ fun DatosImportantesScreen(
         }
     }
 
+    fun startDriveFolderListing(account: GoogleSignInAccount) {
+        driveAccount = account
+        pendingAccountForConsent = null
+        pendingConsentIntent = null
+        isDriveLoading = true
+        showDriveFolderList = true
+
+        coroutineScope.launch {
+            val auth = withContext(Dispatchers.IO) {
+                DriveAuthHelper.getAccessToken(context, account)
+            }
+
+            when (auth) {
+                is DriveAuthResult.Token -> {
+                    val folders = try {
+                        withContext(Dispatchers.IO) { DriveRestClient.listFolders(auth.accessToken) }
+                    } catch (e: Exception) {
+                        val msg = when (e) {
+                            is DriveRestClient.DriveApiException -> {
+                                android.util.Log.e(
+                                    "DatosImportantes",
+                                    "Drive listFolders failed HTTP ${e.httpCode}. raw=${e.rawBody}",
+                                )
+
+                                val lower = e.message.lowercase()
+                                when {
+                                    lower.contains("accessnotconfigured") ||
+                                        lower.contains("has not been used") ||
+                                        lower.contains("drive.googleapis.com") -> {
+                                        "Drive API bloqueada (HTTP ${e.httpCode}).\n" +
+                                            "Activa Google Drive API en Google Cloud Console y vuelve a intentar."
+                                    }
+
+                                    lower.contains("insufficientpermissions") ||
+                                        lower.contains("insufficient permission") -> {
+                                        "Permisos insuficientes (HTTP ${e.httpCode}).\n" +
+                                            "Cierra sesión y vuelve a iniciar sesión aceptando permisos de Drive."
+                                    }
+
+                                    else -> "No se pudo enlistar carpetas (HTTP ${e.httpCode}).\n${e.message}".take(260)
+                                }
+                            }
+
+                            else -> {
+                                android.util.Log.e("DatosImportantes", "Drive listFolders error: ${e.message}", e)
+                                "No se pudo enlistar carpetas de Drive"
+                            }
+                        }
+
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        emptyList()
+                    }
+                    driveFolders = folders
+                }
+
+                is DriveAuthResult.NeedsUserConsent -> {
+                    pendingAccountForConsent = account
+                    pendingConsentIntent = auth.consentIntent
+                }
+
+                is DriveAuthResult.Error -> {
+                    Toast.makeText(context, auth.message, Toast.LENGTH_LONG).show()
+                }
+            }
+
+            isDriveLoading = false
+        }
+    }
+
+    val driveSignInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        try {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+            val account = task.getResult(Exception::class.java)
+            if (account != null) {
+                startDriveFolderListing(account)
+            } else {
+                Toast.makeText(context, "No se pudo iniciar sesión con Google", Toast.LENGTH_LONG).show()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(context, "Inicio de sesión cancelado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val driveConsentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val account = pendingAccountForConsent
+        if (account != null) {
+            startDriveFolderListing(account)
+        } else {
+            Toast.makeText(context, "Permiso de Drive cancelado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(pendingConsentIntent) {
+        val intent = pendingConsentIntent ?: return@LaunchedEffect
+        // Lanzar el consentimiento como side-effect controlado.
+        driveConsentLauncher.launch(intent)
+        pendingConsentIntent = null
+    }
+
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
         val uri = result.data?.data
-        if (uri == null) return@rememberLauncherForActivityResult
-
-        if (!isGoogleDriveTreeUri(uri)) {
-            Toast.makeText(
-                context,
-                "Selecciona una carpeta de Google Drive (no almacenamiento local).",
-                Toast.LENGTH_LONG,
-            ).show()
+        if (uri == null) {
+            android.util.Log.w("DatosImportantes", "folderPicker: URI es null")
             return@rememberLauncherForActivityResult
         }
 
-        try {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-        } catch (_: Exception) {
+        android.util.Log.d("DatosImportantes", "URI seleccionado: $uri")
+        android.util.Log.d("DatosImportantes", "Authority: ${uri.authority}")
+
+        if (!isGoogleDriveTreeUri(uri)) {
+            android.util.Log.w("DatosImportantes", "URI no es de Google Drive válido: $uri")
+            android.util.Log.w("DatosImportantes", "Authority encontrada: ${uri.authority}")
+            
+            // Mostrar mensaje más detallado
+            val msg = if (GoogleDriveHelper.isGoogleDriveInstalled(context)) {
+                "⚠️ No seleccionaste Google Drive.\n\n" +
+                "En el selector, en la parte superior IZQUIERDA donde dice 'Almacenamiento interno' o 'Descargas',\n" +
+                "TAP ahí y selecciona 'Google Drive'\n\n" +
+                "Intentemos de nuevo."
+            } else {
+                "⚠️ Google Drive no parece estar instalada.\n\n" +
+                "Necesitas tener Google Drive instalada para usar esta función.\n" +
+                "Descárgala desde Play Store."
+            }
+            
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            return@rememberLauncherForActivityResult
+        }
+
+        // Tomar permisos persistentes
+        val permissionTaken = GoogleDriveHelper.takePersistableUriPermission(context, uri)
+        if (!permissionTaken) {
+            android.util.Log.w("DatosImportantes", "No se pudo tomar permiso persistente")
         }
 
         driveTreeUri = uri.toString()
         driveFolderUrl = uri.toString()
+        
+        val folderName = GoogleDriveHelper.getFolderNameFromUri(context, uri)
+        android.util.Log.d("DatosImportantes", "Carpeta seleccionada: '$folderName'")
+        
         if (uid.isNotEmpty()) {
             profilePrefs.edit()
                 .putString("drive_tree_uri_$uid", driveTreeUri)
@@ -177,12 +328,76 @@ fun DatosImportantesScreen(
                     )
                 )
         }
-        Toast.makeText(context, "Carpeta de Drive seleccionada correctamente", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Carpeta de Drive seleccionada correctamente: $folderName", Toast.LENGTH_SHORT).show()
     }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { fileUri ->
         if (fileUri == null) return@rememberLauncherForActivityResult
 
+        // Modo Drive API (opción 2): subir por API al folderId
+        if (driveFolderId.isNotBlank()) {
+            val account = driveAccount ?: DriveAuthHelper.getLastSignedInAccount(context)
+            if (account == null) {
+                Toast.makeText(context, "Inicia sesión con Google para usar Drive", Toast.LENGTH_LONG).show()
+                driveSignInLauncher.launch(DriveAuthHelper.getSignInIntent(context))
+                return@rememberLauncherForActivityResult
+            }
+
+            val targetName = queryDisplayName(context, fileUri) ?: "documento_${System.currentTimeMillis()}.pdf"
+            val mime = context.contentResolver.getType(fileUri) ?: "application/octet-stream"
+            Toast.makeText(context, "Subiendo a Drive...", Toast.LENGTH_SHORT).show()
+
+            coroutineScope.launch {
+                isDriveLoading = true
+                val tokenResult = withContext(Dispatchers.IO) { DriveAuthHelper.getAccessToken(context, account) }
+                when (tokenResult) {
+                    is DriveAuthResult.Token -> {
+                        try {
+                            val input = context.contentResolver.openInputStream(fileUri)
+                            if (input == null) {
+                                Toast.makeText(context, "No se pudo leer el archivo", Toast.LENGTH_LONG).show()
+                            } else {
+                                input.use {
+                                    val uploaded = withContext(Dispatchers.IO) {
+                                        DriveRestClient.uploadFileToFolder(
+                                            accessToken = tokenResult.accessToken,
+                                            folderId = driveFolderId,
+                                            fileName = targetName,
+                                            mimeType = mime,
+                                            inputStream = it,
+                                        )
+                                    }
+                                    driveFilesCache = driveFilesCache + uploaded
+                                    if (!documents.contains(uploaded.name)) documents.add(uploaded.name)
+                                    if (uid.isNotEmpty()) {
+                                        profilePrefs.edit().putStringSet("documents_$uid", documents.toSet()).apply()
+                                        FirebaseDatabase.getInstance().getReference("patients/$uid/profile/documents")
+                                            .setValue(documents)
+                                    }
+                                    Toast.makeText(context, "Documento subido a Drive", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error al subir: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+
+                    is DriveAuthResult.NeedsUserConsent -> {
+                        pendingAccountForConsent = account
+                        driveConsentLauncher.launch(tokenResult.consentIntent)
+                    }
+
+                    is DriveAuthResult.Error -> {
+                        Toast.makeText(context, tokenResult.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+                isDriveLoading = false
+            }
+
+            return@rememberLauncherForActivityResult
+        }
+
+        // Modo SAF (fallback): copiar con DocumentFile a TreeUri
         if (driveTreeUri.isBlank()) {
             Toast.makeText(context, "Selecciona primero una carpeta", Toast.LENGTH_LONG).show()
             return@rememberLauncherForActivityResult
@@ -201,7 +416,7 @@ fun DatosImportantesScreen(
         try {
             // Intentar copiar a DocumentFile primero
             val success = copyDocumentToTree(context, fileUri, Uri.parse(driveTreeUri), targetName)
-            
+
             if (success) {
                 if (!documents.contains(targetName)) documents.add(targetName)
                 if (uid.isNotEmpty()) {
@@ -231,8 +446,8 @@ fun DatosImportantesScreen(
     val qrBitmap = remember(driveFolderUrl) {
         if (driveFolderUrl.isNotBlank()) generateQrBitmap(driveFolderUrl) else null
     }
-    val isDriveFolderSelected = remember(driveTreeUri) {
-        driveTreeUri.isNotBlank() && isGoogleDriveTreeUri(Uri.parse(driveTreeUri))
+    val isDriveFolderSelected = remember(driveFolderId, driveTreeUri) {
+        driveFolderId.isNotBlank() || (driveTreeUri.isNotBlank() && isGoogleDriveTreeUri(Uri.parse(driveTreeUri)))
     }
 
     Box(modifier = Modifier.fillMaxSize().background(DashBg)) {
@@ -379,19 +594,15 @@ fun DatosImportantesScreen(
                     ) {
                         Button(
                             onClick = {
-                                val initialUri = when {
-                                    isDriveFolderSelected -> Uri.parse(driveTreeUri)
-                                    else -> Uri.parse("content://com.google.android.apps.docs.storage/document/root")
+                                // UX: si el usuario va a usar Drive API, no mostrar advertencia por carpeta local previa
+                                driveTreeUri = ""
+
+                                val last = DriveAuthHelper.getLastSignedInAccount(context)
+                                if (last == null) {
+                                    driveSignInLauncher.launch(DriveAuthHelper.getSignInIntent(context))
+                                } else {
+                                    startDriveFolderListing(last)
                                 }
-                                val pickIntent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                                    addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                                    addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
-                                    putExtra("android.content.extra.SHOW_ADVANCED", true)
-                                    putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri)
-                                }
-                                folderPicker.launch(pickIntent)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
@@ -401,24 +612,130 @@ fun DatosImportantesScreen(
                         }
                     }
 
+                    if (showDriveFolderList) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = if (isDriveLoading) "Cargando carpetas de Drive..." else "Elige una carpeta de Drive",
+                            fontFamily = Manrope,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                            color = Color(0xFF4B5563),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        Spacer(Modifier.height(6.dp))
+
+                        if (!isDriveLoading && driveFolders.isEmpty()) {
+                            Text(
+                                text = "No se encontraron carpetas o no hay permiso.",
+                                fontFamily = Manrope,
+                                fontSize = 11.sp,
+                                color = Color(0xFF6B7280),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            driveFolders.take(50).forEach { folder ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            driveFolderId = folder.id
+                                            val url = "https://drive.google.com/drive/folders/${folder.id}"
+                                            driveFolderUrl = url
+                                            driveTreeUri = ""
+                                            showDriveFolderList = false
+
+                                            if (uid.isNotEmpty()) {
+                                                profilePrefs.edit()
+                                                    .putString("drive_folder_id_$uid", driveFolderId)
+                                                    .putString("drive_folder_url_$uid", driveFolderUrl)
+                                                    .putString("drive_tree_uri_$uid", "")
+                                                    .putBoolean("drive_folder_locked_$uid", true)
+                                                    .apply()
+                                                FirebaseDatabase.getInstance().getReference("patients/$uid/profile")
+                                                    .updateChildren(
+                                                        mapOf(
+                                                            "driveFolderId" to driveFolderId,
+                                                            "driveFolderUrl" to driveFolderUrl,
+                                                            "driveTreeUri" to "",
+                                                        )
+                                                    )
+                                            }
+
+                                            Toast.makeText(context, "Carpeta seleccionada: ${folder.name}", Toast.LENGTH_SHORT).show()
+
+                                            val account = driveAccount ?: DriveAuthHelper.getLastSignedInAccount(context)
+                                            if (account != null) {
+                                                coroutineScope.launch {
+                                                    isDriveLoading = true
+                                                    val tokenResult = withContext(Dispatchers.IO) {
+                                                        DriveAuthHelper.getAccessToken(context, account)
+                                                    }
+                                                    if (tokenResult is DriveAuthResult.Token) {
+                                                        try {
+                                                            val files = withContext(Dispatchers.IO) {
+                                                                DriveRestClient.listFilesInFolder(
+                                                                    accessToken = tokenResult.accessToken,
+                                                                    folderId = driveFolderId,
+                                                                )
+                                                            }
+                                                            driveFilesCache = files
+                                                            documents.clear()
+                                                            documents.addAll(files.map { it.name })
+                                                            if (uid.isNotEmpty()) {
+                                                                profilePrefs.edit().putStringSet("documents_$uid", documents.toSet()).apply()
+                                                                FirebaseDatabase.getInstance().getReference("patients/$uid/profile/documents")
+                                                                    .setValue(documents)
+                                                            }
+                                                        } catch (_: Exception) {
+                                                            // Silencioso: la carpeta quedó guardada aunque no se pueda listar.
+                                                        }
+                                                    }
+                                                    isDriveLoading = false
+                                                }
+                                            }
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                ) {
+                                    Text(
+                                        text = folder.name,
+                                        fontFamily = Manrope,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF1A1A2E),
+                                        maxLines = 1,
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(8.dp))
 
                     Spacer(Modifier.height(10.dp))
 
                     Button(
                         onClick = {
-                            if (driveTreeUri.isBlank()) {
+                            val urlToOpen = when {
+                                driveFolderId.isNotBlank() && driveFolderUrl.isNotBlank() -> driveFolderUrl
+                                driveTreeUri.isNotBlank() -> driveTreeUri
+                                else -> ""
+                            }
+
+                            if (urlToOpen.isBlank()) {
                                 Toast.makeText(context, "Primero selecciona una carpeta", Toast.LENGTH_LONG).show()
-                            } else {
-                                try {
-                                    val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse(driveTreeUri)).apply {
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                                    }
-                                    context.startActivity(openIntent)
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, "No se pudo abrir la carpeta", Toast.LENGTH_LONG).show()
+                                return@Button
+                            }
+
+                            try {
+                                val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse(urlToOpen)).apply {
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                                 }
+                                context.startActivity(openIntent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "No se pudo abrir la carpeta", Toast.LENGTH_LONG).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -461,8 +778,36 @@ fun DatosImportantesScreen(
                                             profilePrefs.edit().putStringSet("documents_$uid", documents.toSet()).apply()
                                             FirebaseDatabase.getInstance().getReference("patients/$uid/profile/documents")
                                                 .setValue(documents)
-                                            deleteFileFromDrive(context, driveTreeUri, filename)
-                                            Toast.makeText(context, "Documento eliminado", Toast.LENGTH_SHORT).show()
+
+                                            if (driveFolderId.isNotBlank()) {
+                                                val account = driveAccount ?: DriveAuthHelper.getLastSignedInAccount(context)
+                                                val cached = driveFilesCache.firstOrNull { it.name == filename }
+                                                if (account == null || cached == null) {
+                                                    Toast.makeText(context, "Eliminado localmente (no se pudo borrar en Drive)", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    coroutineScope.launch {
+                                                        val tokenResult = withContext(Dispatchers.IO) {
+                                                            DriveAuthHelper.getAccessToken(context, account)
+                                                        }
+                                                        if (tokenResult is DriveAuthResult.Token) {
+                                                            try {
+                                                                withContext(Dispatchers.IO) {
+                                                                    DriveRestClient.deleteFile(tokenResult.accessToken, cached.id)
+                                                                }
+                                                                driveFilesCache = driveFilesCache.filterNot { it.id == cached.id }
+                                                                Toast.makeText(context, "Documento eliminado en Drive", Toast.LENGTH_SHORT).show()
+                                                            } catch (_: Exception) {
+                                                                Toast.makeText(context, "No se pudo eliminar en Drive", Toast.LENGTH_LONG).show()
+                                                            }
+                                                        } else {
+                                                            Toast.makeText(context, "No se pudo validar permiso de Drive", Toast.LENGTH_LONG).show()
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                deleteFileFromDrive(context, driveTreeUri, filename)
+                                                Toast.makeText(context, "Documento eliminado", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     }
                                 )
@@ -637,6 +982,68 @@ private fun loadFilesFromDriveFolder(context: Context, driveUri: String, documen
     }
 }
 
+private fun launchGoogleDrivePicker(context: Context, folderPicker: androidx.activity.compose.ManagedActivityResultLauncher<Intent, ActivityResult>) {
+    try {
+        android.util.Log.d("DatosImportantes", "Abriendo selector de carpetas...")
+
+        val driveInstalled = GoogleDriveHelper.isGoogleDriveInstalled(context)
+        val driveProviderAvailable = GoogleDriveHelper.isDriveDocumentsProviderAvailable(context)
+
+        if (!driveInstalled) {
+            Toast.makeText(
+                context,
+                "Google Drive no está instalada. Instálala desde Play Store.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+
+        if (!driveProviderAvailable) {
+            Toast.makeText(
+                context,
+                "Tu teléfono no expone Google Drive en el selector de carpetas.\n\n" +
+                    "Abre Google Drive, inicia sesión, y vuelve a intentar.\n" +
+                    "Si sigue igual, este modelo/ROM solo permite seleccionar carpetas locales.",
+                Toast.LENGTH_LONG,
+            ).show()
+            // Aun así, abrir el selector por si el OEM lo soporta parcialmente.
+        } else {
+            Toast.makeText(
+                context,
+                "Se abrirá un selector. Si aparece 'Almacenamiento interno', toca el título de arriba para cambiar ubicación y elige 'Google Drive'.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+
+        // Usar el intent corregido (EXTRA_INITIAL_URI válido) y preferir DocumentsUI en Samsung
+        val pickIntent = GoogleDriveHelper.createDriveFolderPickerIntentPreferDocumentsUi(context)
+
+        // Diagnóstico: qué app/actividad está resolviendo el intent en este dispositivo
+        val resolved = try {
+            pickIntent.resolveActivity(context.packageManager)
+        } catch (_: Exception) {
+            null
+        }
+        val resolvedPkg = resolved?.packageName.orEmpty()
+        val resolvedCls = resolved?.className.orEmpty()
+        android.util.Log.d(
+            "DatosImportantes",
+            "Picker resolved to package='$resolvedPkg' class='$resolvedCls' driveProviderAvailable=$driveProviderAvailable"
+        )
+        if (resolvedPkg.isNotBlank()) {
+            Toast.makeText(
+                context,
+                "Selector: $resolvedPkg\nDrive provider: ${if (driveProviderAvailable) "sí" else "no"}",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+        folderPicker.launch(pickIntent)
+    } catch (e: Exception) {
+        android.util.Log.e("DatosImportantes", "Error launching picker: ${e.message}", e)
+        Toast.makeText(context, "Error al abrir selector de carpetas", Toast.LENGTH_LONG).show()
+    }
+}
+
 private fun queryDisplayName(context: Context, uri: Uri): String? {
     val cursor = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
     cursor?.use {
@@ -755,8 +1162,7 @@ private fun deleteFileFromDrive(context: Context, driveUri: String, fileName: St
 }
 
 private fun isGoogleDriveTreeUri(uri: Uri): Boolean {
-    val authority = uri.authority.orEmpty().lowercase()
-    return authority.contains("com.google.android.apps.docs")
+    return GoogleDriveHelper.isValidTreeUri(uri)
 }
 
 private fun generateQrBitmap(data: String, size: Int = 512): Bitmap? {
