@@ -154,7 +154,7 @@ fun AddMedicationScreen(
                     value = frecuencia,
                     onValueChange = {},
                     readOnly = true,
-                    modifier = Modifier.fillMaxWidth().clickable { freqExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = frecuenciaError,
                     placeholder = { Text("Selecciona una frecuencia", color = Color(0xFF9CA3AF)) },
@@ -166,6 +166,8 @@ fun AddMedicationScreen(
                         unfocusedIndicatorColor = Color(0xFFE5E7EB),
                     ),
                 )
+                // Overlay transparente que captura el toque sin que el TextField lo bloquee
+                Box(modifier = Modifier.matchParentSize().clickable { freqExpanded = true })
                 DropdownMenu(expanded = freqExpanded, onDismissRequest = { freqExpanded = false }) {
                     frequencyOptions.forEach { option ->
                         DropdownMenuItem(
@@ -211,7 +213,7 @@ fun AddMedicationScreen(
                     value = duracion,
                     onValueChange = {},
                     readOnly = true,
-                    modifier = Modifier.fillMaxWidth().clickable { durExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = duracionError,
                     placeholder = { Text("Selecciona duracion", color = Color(0xFF9CA3AF)) },
@@ -223,6 +225,8 @@ fun AddMedicationScreen(
                         unfocusedIndicatorColor = Color(0xFFE5E7EB),
                     ),
                 )
+                // Overlay transparente que captura el toque sin que el TextField lo bloquee
+                Box(modifier = Modifier.matchParentSize().clickable { durExpanded = true })
                 DropdownMenu(expanded = durExpanded, onDismissRequest = { durExpanded = false }) {
                     durationOptions.forEach { option ->
                         DropdownMenuItem(

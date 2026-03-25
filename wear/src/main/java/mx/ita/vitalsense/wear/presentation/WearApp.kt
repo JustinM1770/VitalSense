@@ -613,35 +613,18 @@ fun MonitoringScreen(isAmbient: Boolean, heartRate: Int, sosSent: Boolean, onSos
 @Composable
 fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
     val database = remember { FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com") }
-    var driveFolderUrl by remember(userId) { mutableStateOf<String?>(null) }
-    val qrData = driveFolderUrl?.takeIf { it.isNotBlank() } ?: "vitalsense://sos/$sosId"
+    // El QR siempre codifica el deep link SOS — el teléfono del socorrista abre la app directamente
+    val qrData   = "vitalsense://sos/$sosId"
     val qrBitmap = remember(qrData) { generateZxingQr(qrData) }
 
     LaunchedEffect(sosId, userId) {
         val ref = database.getReference("alerts").child(userId).child(sosId)
-        val profileRef = database.getReference("patients/$userId/profile/driveFolderUrl")
-
-        val profileListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                driveFolderUrl = snapshot.getValue(String::class.java)
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        profileRef.addValueEventListener(profileListener)
-
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (!snapshot.exists()) {
-                    profileRef.removeEventListener(profileListener)
-                    onDismiss()
-                    return
-                }
-                val read = snapshot.child("read").getValue(Boolean::class.java) ?: false
+                if (!snapshot.exists()) { onDismiss(); return }
+                val read   = snapshot.child("read").getValue(Boolean::class.java) ?: false
                 val status = snapshot.child("status").getValue(String::class.java) ?: "active"
-                if (read || status == "accepted" || status == "resolved") {
-                    profileRef.removeEventListener(profileListener)
-                    onDismiss()
-                }
+                if (read || status == "accepted" || status == "resolved") onDismiss()
             }
             override fun onCancelled(error: DatabaseError) {}
         }
@@ -666,11 +649,7 @@ fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                if (driveFolderUrl.isNullOrBlank()) "Esperando ayuda..." else "Carpeta Drive",
-                color = Color.Black,
-                fontSize = 12.sp,
-            )
+            Text("Escanea para ayudar", color = Color.Black, fontSize = 12.sp)
         }
     }
 }
