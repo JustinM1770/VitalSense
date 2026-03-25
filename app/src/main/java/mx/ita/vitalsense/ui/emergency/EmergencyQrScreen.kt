@@ -198,9 +198,56 @@ private fun ActiveContent(
             fontWeight = if (isUrgent) FontWeight.Bold else FontWeight.Normal,
         )
 
+        // — PIN de acceso —
+        Card(
+            shape     = RoundedCornerShape(16.dp),
+            colors    = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.15f)),
+            elevation = CardDefaults.cardElevation(0.dp),
+        ) {
+            Column(
+                modifier            = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text       = "PIN de acceso",
+                    color      = EmergencyLightRed,
+                    fontSize   = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 1.sp,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    state.pin.chunked(1).forEachIndexed { index, digit ->
+                        Text(
+                            text       = digit,
+                            color      = Color.White,
+                            fontSize   = 36.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                        if (index < 3) {
+                            Text(
+                                text     = "–",
+                                color    = EmergencyLightRed,
+                                fontSize = 24.sp,
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text      = "El paramédico necesita este PIN para ver el perfil médico",
+                    color     = EmergencyLightRed,
+                    fontSize  = 10.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+
         // — Instrucción —
         Text(
-            text      = "Muestra este QR al paramédico.\nEscanéalo para ver el perfil médico completo.",
+            text      = "Muestra este QR al paramédico.\nEscanéalo e ingresa el PIN para ver el perfil médico.",
             color     = EmergencyLightRed,
             fontSize  = 13.sp,
             textAlign = TextAlign.Center,

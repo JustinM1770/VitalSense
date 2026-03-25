@@ -1,0 +1,17 @@
+{
+  "name": "vitalsense-functions",
+  "description": "Firebase Cloud Functions — VitalSense emergency Twilio calls",
+  "scripts": {
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-functions": "^4.9.0",
+    "twilio": "^5.3.7"
+  },
+  "private": true
+}

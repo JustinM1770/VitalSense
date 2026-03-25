@@ -93,6 +93,12 @@ fun WearApp(
     var showSuccessScreen by remember { mutableStateOf(false) }
     var forcedSosId by remember { mutableStateOf<String?>(null) }
     var forcedSosUserId by remember { mutableStateOf<String?>(null) }
+
+    // Estado de emergencia activa (viene de patients/{userId}/activeEmergency en Firebase)
+    var activeEmergencyTokenId  by remember { mutableStateOf<String?>(null) }
+    var activeEmergencyPin      by remember { mutableStateOf("") }
+    var activeEmergencyType     by remember { mutableStateOf("") }
+    var activeEmergencyExpires  by remember { mutableStateOf(0L) }
     
     // Auth Anónima
     LaunchedEffect(Unit) {
@@ -140,6 +146,32 @@ fun WearApp(
                 }
             }
         }
+    }
+
+    // Escuchar emergencias activas desde Firebase para mostrar QR+PIN en el reloj
+    LaunchedEffect(isPaired, isAuthenticated) {
+        val userId = prefs.getString(KEY_USER_ID, null)
+        if (!isPaired || userId.isNullOrEmpty()) return@LaunchedEffect
+
+        val ref = database.getReference("patients/$userId/activeEmergency")
+        ref.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) {
+                    activeEmergencyTokenId = null
+                    return
+                }
+                val expiresAt = snapshot.child("expiresAt").getValue(Long::class.java) ?: 0L
+                if (System.currentTimeMillis() > expiresAt) {
+                    activeEmergencyTokenId = null
+                    return
+                }
+                activeEmergencyTokenId = snapshot.child("tokenId").getValue(String::class.java)
+                activeEmergencyPin     = snapshot.child("pin").getValue(String::class.java) ?: ""
+                activeEmergencyType    = snapshot.child("anomalyType").getValue(String::class.java) ?: "Emergencia"
+                activeEmergencyExpires = expiresAt
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
     }
 
     // Lógica de Servicio
@@ -226,6 +258,14 @@ fun WearApp(
                 SuccessScreen()
             } else if (!hasPermission) {
                 PermissionScreen { launcher.launch(permissions) }
+            } else if (activeEmergencyTokenId != null) {
+                // Emergencia crítica detectada por la IA — mostrar QR + PIN en el reloj
+                EmergencyQrWearScreen(
+                    tokenId    = activeEmergencyTokenId!!,
+                    pin        = activeEmergencyPin,
+                    anomalyType = activeEmergencyType,
+                    expiresAt  = activeEmergencyExpires,
+                )
             } else if (activeSosId != null || forcedSosId != null) {
                 SosQrScreen(
                     sosId = activeSosId ?: forcedSosId.orEmpty(),
@@ -630,6 +670,93 @@ fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
                 if (driveFolderUrl.isNullOrBlank()) "Esperando ayuda..." else "Carpeta Drive",
                 color = Color.Black,
                 fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+/**
+ * Pantalla de emergencia del reloj: muestra el QR (con el deep link del token)
+ * y el PIN de 4 dígitos que el paramédico debe ingresar.
+ *
+ * Se activa automáticamente cuando el smartphone detecta HR > 150 BPM en reposo
+ * y escribe el nodo patients/{userId}/activeEmergency en Firebase.
+ */
+@Composable
+fun EmergencyQrWearScreen(
+    tokenId: String,
+    pin: String,
+    anomalyType: String,
+    expiresAt: Long,
+) {
+    val deepLink = "vitalsense://emergency/$tokenId"
+    val qrBitmap = remember(deepLink) { generateZxingQr(deepLink, size = 200) }
+
+    var secondsLeft by remember { mutableStateOf(((expiresAt - System.currentTimeMillis()) / 1000L).toInt().coerceAtLeast(0)) }
+    LaunchedEffect(expiresAt) {
+        while (secondsLeft > 0) {
+            delay(1_000L)
+            secondsLeft = ((expiresAt - System.currentTimeMillis()) / 1000L).toInt().coerceAtLeast(0)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFB71C1C)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(8.dp),
+        ) {
+            Text(
+                text       = "EMERGENCIA",
+                color      = Color.White,
+                fontSize   = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+            )
+            Text(
+                text     = anomalyType,
+                color    = Color(0xFFFFCDD2),
+                fontSize = 9.sp,
+            )
+
+            // QR Code
+            if (qrBitmap != null) {
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .background(Color.White, RoundedCornerShape(8.dp))
+                        .padding(4.dp),
+                ) {
+                    Image(
+                        bitmap             = qrBitmap.asImageBitmap(),
+                        contentDescription = "QR de emergencia",
+                        modifier           = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+
+            // PIN destacado
+            val pinFormatted = pin.chunked(1).joinToString(" – ")
+            Text(
+                text       = "PIN: $pinFormatted",
+                color      = Color.White,
+                fontSize   = 14.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp,
+            )
+
+            // Countdown
+            val mins = secondsLeft / 60
+            val secs = secondsLeft % 60
+            Text(
+                text     = "%02d:%02d".format(mins, secs),
+                color    = if (secondsLeft < 300) Color(0xFFFFD600) else Color(0xFFFFCDD2),
+                fontSize = 10.sp,
             )
         }
     }

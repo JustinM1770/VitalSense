@@ -287,13 +287,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Umbrales críticos que justifican mostrar el QR de emergencia.
      * Son más extremos que los umbrales de notificación para evitar falsos positivos.
-     *   - Taquicardia severa  : HR > 130 BPM
-     *   - Bradicardia severa  : HR entre 1 y 39 BPM
-     *   - Hipoxia crítica     : SpO2 entre 1 % y 84 %
-     *   - Hiperglucemia grave : Glucosa > 300 mg/dL
+     *   - Taquicardia en reposo : HR > 150 BPM
+     *   - Bradicardia severa    : HR entre 1 y 39 BPM
+     *   - Hipoxia crítica       : SpO2 entre 1 % y 84 %
+     *   - Hiperglucemia grave   : Glucosa > 300 mg/dL
      */
     private fun VitalsData.isCriticalEmergency(): Boolean =
-        heartRate > 130 ||
+        heartRate > 150 ||
         heartRate in 1..39 ||
         (spo2 in 1..84) ||
         glucose > 300.0

@@ -6,6 +6,9 @@ import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.data.model.MedicalProfile
 import java.util.UUID
 
+/** Resultado de crear un token: tokenId + PIN de 4 dígitos para el paramédico. */
+data class EmergencyCreated(val tokenId: String, val pin: String)
+
 /**
  * Datos que se almacenan en emergency_tokens/{tokenId} de Firebase.
  * Son un snapshot del perfil médico en el momento de la emergencia.
@@ -61,6 +64,8 @@ data class EmergencyTokenData(
     val expiresAt: Long = 0L,
     val active: Boolean = true,
     val documentos: List<Map<String, String>> = emptyList(),
+    /** PIN de 4 dígitos generado al crear el token. Necesario para acceder al perfil médico. */
+    val pin: String = "",
 )
 
 class EmergencyTokenRepository {
@@ -72,13 +77,14 @@ class EmergencyTokenRepository {
     private val ttlMs = 30 * 60 * 1000L
 
     /**
-     * Lee el MedicalProfile del usuario autenticado desde Firebase,
-     * crea un token temporal en emergency_tokens/{uuid} y devuelve el tokenId.
+     * Lee el MedicalProfile del usuario autenticado desde Firebase, crea un token temporal
+     * en emergency_tokens/{uuid} con un PIN de 4 dígitos, escribe el nodo activeEmergency
+     * para que el reloj muestre el QR automáticamente, y devuelve [EmergencyCreated].
      *
-     * @param anomalyType  Descripción de la anomalía detectada por la IA (ej. "Taquicardia")
+     * @param anomalyType  Descripción de la anomalía (ej. "Taquicardia")
      * @param heartRate    Frecuencia cardíaca en el momento de la alerta
      */
-    suspend fun createToken(anomalyType: String, heartRate: Int): Result<String> = runCatching {
+    suspend fun createToken(anomalyType: String, heartRate: Int): Result<EmergencyCreated> = runCatching {
         val userId = auth.currentUser?.uid
             ?: error("Usuario no autenticado — no se puede crear token de emergencia")
 
@@ -95,8 +101,9 @@ class EmergencyTokenRepository {
             mapOf("nombre" to nombre, "url" to url, "tipo" to tipo)
         }
 
-        // 2. Generar UUID como token
+        // 2. Generar UUID como token + PIN de 4 dígitos
         val tokenId = UUID.randomUUID().toString()
+        val pin = (1000..9999).random().toString()
         val now = System.currentTimeMillis()
 
         // 3. Construir el nodo del token (Map para Firebase)
@@ -117,12 +124,26 @@ class EmergencyTokenRepository {
             "expiresAt"          to (now + ttlMs),
             "active"             to true,
             "documentos"         to storageDocsList,
+            // El PIN se almacena en el token para que el servidor de Twilio pueda leerlo.
+            // La app del paramédico solo puede ingresar el PIN; no lo lee directamente de aquí.
+            "pin"                to pin,
         )
 
-        // 4. Escribir en Firebase
+        // 4. Escribir token de emergencia en Firebase
         db.getReference("emergency_tokens/$tokenId").setValue(tokenData).await()
 
-        tokenId
+        // 5. Escribir nodo activeEmergency para que el reloj muestre el QR automáticamente
+        db.getReference("patients/$userId/activeEmergency").setValue(
+            mapOf(
+                "tokenId"     to tokenId,
+                "pin"         to pin,
+                "expiresAt"   to (now + ttlMs),
+                "anomalyType" to anomalyType,
+                "heartRate"   to heartRate,
+            )
+        ).await()
+
+        EmergencyCreated(tokenId = tokenId, pin = pin)
     }
 
     /**
@@ -163,16 +184,36 @@ class EmergencyTokenRepository {
             expiresAt          = expiresAt,
             active             = active,
             documentos         = documentos,
+            pin                = snap.child("pin").getValue(String::class.java) ?: "",
         )
     }
 
     /**
+     * Verifica que el PIN ingresado por el paramédico coincida con el del token.
+     * Devuelve true si es correcto.
+     */
+    suspend fun verifyPin(tokenId: String, enteredPin: String): Result<Boolean> = runCatching {
+        val snap = db.getReference("emergency_tokens/$tokenId/pin").get().await()
+        val storedPin = snap.getValue(String::class.java) ?: return@runCatching false
+        storedPin == enteredPin
+    }
+
+    /**
      * Revoca el token activo: lo marca como inactivo y lo elimina de Firebase.
+     * También elimina el nodo activeEmergency del reloj.
      * Llamar cuando la emergencia sea resuelta o el usuario cierre la pantalla de QR.
      */
     suspend fun revokeToken(tokenId: String) {
         runCatching {
             db.getReference("emergency_tokens/$tokenId/active").setValue(false).await()
+
+            // Leer userId para limpiar el nodo del reloj
+            val userId = db.getReference("emergency_tokens/$tokenId/userId")
+                .get().await().getValue(String::class.java)
+            if (!userId.isNullOrEmpty()) {
+                db.getReference("patients/$userId/activeEmergency").removeValue().await()
+            }
+
             db.getReference("emergency_tokens/$tokenId").removeValue().await()
         }
     }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mx.ita.vitalsense.data.emergency.EmergencyTokenRepository
 import mx.ita.vitalsense.data.emergency.QrCodeGenerator
+import mx.ita.vitalsense.data.emergency.TwilioEmergencyService
 
 // ─── Estado de la pantalla de QR de emergencia ────────────────────────────────
 
@@ -20,6 +21,7 @@ sealed interface EmergencyQrState {
     data class Active(
         val qrBitmap: Bitmap,
         val tokenId: String,
+        val pin: String,
         val expiresAt: Long,
         val anomalyType: String,
         val heartRate: Int,
@@ -33,6 +35,7 @@ sealed interface EmergencyQrState {
 class EmergencyQrViewModel : ViewModel() {
 
     private val repository = EmergencyTokenRepository()
+    private val twilioService = TwilioEmergencyService()
 
     private val _state = MutableStateFlow<EmergencyQrState>(EmergencyQrState.Idle)
     val state: StateFlow<EmergencyQrState> = _state.asStateFlow()
@@ -59,20 +62,29 @@ class EmergencyQrViewModel : ViewModel() {
             _state.value = EmergencyQrState.Loading
 
             repository.createToken(anomalyType, heartRate)
-                .onSuccess { tokenId ->
-                    val deepLink = "vitalsense://emergency/$tokenId"
+                .onSuccess { created ->
+                    val deepLink = "vitalsense://emergency/${created.tokenId}"
                     val bitmap = QrCodeGenerator.generate(deepLink)
                     val expiresAt = System.currentTimeMillis() + 30 * 60 * 1000L
 
                     _state.value = EmergencyQrState.Active(
                         qrBitmap    = bitmap,
-                        tokenId     = tokenId,
+                        tokenId     = created.tokenId,
+                        pin         = created.pin,
                         expiresAt   = expiresAt,
                         anomalyType = anomalyType,
                         heartRate   = heartRate,
                     )
-                    startExpiry(tokenId, expiresAt, anomalyType)
+                    startExpiry(created.tokenId, expiresAt, anomalyType)
                     startCountdown(expiresAt)
+
+                    // Llamada Twilio: IA operadora anuncia la alerta + PIN al contacto de emergencia
+                    twilioService.triggerEmergencyCall(
+                        tokenId     = created.tokenId,
+                        anomalyType = anomalyType,
+                        heartRate   = heartRate,
+                        pin         = created.pin,
+                    )
                 }
                 .onFailure { e ->
                     _state.value = EmergencyQrState.Error(

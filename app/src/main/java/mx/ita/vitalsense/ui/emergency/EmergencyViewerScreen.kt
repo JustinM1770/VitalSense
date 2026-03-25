@@ -1,6 +1,7 @@
 package mx.ita.vitalsense.ui.emergency
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,11 +16,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -28,12 +31,16 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +57,7 @@ import android.net.Uri
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import mx.ita.vitalsense.data.emergency.EmergencyTokenData
 import mx.ita.vitalsense.data.emergency.EmergencyTokenRepository
 
@@ -71,26 +80,32 @@ private val GreenCall      = Color(0xFF2E7D32)
  * @param tokenId  UUID del token de emergencia (viene del deep link)
  * @param onBack   Callback para cerrar la pantalla
  */
+/** Estados posibles de la pantalla del paramédico. */
+private sealed interface ViewerState {
+    data object Loading   : ViewerState
+    data object PinEntry  : ViewerState
+    data class  Profile(val data: EmergencyTokenData) : ViewerState
+    data class  Error(val message: String) : ViewerState
+}
+
 @Composable
 fun EmergencyViewerScreen(
     tokenId: String,
     onBack: () -> Unit = {},
 ) {
-    val repository = remember { EmergencyTokenRepository() }
-    var tokenData by remember { mutableStateOf<EmergencyTokenData?>(null) }
-    var error     by remember { mutableStateOf<String?>(null) }
-    var loading   by remember { mutableStateOf(true) }
+    val repository  = remember { EmergencyTokenRepository() }
+    val scope       = rememberCoroutineScope()
+    var viewerState by remember { mutableStateOf<ViewerState>(ViewerState.Loading) }
 
-    // Cargar datos del token desde Firebase
+    // Cargar datos del token desde Firebase; si es válido → solicitar PIN
     LaunchedEffect(tokenId) {
         repository.readToken(tokenId)
             .onSuccess { data ->
-                tokenData = data
-                loading   = false
+                // Guardamos los datos pero mostramos la pantalla de PIN primero
+                viewerState = if (data.pin.isNotEmpty()) ViewerState.PinEntry else ViewerState.Profile(data)
             }
             .onFailure { e ->
-                error   = e.message ?: "No se pudo cargar el perfil de emergencia"
-                loading = false
+                viewerState = ViewerState.Error(e.message ?: "No se pudo cargar el perfil de emergencia")
             }
     }
 
@@ -99,17 +114,161 @@ fun EmergencyViewerScreen(
             .fillMaxSize()
             .background(ViewerBg),
     ) {
-        when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        when (val s = viewerState) {
+            is ViewerState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(color = EmergencyRed)
                     Text("Cargando perfil de emergencia...", color = TextGray, fontSize = 14.sp)
                 }
             }
 
-            error != null -> ErrorView(message = error!!, onBack = onBack)
+            is ViewerState.PinEntry -> PinEntryView(
+                onPinSubmitted = { enteredPin ->
+                    scope.launch {
+                        viewerState = ViewerState.Loading
+                        repository.verifyPin(tokenId, enteredPin)
+                            .onSuccess { correct ->
+                                if (correct) {
+                                    repository.readToken(tokenId)
+                                        .onSuccess { data -> viewerState = ViewerState.Profile(data) }
+                                        .onFailure { e -> viewerState = ViewerState.Error(e.message ?: "Error al cargar perfil") }
+                                } else {
+                                    viewerState = ViewerState.PinEntry  // volver a mostrar con error
+                                }
+                            }
+                            .onFailure { e ->
+                                viewerState = ViewerState.Error(e.message ?: "Error al verificar PIN")
+                            }
+                    }
+                },
+                onBack = onBack,
+            )
 
-            tokenData != null -> ProfileView(data = tokenData!!, onBack = onBack)
+            is ViewerState.Error   -> ErrorView(message = s.message, onBack = onBack)
+
+            is ViewerState.Profile -> ProfileView(data = s.data, onBack = onBack)
+        }
+    }
+}
+
+// ─── Vista de ingreso de PIN ──────────────────────────────────────────────────
+
+@Composable
+private fun PinEntryView(
+    onPinSubmitted: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var pin         by remember { mutableStateOf("") }
+    var attempts    by remember { mutableIntStateOf(0) }
+    var showError   by remember { mutableStateOf(false) }
+    val maxAttempts = 5
+
+    // Detectar reingreso tras PIN incorrecto
+    LaunchedEffect(attempts) {
+        if (attempts > 0) showError = true
+    }
+
+    Column(
+        modifier            = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .background(EmergencyRed.copy(alpha = 0.1f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Lock, null, tint = EmergencyRed, modifier = Modifier.size(36.dp))
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Text(
+            text       = "Ingresa el PIN de emergencia",
+            fontSize   = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color      = TextDark,
+            textAlign  = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text      = "El PIN fue anunciado por llamada de voz a los servicios de emergencia.",
+            fontSize  = 13.sp,
+            color     = TextGray,
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        OutlinedTextField(
+            value              = pin,
+            onValueChange      = { new ->
+                if (new.length <= 4 && new.all { it.isDigit() }) {
+                    pin       = new
+                    showError = false
+                }
+            },
+            label              = { Text("PIN de 4 dígitos") },
+            singleLine         = true,
+            isError            = showError,
+            keyboardOptions    = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            modifier           = Modifier.fillMaxWidth(),
+            colors             = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor   = EmergencyRed,
+                focusedLabelColor    = EmergencyRed,
+                errorBorderColor     = Color(0xFFFF5252),
+            ),
+        )
+
+        if (showError) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text     = "PIN incorrecto. Intento $attempts de $maxAttempts.",
+                color    = Color(0xFFFF5252),
+                fontSize = 12.sp,
+            )
+        }
+
+        if (attempts >= maxAttempts) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text     = "Demasiados intentos. Contacta al equipo médico.",
+                color    = EmergencyRed,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick  = onBack,
+                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFFBDBDBD)),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Cancelar", color = Color.White)
+            }
+            Button(
+                onClick  = {
+                    if (pin.length == 4 && attempts < maxAttempts) {
+                        attempts++
+                        onPinSubmitted(pin)
+                        pin = ""
+                    }
+                },
+                enabled  = pin.length == 4 && attempts < maxAttempts,
+                colors   = ButtonDefaults.buttonColors(containerColor = EmergencyRed),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Verificar", color = Color.White, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
