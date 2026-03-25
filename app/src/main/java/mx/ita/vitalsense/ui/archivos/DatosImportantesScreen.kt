@@ -129,23 +129,41 @@ fun DatosImportantesScreen(
         scope.launch {
             isUploading = true
             try {
-                val stream = context.contentResolver.openInputStream(fileUri)
+                // Leer todos los bytes antes de subir — evita que el InputStream se cierre
+                // antes de que Firebase Storage termine con putStream (causa de "Object not found")
+                val bytes = context.contentResolver.openInputStream(fileUri)?.use { it.readBytes() }
                     ?: run {
                         Toast.makeText(context, "No se pudo leer el archivo", Toast.LENGTH_SHORT).show()
                         isUploading = false
                         return@launch
                     }
-                val storageRef = FirebaseStorage.getInstance().reference.child("documents/$uid/$fileName")
-                storageRef.putStream(stream).await()
+
+                val storageRef = FirebaseStorage.getInstance()
+                    .reference.child("documents/$uid/$fileName")
+
+                storageRef.putBytes(bytes).await()
                 val downloadUrl = storageRef.downloadUrl.await().toString()
+
                 val newDoc = StorageDoc(nombre = fileName, url = downloadUrl, tipo = tipo)
                 storageDocuments.add(newDoc)
                 val docsToSave = storageDocuments.map {
                     mapOf("nombre" to it.nombre, "url" to it.url, "tipo" to it.tipo)
                 }
-                FirebaseDatabase.getInstance().getReference("patients/$uid/profile/storageDocuments")
+                FirebaseDatabase.getInstance()
+                    .getReference("patients/$uid/profile/storageDocuments")
                     .setValue(docsToSave).await()
                 Toast.makeText(context, "Documento subido correctamente", Toast.LENGTH_SHORT).show()
+            } catch (e: com.google.firebase.storage.StorageException) {
+                val msg = when (e.errorCode) {
+                    com.google.firebase.storage.StorageException.ERROR_OBJECT_NOT_FOUND ->
+                        "Storage no configurado. Actívalo en Firebase Console → Storage."
+                    com.google.firebase.storage.StorageException.ERROR_NOT_AUTHORIZED ->
+                        "Sin permisos para subir. Revisa las reglas de Firebase Storage."
+                    com.google.firebase.storage.StorageException.ERROR_QUOTA_EXCEEDED ->
+                        "Cuota de almacenamiento excedida."
+                    else -> "Error al subir: ${e.localizedMessage}"
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "Error al subir: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
             } finally {
