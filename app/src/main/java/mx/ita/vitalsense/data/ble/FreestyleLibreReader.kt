@@ -75,11 +75,43 @@ class FreestyleLibreReader(private val context: Context) {
         }
     }
 
+    /**
+     * Extrae la glucosa en mg/dL del frame NFC del sensor Freestyle Libre 1.
+     *
+     * Estructura de la respuesta NfcV (ISO 15693):
+     * - Byte 0    : flags de respuesta
+     * - Bytes 1–8 : Bloque 0 (8 bytes) — contiene índices de frame y metadatos del sensor
+     * - Bytes 9+  : Bloques 1–N de datos de tendencia e historial
+     *
+     * Posición del valor de glucosa actual:
+     * - FRAM[4..5] (= response[5..6]): valor crudo de 12 bits de la lectura actual.
+     *   Formato little-endian: byte bajo en [4], nibble alto en bits 0–3 de [5].
+     *   Unidades: mg/dL (factor de escala ~0.18 respecto al ADC interno del sensor).
+     *
+     * Referencias comunitarias (protocolo no oficial, sin publicación Abbott):
+     * - LibreMonitor (GitHub: UPetersen/LibreMonitor) — especificación FRAM Libre 1
+     * - xDrip+ (GitHub: NightscoutFoundation/xDrip) — NFC reader Libre 1
+     *
+     * IMPORTANTE: El factor de conversión y los offsets pueden diferir entre
+     * generaciones del sensor (Libre 1, 2 y 3). Se recomienda validar con
+     * hardware físico antes de uso clínico.
+     *
+     * @param data Respuesta raw de [NfcV.transceive]; debe incluir el byte de flags.
+     * @return Glucosa en mg/dL si el valor está en rango fisiológico plausible (20–600),
+     *         o `null` si la respuesta es inválida o el valor está fuera de rango.
+     */
     private fun parseGlucoseFromResponse(data: ByteArray): Float? {
-        // El Freestyle Libre codifica la glucosa en mg/dL en bytes específicos
-        // Byte 5 y 6 del bloque de datos actual contienen la lectura
-        if (data.size < 344) return null
-        val rawGlucose = ((data[5].toInt() and 0xFF) or ((data[6].toInt() and 0x0F) shl 8))
-        return rawGlucose * 0.18f // conversión a mg/dL aproximada
+        // Mínimo esperado: 1 byte flags + 40 bloques × 8 bytes = 321 bytes
+        if (data.size < 321) return null
+
+        // Valor crudo de 12 bits: byte 5 (bits 0–7) + nibble bajo de byte 6 (bits 8–11)
+        val rawGlucose = (data[5].toInt() and 0xFF) or ((data[6].toInt() and 0x0F) shl 8)
+
+        // Conversión a mg/dL (factor empírico documentado para Libre 1)
+        val glucoseMgdL = rawGlucose * 0.18f
+
+        // Validación de rango fisiológico plausible (ADA: emergencia < 20 o > 600 mg/dL
+        // indica error de lectura, no valor real)
+        return if (glucoseMgdL in 20f..600f) glucoseMgdL else null
     }
 }

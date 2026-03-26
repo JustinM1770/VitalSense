@@ -18,8 +18,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        val claudeApiKey = project.findProperty("CLAUDE_API_KEY")?.toString() ?: ""
-        buildConfigField("String", "CLAUDE_API_KEY", "\"$claudeApiKey\"")
+        val geminiApiKey = project.findProperty("GEMINI_API_KEY")?.toString() ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     }
 
     buildTypes {
@@ -79,8 +79,6 @@ dependencies {
     // QR Code generation
     implementation("com.google.zxing:core:3.5.3")
 
-    // Servidor HTTP local (funciona sin internet — paramédico escanea QR y abre navegador)
-    implementation("org.nanohttpd:nanohttpd:2.3.1")
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.firebase.messaging)
@@ -94,6 +92,7 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.android.image.cropper)
     implementation(libs.coil.compose)
+    implementation(libs.work.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

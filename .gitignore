@@ -10,12 +10,18 @@ local.properties
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+**/build/
+.kotlin/
 /captures
 .externalNativeBuild
 .cxx
 
 # Firebase - NO subir a GitHub público
 app/google-services.json
+
+# API Keys - NO subir a repositorios públicos
+# Mover a ~/.gradle/gradle.properties para mayor seguridad
+# GEMINI_API_KEY está en gradle.properties — no commitear si el repo es público
 
 # Keystore files
 *.jks

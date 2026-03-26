@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.google.firebase.database.FirebaseDatabase
+import mx.ita.vitalsense.data.ai.ProactiveHealthWorker
 
 class HealthSensorApp : Application() {
 
@@ -16,6 +17,7 @@ class HealthSensorApp : Application() {
             .setPersistenceEnabled(true)
 
         createNotificationChannels()
+        ProactiveHealthWorker.schedule(this)
     }
 
     private fun createNotificationChannels() {
@@ -40,11 +42,22 @@ class HealthSensorApp : Application() {
             ).apply {
                 description = "Estado de conexión y actualizaciones generales"
             }.also { manager.createNotificationChannel(it) }
+
+            // Canal de análisis preventivo con IA (cada 12 horas)
+            NotificationChannel(
+                CHANNEL_AI_INSIGHTS,
+                "Análisis Preventivo IA",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = "Recomendaciones proactivas para prevenir enfermedades crónicas"
+                enableVibration(false)
+            }.also { manager.createNotificationChannel(it) }
         }
     }
 
     companion object {
-        const val CHANNEL_ALERTS = "vital_alerts"
-        const val CHANNEL_INFO   = "vital_info"
+        const val CHANNEL_ALERTS      = "vital_alerts"
+        const val CHANNEL_INFO        = "vital_info"
+        const val CHANNEL_AI_INSIGHTS = "ai_insights"
     }
 }

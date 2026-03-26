@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VitalSense — Acceso de Emergencia</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5; min-height: 100vh;
+    }
+
+    /* ── PIN Screen ── */
+    #pin-screen {
+      background: #B71C1C;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .pin-card {
+      background: #fff; border-radius: 20px; padding: 32px 24px;
+      max-width: 380px; width: 100%; text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3);
+    }
+    .logo { font-size: 12px; font-weight: 700; color: #B71C1C; letter-spacing: 1px; margin-bottom: 20px; }
+    .pin-title { font-size: 22px; font-weight: 700; color: #B71C1C; margin-bottom: 8px; }
+    .pin-subtitle { font-size: 13px; color: #757575; margin-bottom: 28px; line-height: 1.5; }
+    .pin-input {
+      width: 100%; font-size: 36px; font-weight: 700; letter-spacing: 16px;
+      text-align: center; border: 2px solid #E0E0E0; border-radius: 14px;
+      padding: 14px 8px; outline: none; color: #212121;
+    }
+    .pin-input:focus { border-color: #B71C1C; }
+    .pin-btn {
+      width: 100%; background: #B71C1C; color: #fff; border: none;
+      border-radius: 14px; padding: 16px; font-size: 16px; font-weight: 700;
+      margin-top: 16px; cursor: pointer; transition: background .2s;
+    }
+    .pin-btn:hover { background: #D32F2F; }
+    .pin-btn:disabled { background: #BDBDBD; cursor: default; }
+    .pin-error {
+      color: #D32F2F; font-size: 13px; margin-top: 10px;
+      display: none; font-weight: 600;
+    }
+    .pin-attempts { font-size: 11px; color: #9E9E9E; margin-top: 8px; }
+
+    /* ── Profile Screen ── */
+    #profile-screen { display: none; }
+    .header {
+      background: linear-gradient(135deg, #B71C1C, #D32F2F);
+      color: #fff; padding: 32px 20px 28px; text-align: center;
+    }
+    .avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: rgba(255,255,255,.2); display: inline-flex;
+      align-items: center; justify-content: center;
+      font-size: 28px; font-weight: 700; margin-bottom: 12px;
+    }
+    .patient-name { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .blood-badge {
+      display: inline-block; background: #fff; color: #B71C1C;
+      font-size: 20px; font-weight: 900; padding: 4px 20px;
+      border-radius: 30px; margin-bottom: 6px;
+    }
+    .anomaly-tag {
+      font-size: 12px; background: rgba(255,255,255,.15);
+      border-radius: 20px; padding: 4px 12px; display: inline-block;
+    }
+    .content { padding: 16px; max-width: 520px; margin: 0 auto; }
+    .section {
+      background: #fff; border-radius: 14px; padding: 16px;
+      margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .section.alert { border-left: 4px solid #B71C1C; background: #FFF8F8; }
+    .section-label {
+      font-size: 11px; color: #9E9E9E; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+    }
+    .section-value { font-size: 15px; color: #212121; font-weight: 500; line-height: 1.5; }
+    .call-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: #2E7D32; color: #fff; border-radius: 12px; padding: 14px;
+      text-decoration: none; font-weight: 700; font-size: 15px; margin-bottom: 12px;
+    }
+    .docs-list { display: flex; flex-direction: column; gap: 8px; }
+    .doc-item {
+      display: flex; align-items: center; gap: 10px;
+      border: 1px solid #E0E0E0; border-radius: 10px; padding: 10px 14px;
+      text-decoration: none; color: #1565C0; font-weight: 600; font-size: 14px;
+    }
+    .doc-item:hover { background: #E3F2FD; }
+    .doc-badge {
+      padding: 3px 8px; border-radius: 6px; font-size: 10px;
+      font-weight: 700; flex-shrink: 0;
+    }
+    .doc-badge.pdf { background: #FFEBEE; color: #C62828; }
+    .doc-badge.img { background: #E3F2FD; color: #1565C0; }
+    .img-preview {
+      width: 100%; border-radius: 10px; margin-bottom: 6px; max-height: 220px; object-fit: cover;
+    }
+    .footer {
+      text-align: center; font-size: 11px; color: #BDBDBD;
+      padding: 20px; margin-top: 8px;
+    }
+
+    /* ── Loading / Error ── */
+    #loading-screen, #expired-screen {
+      display: none; align-items: center; justify-content: center;
+      min-height: 100vh; flex-direction: column; gap: 16px;
+      background: #B71C1C; color: #fff; text-align: center; padding: 32px;
+    }
+    .spinner {
+      width: 48px; height: 48px; border: 4px solid rgba(255,255,255,.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-screen" style="display:flex">
+  <div class="spinner"></div>
+  <p style="font-size:16px">Cargando perfil de emergencia...</p>
+</div>
+
+<!-- Expirado / Error -->
+<div id="expired-screen">
+  <div style="font-size:64px">⚠️</div>
+  <h2 id="expired-title" style="font-size:22px;font-weight:700">Acceso no disponible</h2>
+  <p id="expired-msg" style="font-size:14px;opacity:.8;max-width:300px;line-height:1.5"></p>
+</div>
+
+<!-- PIN Entry -->
+<div id="pin-screen" style="display:none">
+  <div class="pin-card">
+    <div class="logo">● VITALSENSE BIOMETRIC</div>
+    <h1 class="pin-title">Acceso de Emergencia</h1>
+    <p class="pin-subtitle">
+      Ingresa el PIN de 4 dígitos anunciado en la llamada de emergencia
+    </p>
+    <input id="pin-input" class="pin-input" type="number"
+           placeholder="0000" maxlength="4" autocomplete="off">
+    <div id="pin-error" class="pin-error">PIN incorrecto. Verifica la llamada.</div>
+    <p id="pin-attempts" class="pin-attempts"></p>
+    <button id="pin-btn" class="pin-btn" onclick="verifyPin()">Verificar PIN</button>
+  </div>
+</div>
+
+<!-- Profile -->
+<div id="profile-screen">
+  <div class="header">
+    <div id="avatar" class="avatar"></div>
+    <div id="patient-name" class="patient-name"></div>
+    <div id="blood-badge" class="blood-badge" style="display:none"></div>
+    <br>
+    <span id="anomaly-tag" class="anomaly-tag"></span>
+  </div>
+  <div class="content">
+    <div id="sections"></div>
+    <div id="docs-section" style="display:none" class="section">
+      <div class="section-label">📎 Documentos médicos</div>
+      <div id="docs-list" class="docs-list"></div>
+    </div>
+    <div id="call-btn-wrap"></div>
+    <div class="footer">VitalSense BioMetric · Acceso temporal de emergencia</div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCwNw4trKyn6sE2_6jis48qTP8sJ-M0bcg",
+    authDomain: "vitalsenseai-1cb9f.firebaseapp.com",
+    databaseURL: "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com",
+    projectId: "vitalsenseai-1cb9f",
+    storageBucket: "vitalsenseai-1cb9f.firebasestorage.app",
+    messagingSenderId: "576196499899",
+    appId: "1:576196499899:web:vitalsenseweb"  // ← obtener de Firebase Console → Project Settings → Web app
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // Obtener tokenId de la URL (?t=...)
+  const params  = new URLSearchParams(window.location.search);
+  const tokenId = params.get('t');
+
+  let tokenData  = null;
+  let attempts   = 0;
+  const MAX_ATTEMPTS = 5;
+
+  // ── Cargar token desde Firebase ──────────────────────────────────────────────
+  async function loadToken() {
+    if (!tokenId) return showExpired("URL inválida", "No se proporcionó un token de emergencia.");
+
+    try {
+      const snap = await get(ref(db, `emergency_tokens/${tokenId}`));
+      if (!snap.exists()) return showExpired("Token no encontrado", "Este QR ya expiró o fue revocado.");
+
+      const data = snap.val();
+      if (!data.active) return showExpired("Token revocado", "La emergencia ya fue atendida.");
+
+      if (Date.now() > data.expiresAt)
+        return showExpired("QR expirado", "El tiempo de acceso de emergencia (30 min) ha expirado.");
+
+      tokenData = data;
+      show('pin-screen');
+      hide('loading-screen');
+
+      // Enter en el input verifica
+      document.getElementById('pin-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') verifyPin();
+      });
+    } catch (e) {
+      showExpired("Error de conexión", "Verifica tu conexión a internet e intenta de nuevo.");
+    }
+  }
+
+  // ── Verificar PIN ─────────────────────────────────────────────────────────────
+  window.verifyPin = function() {
+    const entered = document.getElementById('pin-input').value.trim();
+    if (entered.length !== 4) return;
+
+    attempts++;
+    document.getElementById('pin-attempts').textContent =
+      `Intento ${attempts} de ${MAX_ATTEMPTS}`;
+
+    if (entered === String(tokenData.pin)) {
+      hide('pin-screen');
+      renderProfile(tokenData);
+      show('profile-screen');
+    } else {
+      document.getElementById('pin-error').style.display = 'block';
+      document.getElementById('pin-input').value = '';
+      if (attempts >= MAX_ATTEMPTS) {
+        document.getElementById('pin-btn').disabled = true;
+        document.getElementById('pin-btn').textContent = 'Demasiados intentos';
+      }
+    }
+  };
+
+  // ── Renderizar perfil ─────────────────────────────────────────────────────────
+  function renderProfile(d) {
+    // Avatar
+    const initials = (d.nombre?.[0] || '') + (d.apellidos?.[0] || '');
+    document.getElementById('avatar').textContent = initials.toUpperCase() || 'VS';
+    document.getElementById('patient-name').textContent =
+      `${d.nombre || ''} ${d.apellidos || ''}`.trim() || 'Paciente';
+
+    // Tipo de sangre
+    if (d.tipoSangre) {
+      const b = document.getElementById('blood-badge');
+      b.textContent = d.tipoSangre;
+      b.style.display = 'inline-block';
+    }
+
+    // Anomalía
+    if (d.anomalyType)
+      document.getElementById('anomaly-tag').textContent =
+        `⚡ ${d.anomalyType} · ${d.heartRateAtAlert} BPM`;
+
+    // Secciones
+    const sections = document.getElementById('sections');
+    const add = (label, value, alert = false) => {
+      if (!value) return;
+      sections.innerHTML += `
+        <div class="section${alert ? ' alert' : ''}">
+          <div class="section-label">${label}</div>
+          <div class="section-value">${value}</div>
+        </div>`;
+    };
+    add('⚠ Alergias', d.alergias, true);
+    add('Padecimientos', d.padecimientos);
+    add('Medicamentos actuales', d.medicamentos);
+    add('Contacto de emergencia', d.contactoEmergencia);
+
+    // Botón llamar
+    if (d.telefonoEmergencia) {
+      document.getElementById('call-btn-wrap').innerHTML =
+        `<a class="call-btn" href="tel:${d.telefonoEmergencia}">
+           📞 Llamar a contacto: ${d.telefonoEmergencia}
+         </a>`;
+    }
+
+    // Documentos (PDFs + imágenes de Firebase Storage)
+    if (d.documentos && d.documentos.length > 0) {
+      const docsSection = document.getElementById('docs-section');
+      const docsList    = document.getElementById('docs-list');
+      docsSection.style.display = 'block';
+
+      d.documentos.forEach(doc => {
+        if (doc.tipo === 'imagen') {
+          docsList.innerHTML += `
+            <div>
+              <img src="${doc.url}" alt="${doc.nombre}" class="img-preview"
+                   onerror="this.style.display='none'">
+              <a href="${doc.url}" target="_blank" class="doc-item">
+                <span class="doc-badge img">IMG</span>${doc.nombre}
+              </a>
+            </div>`;
+        } else {
+          docsList.innerHTML += `
+            <a href="${doc.url}" target="_blank" class="doc-item">
+              <span class="doc-badge pdf">PDF</span>${doc.nombre}
+            </a>`;
+        }
+      });
+    }
+  }
+
+  // ── Utilidades ────────────────────────────────────────────────────────────────
+  function show(id) { document.getElementById(id).style.display = id === 'profile-screen' ? 'block' : 'flex'; }
+  function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+  function showExpired(title, msg) {
+    hide('loading-screen');
+    hide('pin-screen');
+    document.getElementById('expired-title').textContent = title;
+    document.getElementById('expired-msg').textContent   = msg;
+    document.getElementById('expired-screen').style.display = 'flex';
+  }
+
+  loadToken();
+</script>
+</body>
+</html>

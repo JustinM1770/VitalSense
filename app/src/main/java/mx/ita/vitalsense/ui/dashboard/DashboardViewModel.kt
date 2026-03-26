@@ -23,10 +23,16 @@ import kotlinx.coroutines.withTimeoutOrNull
 import mx.ita.vitalsense.HealthSensorApp
 import mx.ita.vitalsense.MainActivity
 import mx.ita.vitalsense.R
+import mx.ita.vitalsense.data.model.MedicalProfile
 import mx.ita.vitalsense.data.model.Medication
+import mx.ita.vitalsense.data.model.PatientThresholds
+import mx.ita.vitalsense.data.model.RapidDegradationEvent
 import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
+import mx.ita.vitalsense.data.model.VitalsSnapshot
 import mx.ita.vitalsense.data.model.computeAlerts
+import mx.ita.vitalsense.data.model.computePersonalizedThresholds
+import mx.ita.vitalsense.data.model.detectRapidDegradation
 import mx.ita.vitalsense.data.repository.VitalsRepository
 import mx.ita.vitalsense.data.test.TestDataSeeder
 import com.google.firebase.auth.FirebaseAuth
@@ -67,8 +73,15 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = VitalsRepository()
     private val prefs = app.getSharedPreferences("vitalsense_watch_prefs", Context.MODE_PRIVATE)
 
-    private val lastKnownVitals = mutableMapOf<String, VitalsData>()
+    private val lastKnownVitals  = mutableMapOf<String, VitalsData>()
     private val notifiedPatients = mutableSetOf<String>()
+
+    /**
+     * Umbrales clínicos del paciente autenticado, personalizados por edad y diagnósticos.
+     * Se inicializan con los valores estándar AHA/ADA/WHO y se actualizan al cargar el perfil.
+     */
+    @Volatile
+    private var patientThresholds = PatientThresholds()
 
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
@@ -85,6 +98,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val db = FirebaseDatabase.getInstance()
 
     init {
+        loadPatientProfile()
         observePatients()
         loadAdditionalData()
         // Ensure paired state is always up to date
@@ -93,6 +107,26 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             val current = _uiState.value
             if (current is DashboardUiState.Success && current.isWatchPaired != isPaired) {
                 _uiState.value = current.copy(isWatchPaired = isPaired)
+            }
+        }
+    }
+
+    /**
+     * Carga el perfil médico del paciente desde Firebase y calcula los umbrales
+     * personalizados (edad, EPOC, diabetes, etc.) según AHA/ADA/BTS/WHO.
+     * Opera en background; si falla se mantienen los umbrales estándar.
+     */
+    private fun loadPatientProfile() {
+        val userId = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val snap = db.getReference("users/$userId/datosMedicos").get().await()
+                val profile = snap.getValue(MedicalProfile::class.java)
+                if (profile != null) {
+                    patientThresholds = profile.computePersonalizedThresholds()
+                }
+            } catch (_: Exception) {
+                // Mantener umbrales estándar si el perfil no está disponible
             }
         }
     }
@@ -265,19 +299,34 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             if (patient.patientId.isNotEmpty()) {
                 repository.saveSnapshot(patient.patientId, patient)
             }
-            val alerts = patient.computeAlerts()
+
+            // Evaluar alertas con umbrales personalizados del paciente
+            val alerts = patient.computeAlerts(patientThresholds)
             if (alerts.isNotEmpty()) {
                 val key = "${patient.patientId}:${patient.timestamp}"
                 if (!notifiedPatients.contains(key)) {
                     notifiedPatients.add(key)
-                    // Only alert if we already had previous data, avoiding alerts on initial load
                     if (!patient.patientId.startsWith("demo_") && previous != null) {
                         sendAlertNotification(patient, alerts.first().title)
                     }
                 }
             }
-            // Anomalía crítica → disparar pantalla de QR de emergencia
-            if (patient.isCriticalEmergency()) {
+
+            // Detectar deterioro agudo en el historial reciente (p. ej. caída SpO₂ > 5 % en 10 min)
+            val currentState = _uiState.value
+            if (currentState is DashboardUiState.Success) {
+                val historySnapshots = currentState.vitalsHistory.map { v ->
+                    VitalsSnapshot(v.heartRate, v.glucose, v.spo2, v.timestamp)
+                }
+                val degradation = historySnapshots.detectRapidDegradation()
+                if (degradation != null && previous != null &&
+                    !patient.patientId.startsWith("demo_")) {
+                    sendAlertNotification(patient, degradation.message)
+                }
+            }
+
+            // Emergencia crítica → mostrar QR (umbrales personalizados + hipoglucemia severa)
+            if (patient.isCriticalEmergency(patientThresholds)) {
                 _emergencyTrigger.tryEmit(patient)
             }
             lastKnownVitals[patient.patientId] = patient
@@ -285,18 +334,21 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Umbrales críticos que justifican mostrar el QR de emergencia.
-     * Son más extremos que los umbrales de notificación para evitar falsos positivos.
-     *   - Taquicardia en reposo : HR > 150 BPM
-     *   - Bradicardia severa    : HR entre 1 y 39 BPM
-     *   - Hipoxia crítica       : SpO2 entre 1 % y 84 %
-     *   - Hiperglucemia grave   : Glucosa > 300 mg/dL
+     * Determina si los signos vitales requieren activar el protocolo de emergencia QR.
+     *
+     * Umbrales aplicados (personalizados según perfil del paciente):
+     * - Taquicardia severa  : FC ≥ umbral ESC 2019 (default 150 BPM)
+     * - Bradicardia severa  : FC < umbral ESC 2019 (default 40 BPM)
+     * - Hipoxemia crítica   : SpO₂ ≤ umbral WHO 2011 (default 85 %)
+     * - Hipoglucemia L2     : Glucosa < 54 mg/dL (ADA 2024 — riesgo de inconsciencia)
+     * - Hiperglucemia crisis: Glucosa > umbral ADA 2024 (default 300 mg/dL — riesgo CAD/SHH)
      */
-    private fun VitalsData.isCriticalEmergency(): Boolean =
-        heartRate > 150 ||
-        heartRate in 1..39 ||
-        (spo2 in 1..84) ||
-        glucose > 300.0
+    private fun VitalsData.isCriticalEmergency(thresholds: PatientThresholds): Boolean =
+        (heartRate >= thresholds.hrTachycardiaSevere) ||
+        (heartRate in 1 until thresholds.hrBradycardiaSevere) ||
+        (spo2 in 1..thresholds.spo2HypoxemiaCritical) ||
+        (glucose > 0.0 && glucose < thresholds.glucoseHypoL2) ||
+        (glucose >= thresholds.glucoseHyperCrisis)
 
     private fun sendAlertNotification(patient: VitalsData, alertTitle: String) {
         val ctx = getApplication<Application>()

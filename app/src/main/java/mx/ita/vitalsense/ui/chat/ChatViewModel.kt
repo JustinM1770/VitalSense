@@ -49,7 +49,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val uid = auth.currentUser?.uid ?: "guest"
     private val prefs = application.getSharedPreferences("chatbot_history", Context.MODE_PRIVATE)
     private val historyKey = "messages_$uid"
-    private val apiKey = BuildConfig.CLAUDE_API_KEY
+    private val apiKey = BuildConfig.GEMINI_API_KEY
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -89,7 +89,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (apiKey.isBlank()) {
                     buildMedicalFallbackResponse(cleanText, patientContext)
                 } else {
-                    callClaudeMedicalAssistant(cleanText, patientContext)
+                    callGeminiMedicalAssistant(cleanText, patientContext)
                 }
             }.getOrElse {
                 buildMedicalFallbackResponse(cleanText, patientContext)
@@ -334,55 +334,55 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private suspend fun callClaudeMedicalAssistant(userText: String, context: PatientContext): String = withContext(Dispatchers.IO) {
+    /**
+     * Llama a Gemini 2.0 Flash via REST API (Generative Language API v1beta).
+     *
+     * Estructura de la petición:
+     * - system_instruction : rol y reglas del asistente médico
+     * - contents           : historial de conversación + contexto clínico + pregunta actual
+     * - generationConfig   : temperatura baja (0.3) para respuestas consistentes y precisas
+     *
+     * Endpoint: POST /v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}
+     */
+    private suspend fun callGeminiMedicalAssistant(userText: String, context: PatientContext): String = withContext(Dispatchers.IO) {
         val systemPrompt = """
-            Eres un medico virtual de apoyo para VitalSense.
-                        Debes responder en espanol claro, empatico, humano y directo.
-            Usa los datos del perfil y del reloj del paciente para personalizar tu orientacion.
+            Eres un médico virtual de apoyo integrado en VitalSense, una app de telemonitoreo para adultos mayores.
+            Responde en español claro, empático y directo.
+            Usa los datos del perfil y del dispositivo del paciente para personalizar tu orientación.
             Reglas:
-            - No inventes datos.
-            - Si faltan datos, dilo explicitamente.
-                        - Da recomendaciones concretas y breves.
-                        - Usa formato corto con bullets.
-                        - Maximo 90 palabras.
-            - Si hay signos de alarma (dolor de pecho, desmayo, falta de aire severa, confusion neurologica, SpO2 muy baja), sugiere atencion medica urgente.
-                        - Estructura de salida:
-                            1) Estado actual (1 linea)
-                            2) Que hacer ahora (2 o 3 bullets)
-                            3) Cuando ir a urgencias (1 linea)
-                        - Incluye al final una advertencia corta: esta orientacion no sustituye una consulta medica presencial.
+            - No inventes datos; si faltan, dilo explícitamente.
+            - Da recomendaciones concretas y breves.
+            - Usa formato con bullets cortos.
+            - Máximo 90 palabras en total.
+            - Si hay signos de alarma (dolor de pecho, desmayo, falta de aire severa, confusión neurológica, SpO₂ muy baja), indica atención médica urgente.
+            - Estructura de respuesta:
+              1) Estado actual (1 línea)
+              2) Qué hacer ahora (2–3 bullets)
+              3) Cuándo ir a urgencias (1 línea)
+            - Cierra siempre con: "Esta orientación no sustituye una consulta médica presencial."
         """.trimIndent()
 
         val contextJson = JSONObject().apply {
             put("perfil", context.profileSummary)
-            put(
-                "ultima_lectura",
-                JSONObject().apply {
-                    put("heartRate", context.latestVitals?.heartRate ?: JSONObject.NULL)
-                    put("spo2", context.latestVitals?.spo2 ?: JSONObject.NULL)
-                    put("glucose", context.latestVitals?.glucose ?: JSONObject.NULL)
-                    put("timestamp", context.latestVitals?.timestamp ?: JSONObject.NULL)
-                },
-            )
-            put(
-                "sueno",
-                JSONObject().apply {
-                    put("score", context.sleepData?.score ?: JSONObject.NULL)
-                    put("horas", context.sleepData?.horas ?: JSONObject.NULL)
-                    put("estado", context.sleepData?.estado ?: JSONObject.NULL)
-                },
-            )
-
+            put("ultima_lectura", JSONObject().apply {
+                put("heartRate", context.latestVitals?.heartRate ?: JSONObject.NULL)
+                put("spo2",      context.latestVitals?.spo2      ?: JSONObject.NULL)
+                put("glucose",   context.latestVitals?.glucose   ?: JSONObject.NULL)
+                put("timestamp", context.latestVitals?.timestamp ?: JSONObject.NULL)
+            })
+            put("sueno", JSONObject().apply {
+                put("score",  context.sleepData?.score  ?: JSONObject.NULL)
+                put("horas",  context.sleepData?.horas  ?: JSONObject.NULL)
+                put("estado", context.sleepData?.estado ?: JSONObject.NULL)
+            })
             val historyArray = JSONArray()
             context.history.takeLast(10).forEach { h ->
-                historyArray.put(
-                    JSONObject().apply {
-                        put("heartRate", h.heartRate)
-                        put("spo2", h.spo2)
-                        put("glucose", h.glucose)
-                        put("timestamp", h.timestamp)
-                    },
-                )
+                historyArray.put(JSONObject().apply {
+                    put("heartRate", h.heartRate)
+                    put("spo2",      h.spo2)
+                    put("glucose",   h.glucose)
+                    put("timestamp", h.timestamp)
+                })
             }
             put("historial_reciente", historyArray)
         }
@@ -394,12 +394,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 "$role: ${sanitizeText(msg.text)}"
             }
 
-        val userPrompt = buildString {
-            appendLine("Contexto clinico del paciente:")
+        val fullUserMessage = buildString {
+            appendLine("Contexto clínico del paciente:")
             appendLine(contextJson.toString())
             appendLine()
             if (conversationTail.isNotBlank()) {
-                appendLine("Conversacion reciente:")
+                appendLine("Conversación reciente:")
                 appendLine(conversationTail)
                 appendLine()
             }
@@ -407,43 +407,47 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             appendLine(sanitizeText(userText))
         }
 
+        // Gemini request body
         val body = JSONObject().apply {
-            put("model", "claude-3-5-haiku-latest")
-            put("max_tokens", 500)
-            put("temperature", 0.3)
-            put("system", systemPrompt)
-            put(
-                "messages",
-                JSONArray().put(
-                    JSONObject().apply {
-                        put("role", "user")
-                        put("content", userPrompt)
-                    },
-                ),
-            )
+            put("system_instruction", JSONObject().apply {
+                put("parts", JSONArray().put(JSONObject().apply {
+                    put("text", systemPrompt)
+                }))
+            })
+            put("contents", JSONArray().put(JSONObject().apply {
+                put("role", "user")
+                put("parts", JSONArray().put(JSONObject().apply {
+                    put("text", fullUserMessage)
+                }))
+            }))
+            put("generationConfig", JSONObject().apply {
+                put("temperature",     0.3)
+                put("maxOutputTokens", 500)
+            })
         }
 
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey"
         val request = Request.Builder()
-            .url("https://api.anthropic.com/v1/messages")
-            .addHeader("x-api-key", apiKey)
-            .addHeader("anthropic-version", "2023-06-01")
-            .addHeader("content-type", "application/json")
+            .url(url)
+            .addHeader("Content-Type", "application/json")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IllegalStateException("Error IA: ${response.code}")
+                throw IllegalStateException("Error Gemini: ${response.code}")
             }
-            val raw = response.body?.string().orEmpty()
+            val raw  = response.body?.string().orEmpty()
             val json = JSONObject(raw)
-            val content = json.optJSONArray("content") ?: JSONArray()
-            val text = if (content.length() > 0) {
-                content.optJSONObject(0)?.optString("text", "") ?: ""
-            } else {
-                ""
-            }
-            if (text.isBlank()) throw IllegalStateException("Respuesta IA vacia")
+            val text = json
+                .optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.optJSONObject(0)
+                ?.optString("text", "")
+                .orEmpty()
+            if (text.isBlank()) throw IllegalStateException("Respuesta Gemini vacía")
             sanitizeText(text)
         }
     }
