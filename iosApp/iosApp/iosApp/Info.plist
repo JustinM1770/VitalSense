@@ -6,10 +6,18 @@
 	<string>576196499899-64b9179g789khvjv8q1idqvet829bpvj.apps.googleusercontent.com</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>manrope_medium.ttf</string>
-		<string>manrope_semibold.ttf</string>
-		<string>manrope_bold.ttf</string>
+		<string>Resources/Fonts/Manrope-Medium.ttf</string>
+		<string>Resources/Fonts/Manrope-SemiBold.ttf</string>
+		<string>Resources/Fonts/Manrope-Bold.ttf</string>
 	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>VitalSense usa Bluetooth para conectarse a sensores de salud</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>VitalSense usa Bluetooth para conectarse a sensores de salud</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>VitalSense lee tus datos de salud para monitoreo</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>VitalSense actualiza tus datos de salud</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

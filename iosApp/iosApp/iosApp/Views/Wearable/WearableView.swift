@@ -93,22 +93,26 @@ private struct CodePanel: View {
             Spacer().frame(height: 24)
 
             // Campo de código
-            TextField("Código de vinculación", text: $code)
-                .font(.custom("Manrope-Medium", size: 16))
-                .textInputAutocapitalization(.characters)
-                .disableAutocorrection(true)
-                .padding()
-                .background(Color.white)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(errorMessage != nil ? Color(hex: "#EF4444") : Color(hex: "#E5E7EB"), lineWidth: 1)
-                )
-                .frame(maxWidth: UIScreen.main.bounds.width * 0.8)
-                .onChange(of: code) { newValue in
-                    if newValue.count > 8 { code = String(newValue.prefix(8)) }
-                    code = code.uppercased()
-                }
+            GeometryReader { geo in
+                TextField("Código de vinculación", text: $code)
+                    .font(.custom("Manrope-Medium", size: 16))
+                    .textInputAutocapitalization(.characters)
+                    .disableAutocorrection(true)
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(errorMessage != nil ? Color(hex: "#EF4444") : Color(hex: "#E5E7EB"), lineWidth: 1)
+                    )
+                    .frame(maxWidth: geo.size.width * 0.9)
+                    .frame(maxWidth: .infinity)
+                    .onChange(of: code) { newValue in
+                        if newValue.count > 8 { code = String(newValue.prefix(8)) }
+                        code = code.uppercased()
+                    }
+            }
+            .frame(height: 56)
 
             Spacer().frame(height: 32)
 

@@ -7,15 +7,58 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		BB10002CAABB12DE00CCDD00 /* shared.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB10001CAABB12DE00CCDD00 /* shared.xcframework */; };
+		AA00001100AA00BB00CC00DD /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = AA00001000AA00BB00CC00DD /* GoogleSignIn */; };
+		C634767D2F7DE63B00890BC1 /* VitalSenseWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C634767C2F7DE63B00890BC1 /* VitalSenseWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C63476AE2F7DE7C700890BC1 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = C63476AD2F7DE7C700890BC1 /* FirebaseDatabase */; };
+		C63476B02F7DE7D900890BC1 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = C63476AF2F7DE7D900890BC1 /* FirebaseAuth */; };
 		D050919D2F6C625C00B5DB2F /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D050919C2F6C625C00B5DB2F /* FirebaseAuth */; };
 		D050919F2F6C626000B5DB2F /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = D050919E2F6C626000B5DB2F /* FirebaseDatabase */; };
 		D05091A12F6C626A00B5DB2F /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = D05091A02F6C626A00B5DB2F /* FirebaseCore */; };
-		AA00001100AA00BB00CC00DD /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = AA00001000AA00BB00CC00DD /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C634767E2F7DE63B00890BC1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D05091302F6C5AC200B5DB2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C634767B2F7DE63B00890BC1;
+			remoteInfo = "VitalSenseWatch Watch App";
+		};
+		C634768F2F7DE63D00890BC1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D05091302F6C5AC200B5DB2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C634767B2F7DE63B00890BC1;
+			remoteInfo = "VitalSenseWatch Watch App";
+		};
+		C63476992F7DE63D00890BC1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D05091302F6C5AC200B5DB2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C634767B2F7DE63B00890BC1;
+			remoteInfo = "VitalSenseWatch Watch App";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C63476A32F7DE63D00890BC1 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				C634767D2F7DE63B00890BC1 /* VitalSenseWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		BB10001CAABB12DE00CCDD00 /* shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = shared.xcframework; path = ../../shared/build/XCFrameworks/release/shared.xcframework; sourceTree = SOURCE_ROOT; };
+		C63476772F7DE63B00890BC1 /* VitalSenseWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VitalSenseWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C634767C2F7DE63B00890BC1 /* VitalSenseWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "VitalSenseWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C634768E2F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "VitalSenseWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C63476982F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "VitalSenseWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D05091382F6C5AC200B5DB2F /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -30,6 +73,21 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		C63476802F7DE63B00890BC1 /* VitalSenseWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "VitalSenseWatch Watch App";
+			sourceTree = "<group>";
+		};
+		C63476912F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "VitalSenseWatch Watch AppTests";
+			sourceTree = "<group>";
+		};
+		C634769B2F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "VitalSenseWatch Watch AppUITests";
+			sourceTree = "<group>";
+		};
 		D050913A2F6C5AC200B5DB2F /* iosApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -41,6 +99,29 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		C63476792F7DE63B00890BC1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C63476AE2F7DE7C700890BC1 /* FirebaseDatabase in Frameworks */,
+				C63476B02F7DE7D900890BC1 /* FirebaseAuth in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C634768B2F7DE63D00890BC1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C63476952F7DE63D00890BC1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D05091352F6C5AC200B5DB2F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -49,7 +130,6 @@
 				D05091A12F6C626A00B5DB2F /* FirebaseCore in Frameworks */,
 				D050919D2F6C625C00B5DB2F /* FirebaseAuth in Frameworks */,
 				AA00001100AA00BB00CC00DD /* GoogleSignIn in Frameworks */,
-				BB10002CAABB12DE00CCDD00 /* shared.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,6 +140,9 @@
 			isa = PBXGroup;
 			children = (
 				D050913A2F6C5AC200B5DB2F /* iosApp */,
+				C63476802F7DE63B00890BC1 /* VitalSenseWatch Watch App */,
+				C63476912F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests */,
+				C634769B2F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests */,
 				D050919B2F6C625C00B5DB2F /* Frameworks */,
 				D05091392F6C5AC200B5DB2F /* Products */,
 			);
@@ -69,6 +152,10 @@
 			isa = PBXGroup;
 			children = (
 				D05091382F6C5AC200B5DB2F /* iosApp.app */,
+				C63476772F7DE63B00890BC1 /* VitalSenseWatch.app */,
+				C634767C2F7DE63B00890BC1 /* VitalSenseWatch Watch App.app */,
+				C634768E2F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests.xctest */,
+				C63476982F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,7 +163,6 @@
 		D050919B2F6C625C00B5DB2F /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				BB10001CAABB12DE00CCDD00 /* shared.xcframework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -84,6 +170,95 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		C63476762F7DE63B00890BC1 /* VitalSenseWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C63476A42F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch" */;
+			buildPhases = (
+				C63476752F7DE63B00890BC1 /* Resources */,
+				C63476A32F7DE63D00890BC1 /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C634767F2F7DE63B00890BC1 /* PBXTargetDependency */,
+			);
+			name = VitalSenseWatch;
+			packageProductDependencies = (
+			);
+			productName = VitalSenseWatch;
+			productReference = C63476772F7DE63B00890BC1 /* VitalSenseWatch.app */;
+			productType = "com.apple.product-type.application.watchapp2-container";
+		};
+		C634767B2F7DE63B00890BC1 /* VitalSenseWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C63476A02F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch Watch App" */;
+			buildPhases = (
+				C63476782F7DE63B00890BC1 /* Sources */,
+				C63476792F7DE63B00890BC1 /* Frameworks */,
+				C634767A2F7DE63B00890BC1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C63476802F7DE63B00890BC1 /* VitalSenseWatch Watch App */,
+			);
+			name = "VitalSenseWatch Watch App";
+			packageProductDependencies = (
+				C63476AD2F7DE7C700890BC1 /* FirebaseDatabase */,
+				C63476AF2F7DE7D900890BC1 /* FirebaseAuth */,
+			);
+			productName = "VitalSenseWatch Watch App";
+			productReference = C634767C2F7DE63B00890BC1 /* VitalSenseWatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C634768D2F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C63476A72F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch Watch AppTests" */;
+			buildPhases = (
+				C634768A2F7DE63D00890BC1 /* Sources */,
+				C634768B2F7DE63D00890BC1 /* Frameworks */,
+				C634768C2F7DE63D00890BC1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C63476902F7DE63D00890BC1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C63476912F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests */,
+			);
+			name = "VitalSenseWatch Watch AppTests";
+			packageProductDependencies = (
+			);
+			productName = "VitalSenseWatch Watch AppTests";
+			productReference = C634768E2F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C63476972F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C63476AA2F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch Watch AppUITests" */;
+			buildPhases = (
+				C63476942F7DE63D00890BC1 /* Sources */,
+				C63476952F7DE63D00890BC1 /* Frameworks */,
+				C63476962F7DE63D00890BC1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C634769A2F7DE63D00890BC1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C634769B2F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests */,
+			);
+			name = "VitalSenseWatch Watch AppUITests";
+			packageProductDependencies = (
+			);
+			productName = "VitalSenseWatch Watch AppUITests";
+			productReference = C63476982F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		D05091372F6C5AC200B5DB2F /* iosApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D05091432F6C5ACC00B5DB2F /* Build configuration list for PBXNativeTarget "iosApp" */;
@@ -117,9 +292,23 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					C63476762F7DE63B00890BC1 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					C634767B2F7DE63B00890BC1 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					C634768D2F7DE63D00890BC1 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = C634767B2F7DE63B00890BC1;
+					};
+					C63476972F7DE63D00890BC1 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = C634767B2F7DE63B00890BC1;
+					};
 					D05091372F6C5AC200B5DB2F = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -136,7 +325,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-				AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "google-signin-ios" */,
+				AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D05091392F6C5AC200B5DB2F /* Products */;
@@ -144,11 +333,43 @@
 			projectRoot = "";
 			targets = (
 				D05091372F6C5AC200B5DB2F /* iosApp */,
+				C63476762F7DE63B00890BC1 /* VitalSenseWatch */,
+				C634767B2F7DE63B00890BC1 /* VitalSenseWatch Watch App */,
+				C634768D2F7DE63D00890BC1 /* VitalSenseWatch Watch AppTests */,
+				C63476972F7DE63D00890BC1 /* VitalSenseWatch Watch AppUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		C63476752F7DE63B00890BC1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C634767A2F7DE63B00890BC1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C634768C2F7DE63D00890BC1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C63476962F7DE63D00890BC1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D05091362F6C5AC200B5DB2F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -159,6 +380,27 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C63476782F7DE63B00890BC1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C634768A2F7DE63D00890BC1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C63476942F7DE63D00890BC1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D05091342F6C5AC200B5DB2F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -168,7 +410,193 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		C634767F2F7DE63B00890BC1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C634767B2F7DE63B00890BC1 /* VitalSenseWatch Watch App */;
+			targetProxy = C634767E2F7DE63B00890BC1 /* PBXContainerItemProxy */;
+		};
+		C63476902F7DE63D00890BC1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C634767B2F7DE63B00890BC1 /* VitalSenseWatch Watch App */;
+			targetProxy = C634768F2F7DE63D00890BC1 /* PBXContainerItemProxy */;
+		};
+		C634769A2F7DE63D00890BC1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C634767B2F7DE63B00890BC1 /* VitalSenseWatch Watch App */;
+			targetProxy = C63476992F7DE63D00890BC1 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		C63476A12F7DE63D00890BC1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "VitalSenseWatch Watch App/VitalSenseWatch Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"VitalSenseWatch Watch App/Preview Content\"";
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = VitalSenseWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.VitalSenseWatch.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		C63476A22F7DE63D00890BC1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "VitalSenseWatch Watch App/VitalSenseWatch Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"VitalSenseWatch Watch App/Preview Content\"";
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = VitalSenseWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.VitalSenseWatch.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
+		C63476A52F7DE63D00890BC1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				INFOPLIST_KEY_CFBundleDisplayName = VitalSenseWatch;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.VitalSenseWatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C63476A62F7DE63D00890BC1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				INFOPLIST_KEY_CFBundleDisplayName = VitalSenseWatch;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.VitalSenseWatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		C63476A82F7DE63D00890BC1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mx.ita.VitalSenseWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VitalSenseWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/VitalSenseWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		C63476A92F7DE63D00890BC1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mx.ita.VitalSenseWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VitalSenseWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/VitalSenseWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
+		C63476AB2F7DE63D00890BC1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mx.ita.VitalSenseWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "VitalSenseWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Debug;
+		};
+		C63476AC2F7DE63D00890BC1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mx.ita.VitalSenseWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "VitalSenseWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 11.2;
+			};
+			name = Release;
+		};
 		D05091412F6C5ACC00B5DB2F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -297,7 +725,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 74SD88NBH3;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
@@ -331,7 +759,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 74SD88NBH3;
+				DEVELOPMENT_TEAM = 5U9RWVTFAL;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
@@ -361,6 +789,42 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		C63476A02F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C63476A12F7DE63D00890BC1 /* Debug */,
+				C63476A22F7DE63D00890BC1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C63476A42F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C63476A52F7DE63D00890BC1 /* Debug */,
+				C63476A62F7DE63D00890BC1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C63476A72F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch Watch AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C63476A82F7DE63D00890BC1 /* Debug */,
+				C63476A92F7DE63D00890BC1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C63476AA2F7DE63D00890BC1 /* Build configuration list for PBXNativeTarget "VitalSenseWatch Watch AppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C63476AB2F7DE63D00890BC1 /* Debug */,
+				C63476AC2F7DE63D00890BC1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		D05091332F6C5AC200B5DB2F /* Build configuration list for PBXProject "iosApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -382,6 +846,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 		D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -390,17 +862,24 @@
 				minimumVersion = 12.11.0;
 			};
 		};
-		AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "google-signin-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 8.0.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		AA00001000AA00BB00CC00DD /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		C63476AD2F7DE7C700890BC1 /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+		C63476AF2F7DE7D900890BC1 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
 		D050919C2F6C625C00B5DB2F /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
@@ -415,11 +894,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
-		};
-		AA00001000AA00BB00CC00DD /* GoogleSignIn */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "google-signin-ios" */;
-			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

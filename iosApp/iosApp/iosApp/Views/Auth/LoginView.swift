@@ -14,131 +14,127 @@ struct LoginView: View {
     @State private var snackbarMessage = ""
 
     var body: some View {
-        if #available(iOS 17.0, *) {
-            ZStack {
-                Color.white.ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Header
-                        HStack {
-                            Button(action: onBack) {
-                                Image(systemName: "arrow.left")
-                                    .font(.manrope(size: 18))
-                                    .foregroundColor(Color.textDark)
-                            }
-                            Spacer()
-                            Text("Inicia Sesión")
-                                .font(.manropeBold(size: 18))
+        ZStack {
+            Color.white.ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Header
+                    HStack {
+                        Button(action: onBack) {
+                            Image(systemName: "arrow.left")
+                                .font(.manrope(size: 18))
                                 .foregroundColor(Color.textDark)
-                            Spacer()
-                            Color.clear.frame(width: 24)
                         }
-                        .frame(height: 40)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 52)
-                        
-                        Spacer().frame(height: 40)
-                        
-                        // Form fields
-                        VStack(spacing: 20) {
-                            LoginField(
-                                value: $email,
-                                placeholder: "Email",
-                                leadingIcon: "envelope",
-                                keyboardType: .emailAddress,
-                                isEnabled: viewModel.state != .loading
-                            )
-                            
-                            LoginField(
-                                value: $password,
-                                placeholder: "Contraseña",
-                                leadingIcon: "lock",
-                                trailingIcon: passwordVisible ? "eye" : "eye.slash",
-                                onTrailingTap: { passwordVisible.toggle() },
-                                isSecure: !passwordVisible,
-                                isEnabled: viewModel.state != .loading
-                            )
-                        }
-                        .padding(.horizontal, 32)
-                        
-                        Spacer().frame(height: 40)
-                        
-                        // Login button
-                        Button(action: handleLogin) {
-                            if case .loading = viewModel.state {
-                                ProgressView().tint(.white)
-                            } else {
-                                Text("Entrar")
-                                    .font(.manropeSemiBold(size: 16))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .frame(width: 325, height: 59)
-                        .background(Color.primaryBlue)
-                        .cornerRadius(32)
-                        .disabled(viewModel.state == .loading)
-                        
-                        Spacer().frame(height: 24)
-                        
-                        // Google Sign-In button
-                        Button(action: {
-                            viewModel.signInWithGoogle()
-                        }) {
-                            HStack(spacing: 8) {
-                                GoogleLogo()
-                                Text("Continuar con Google")
-                                    .font(.manrope(size: 14))
-                                    .foregroundColor(Color.textDark)
-                            }
-                        }
-                        .frame(width: 325, height: 52)
-                        .background(Color.white)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 32)
-                                .stroke(Color(hex: "#E5E5E5"), lineWidth: 1)
+                        Spacer()
+                        Text("Inicia Sesión")
+                            .font(.manropeBold(size: 18))
+                            .foregroundColor(Color.textDark)
+                        Spacer()
+                        Color.clear.frame(width: 24)
+                    }
+                    .frame(height: 40)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 52)
+
+                    Spacer().frame(height: 40)
+
+                    // Form fields
+                    VStack(spacing: 20) {
+                        LoginField(
+                            value: $email,
+                            placeholder: "Email",
+                            leadingIcon: "envelope",
+                            keyboardType: .emailAddress,
+                            isEnabled: viewModel.state != .loading
                         )
-                        .disabled(viewModel.state == .loading)
-                        
-                        Spacer().frame(height: 32)
-                        
-                        // Register link
-                        Button(action: onRegister) {
-                            Text("¿No tienes cuenta? ")
+
+                        LoginField(
+                            value: $password,
+                            placeholder: "Contraseña",
+                            leadingIcon: "lock",
+                            trailingIcon: passwordVisible ? "eye" : "eye.slash",
+                            onTrailingTap: { passwordVisible.toggle() },
+                            isSecure: !passwordVisible,
+                            isEnabled: viewModel.state != .loading
+                        )
+                    }
+                    .padding(.horizontal, 32)
+
+                    Spacer().frame(height: 40)
+
+                    // Login button
+                    Button(action: handleLogin) {
+                        if case .loading = viewModel.state {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Entrar")
+                                .font(.manropeSemiBold(size: 16))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .frame(width: 325, height: 59)
+                    .background(Color.primaryBlue)
+                    .cornerRadius(32)
+                    .disabled(viewModel.state == .loading)
+
+                    Spacer().frame(height: 24)
+
+                    // Google Sign-In button
+                    Button(action: {
+                        viewModel.signInWithGoogle()
+                    }) {
+                        HStack(spacing: 8) {
+                            GoogleLogo()
+                            Text("Continuar con Google")
                                 .font(.manrope(size: 14))
                                 .foregroundColor(Color.textDark)
-                            +
-                            Text("Regístrate")
-                                .font(.manropeBold(size: 14))
-                                .foregroundColor(Color.primaryBlue)
                         }
-                        
-                        Spacer()
                     }
-                }
-                
-                // Snackbar
-                if showSnackbar {
-                    VStack {
-                        Spacer()
-                        Text(snackbarMessage)
+                    .frame(width: 325, height: 52)
+                    .background(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 32)
+                            .stroke(Color(hex: "#E5E5E5"), lineWidth: 1)
+                    )
+                    .disabled(viewModel.state == .loading)
+
+                    Spacer().frame(height: 32)
+
+                    // Register link
+                    Button(action: onRegister) {
+                        Text("¿No tienes cuenta? ")
                             .font(.manrope(size: 14))
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.red)
-                            .cornerRadius(8)
-                            .padding(.bottom, 50)
+                            .foregroundColor(Color.textDark)
+                        +
+                        Text("Regístrate")
+                            .font(.manropeBold(size: 14))
+                            .foregroundColor(Color.primaryBlue)
                     }
-                    .transition(.move(edge: .bottom))
-                    .animation(.easeInOut, value: showSnackbar)
+
+                    Spacer()
                 }
             }
-            .navigationBarHidden(true)
-            .onChange(of: viewModel.state) { _, newValue in
-                handleStateChange(newValue)
+
+            // Snackbar
+            if showSnackbar {
+                VStack {
+                    Spacer()
+                    Text(snackbarMessage)
+                        .font(.manrope(size: 14))
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(8)
+                        .padding(.bottom, 50)
+                }
+                .transition(.move(edge: .bottom))
+                .animation(.easeInOut, value: showSnackbar)
             }
-        } else {
-            // Fallback on earlier versions
+        }
+        .navigationBarHidden(true)
+        .onChange(of: viewModel.state) { newValue in
+            handleStateChange(newValue)
         }
     }
 
