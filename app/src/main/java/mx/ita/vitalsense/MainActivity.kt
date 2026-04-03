@@ -13,8 +13,10 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.lifecycleScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.launch
 import mx.ita.vitalsense.data.ble.FreestyleLibreReader
 import mx.ita.vitalsense.data.health.HealthConnectRepository
 import mx.ita.vitalsense.ui.health.HealthConnectViewModel
@@ -31,6 +33,8 @@ class MainActivity : FragmentActivity() {
 
     val healthConnectViewModel: HealthConnectViewModel by viewModels()
     var pendingNotificationOpen by mutableStateOf<NotificationOpenRequest?>(null)
+        private set
+    var pendingMedicationOpen by mutableStateOf(false)
         private set
     private val libreReader by lazy { FreestyleLibreReader(this) }
 
@@ -60,9 +64,13 @@ class MainActivity : FragmentActivity() {
             }
         }
         pendingNotificationOpen = parseNotificationOpenRequest(intent)
-        // Request Health Connect permissions AFTER setContent to avoid blank-screen freeze
-        if (HealthConnectClient.getSdkStatus(this) == HealthConnectClient.SDK_AVAILABLE) {
-            hcPermissionLauncher.launch(HealthConnectRepository.PERMISSIONS)
+        pendingMedicationOpen = intent.getBooleanExtra("open_medications", false)
+        // Request Health Connect permissions only if not already granted.
+        // Launching the permission contract restarts MainActivity (via onActivityResult),
+        // so we must guard against re-requesting and creating an infinite loop.
+        if (HealthConnectClient.getSdkStatus(this) == HealthConnectClient.SDK_AVAILABLE
+            && savedInstanceState == null) {
+            requestHealthConnectPermissionsIfNeeded()
         }
     }
 
@@ -70,6 +78,7 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingNotificationOpen = parseNotificationOpenRequest(intent)
+        pendingMedicationOpen = intent.getBooleanExtra("open_medications", false)
 
         val glucose = libreReader.parseFreestyleLibre(intent)
         if (glucose != null) {
@@ -91,6 +100,29 @@ class MainActivity : FragmentActivity() {
 
     fun consumePendingNotificationOpen() {
         pendingNotificationOpen = null
+    }
+
+    fun consumePendingMedicationOpen() {
+        pendingMedicationOpen = false
+    }
+
+    /**
+     * Requests Health Connect permissions only when not already fully granted.
+     * This prevents restarting the permission Activity on every MainActivity re-creation
+     * (which would cause an infinite permission loop).
+     */
+    private fun requestHealthConnectPermissionsIfNeeded() {
+        lifecycleScope.launch {
+            try {
+                val client = HealthConnectClient.getOrCreate(this@MainActivity)
+                val granted = client.permissionController.getGrantedPermissions()
+                if (!granted.containsAll(HealthConnectRepository.PERMISSIONS)) {
+                    hcPermissionLauncher.launch(HealthConnectRepository.PERMISSIONS)
+                }
+            } catch (e: Exception) {
+                // Health Connect not available or error — skip silently
+            }
+        }
     }
 
     private fun parseNotificationOpenRequest(intent: android.content.Intent?): NotificationOpenRequest? {
@@ -121,11 +153,9 @@ class MainActivity : FragmentActivity() {
         )
 
         db.getReference("patients/$uid").updateChildren(updates)
-        db.getReference("patients/$uid/history").push().setValue(
+        db.getReference("patients/$uid/glucose_history").push().setValue(
             mapOf(
                 "glucose" to glucoseMgDl.toDouble(),
-                "heartRate" to 0,
-                "spo2" to 0,
                 "timestamp" to now,
                 "source" to "freestyle_libre_nfc",
             ),

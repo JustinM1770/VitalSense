@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -124,6 +125,14 @@ fun NotificacionesScreen(
     var showUnreadOnly by remember { mutableStateOf(false) }
     var selectedDateFilter by remember { mutableStateOf<String?>(null) }
     var selectedItem by remember { mutableStateOf<NotifItem?>(null) }
+    val handleBack = {
+        if (selectedItem != null) {
+            selectedItem = null
+        }
+        onBack()
+    }
+
+    BackHandler { handleBack() }
 
     // ── Firebase Listener ────────────────────────────────────────────────────
     DisposableEffect(userId) {
@@ -239,7 +248,7 @@ fun NotificacionesScreen(
                         .size(32.dp)
                         .clip(CircleShape)
                         .background(DashBlue.copy(alpha = 0.12f))
-                        .clickable { onBack() },
+                        .clickable { handleBack() },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(

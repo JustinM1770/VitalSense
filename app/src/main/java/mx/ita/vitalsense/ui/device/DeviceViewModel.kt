@@ -120,21 +120,25 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                 val upperCode = code.uppercase().trim()
                 val ref = db.getReference("patients/pairing_codes").child(upperCode)
                 val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId.isNullOrBlank()) {
+                    _codeError.value = "Debes iniciar sesion para vincular el reloj."
+                    repo.setDisconnected()
+                    return@launch
+                }
                 val snapshot = ref.get().await()
 
                 if (snapshot.exists()) {
                     val deviceName = snapshot.child("deviceName").getValue(String::class.java) ?: "Wearable"
-                    val finalUid = userId ?: "global"
-                    ref.updateChildren(mapOf("paired" to true, "userId" to finalUid)).await()
+                    ref.updateChildren(mapOf("paired" to true, "userId" to userId)).await()
                     pairSuccessfully(upperCode, deviceName)
                 } else {
                     _codeError.value = "Código inválido. Verifica el código en tu reloj e inténtalo de nuevo."
                     repo.setDisconnected()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Firebase error, pairing anyway", e)
-                val upperCode = code.uppercase().trim()
-                pairSuccessfully(upperCode, "Wearable")
+                Log.e(TAG, "Error al vincular reloj con Firebase", e)
+                _codeError.value = "No se pudo validar el codigo con el servidor. Intentalo de nuevo."
+                repo.setDisconnected()
             }
         }
     }
@@ -213,6 +217,15 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                     try {
                         if (hcRepo.hasPermissions()) {
                             val hcVitals = hcRepo.readLatestVitals()
+                            val now = System.currentTimeMillis()
+                            val hrSampleTs = hcVitals.heartRateSampleTimestamp
+                            val isHeartRateFresh = hrSampleTs != null && (now - hrSampleTs) <= 2 * 60_000L
+
+                            if (!isHeartRateFresh) {
+                                delay(60_000L)
+                                continue
+                            }
+
                             val ble = BleVitals(
                                 heartRate = hcVitals.heartRate ?: 0,
                                 glucose   = hcVitals.glucose   ?: 0.0,
@@ -221,7 +234,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                             )
                             if ((ble.heartRate ?: 0) > 0) {
                                 repo.updateVitals(ble)
-                                writeVitalsToFirebase(ble)
+                                writeVitalsToFirebase(ble, hrSampleTs)
                             }
                         }
                     } catch (e: Exception) {
@@ -298,16 +311,19 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun writeVitalsToFirebase(vitals: BleVitals) {
+    private fun writeVitalsToFirebase(vitals: BleVitals, heartRateSampleTimestamp: Long? = null) {
         try {
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "global"
             val ref = db.getReference("vitals/current/$userId")
-            val data = mapOf(
+            val data = mutableMapOf<String, Any>(
                 "heartRate" to (vitals.heartRate ?: 0),
                 "spo2" to (vitals.spo2 ?: 0),
                 "glucose" to (vitals.glucose ?: 0.0),
                 "timestamp" to System.currentTimeMillis()
             )
+            if (heartRateSampleTimestamp != null) {
+                data["heartRateSampleTimestamp"] = heartRateSampleTimestamp
+            }
             ref.setValue(data)
         } catch (e: Exception) {
             Log.e(TAG, "Error writing vitals to Firebase", e)

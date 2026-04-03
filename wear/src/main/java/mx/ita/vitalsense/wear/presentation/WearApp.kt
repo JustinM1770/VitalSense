@@ -6,8 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,7 +33,6 @@ import androidx.wear.compose.material.Text
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
-import com.google.android.gms.location.LocationServices
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -43,7 +44,6 @@ import mx.ita.vitalsense.wear.ui.theme.*
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
-import mx.ita.vitalsense.wear.ShakeDetector
 
 private const val TAG = "WearApp"
 private const val DB_URL = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com"
@@ -51,6 +51,14 @@ private const val PREFS_NAME = "vitalsense_wear_prefs"
 private const val KEY_PAIRED = "is_paired"
 private const val KEY_PAIRING_CODE = "pairing_code"
 private const val KEY_USER_ID = "user_id"
+private val HEALTH_SENSOR_PERMISSIONS = listOf(
+    "android.permission.health.READ_HEART_RATE",
+    "android.permission.health.READ_OXYGEN_SATURATION",
+    "android.permission.health.READ_RESPIRATORY_RATE",
+    "android.permission.health.READ_BODY_TEMPERATURE",
+    "android.permission.health.READ_BLOOD_PRESSURE",
+    "android.permission.health.READ_BLOOD_GLUCOSE",
+)
 
 @Composable
 fun WearApp(
@@ -66,24 +74,93 @@ fun WearApp(
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
 
     // --- 1. Permisos ---
-    val permissions = arrayOf(
-        Manifest.permission.BODY_SENSORS,
-        Manifest.permission.ACTIVITY_RECOGNITION,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.POST_NOTIFICATIONS else Manifest.permission.INTERNET
-    )
+    // criticalPermissions: gates the app — the dialog CAN grant these.
+    // ACCESS_BACKGROUND_LOCATION and health permissions are intentionally excluded
+    // because Android 11+ only grants them via System Settings, not the dialog.
+    val criticalPermissions = remember(context) {
+        buildList {
+            add(Manifest.permission.BODY_SENSORS)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACTIVITY_RECOGNITION)
+        }.toTypedArray()
+    }
 
-    var hasPermission by remember {
-        mutableStateOf(permissions.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        })
+    // allPermissionsToRequest: the full set we request on first launch, including
+    // optional background permissions. Not granting these is accepted gracefully.
+    val allPermissionsToRequest = remember(context) {
+        buildList {
+            addAll(criticalPermissions)
+
+            // Background location — must be enabled via Settings ("Allow all the time").
+            // We request it so the system can prompt, but we do NOT block the app on it.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+                add(Manifest.permission.BODY_SENSORS_BACKGROUND)
+            }
+
+            // Health read permissions — only if they exist on this device
+            HEALTH_SENSOR_PERMISSIONS.forEach { permission ->
+                val existsOnDevice = runCatching {
+                    context.packageManager.getPermissionInfo(permission, 0)
+                }.isSuccess
+                if (existsOnDevice) add(permission)
+            }
+        }.distinct().toTypedArray()
+    }
+
+    // Only check critical permissions for the gate — background perms can't be
+    // granted via dialog so we must not block the app on them.
+    fun allGranted() = criticalPermissions.all {
+        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    var hasPermission by remember { mutableStateOf(allGranted()) }
+
+    fun hasLocationPermission(): Boolean {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        return fineGranted || coarseGranted
     }
 
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
-        hasPermission = result.all { it.value }
+        val denied = result.filterValues { granted -> !granted }.keys
+        if (denied.isNotEmpty()) {
+            Log.w(TAG, "Permisos denegados: ${denied.joinToString()}")
+        }
+        hasPermission = allGranted()
+        // If critical perms still denied after dialog, send user to Settings
+        if (!hasPermission) {
+            val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(settingsIntent)
+        }
+    }
+
+    // Auto-launch the full permission request on first open.
+    LaunchedEffect(Unit) {
+        if (!allGranted()) {
+            val missing = allPermissionsToRequest.filter {
+                ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (missing.isNotEmpty()) {
+                launcher.launch(missing.toTypedArray())
+            }
+        }
     }
 
     // --- 2. Estado ---
@@ -189,6 +266,8 @@ fun WearApp(
     // --- 3. Heart Rate Binding ---
     var vitalSignsService by remember { mutableStateOf<VitalSignsService?>(null) }
     val currentHeartRate by (vitalSignsService?.currentHeartRate?.collectAsState() ?: remember { mutableStateOf(0.0) })
+    val currentSpO2 by (vitalSignsService?.currentSpO2?.collectAsState() ?: remember { mutableStateOf(0) })
+    val isSpO2Supported by (vitalSignsService?.isSpO2Supported?.collectAsState() ?: remember { mutableStateOf(true) })
     val activeSosId by (vitalSignsService?.activeSosId?.collectAsState() ?: remember { mutableStateOf(null) })
 
     DisposableEffect(context) {
@@ -210,6 +289,18 @@ fun WearApp(
 
     // --- 4. Alerta SOS Local ---
     var sosSent by remember { mutableStateOf(false) }
+    var pendingSosAfterLocationGrant by remember { mutableStateOf(false) }
+
+    val sosLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        val granted = hasLocationPermission()
+        if (granted && pendingSosAfterLocationGrant) {
+            vitalSignsService?.triggerSosAlert()
+            sosSent = true
+        }
+        pendingSosAfterLocationGrant = false
+    }
 
     LaunchedEffect(sosSent) {
         if (sosSent) {
@@ -228,8 +319,18 @@ fun WearApp(
 
     val triggerSosUI = {
         if (!sosSent) {
-            sosSent = true
-            vitalSignsService?.triggerSosAlert()
+            if (hasLocationPermission()) {
+                sosSent = true
+                vitalSignsService?.triggerSosAlert()
+            } else {
+                pendingSosAfterLocationGrant = true
+                sosLocationLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                    ),
+                )
+            }
         }
     }
 
@@ -257,7 +358,17 @@ fun WearApp(
             } else if (showSuccessScreen) {
                 SuccessScreen()
             } else if (!hasPermission) {
-                PermissionScreen { launcher.launch(permissions) }
+                PermissionScreen {
+                    val missing = criticalPermissions.filter {
+                        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+                    }
+
+                    if (missing.isEmpty()) {
+                        hasPermission = true
+                    } else {
+                        launcher.launch(missing.toTypedArray())
+                    }
+                }
             } else if (activeEmergencyTokenId != null) {
                 // Emergencia crítica detectada por la IA — mostrar QR + PIN en el reloj
                 EmergencyQrWearScreen(
@@ -280,6 +391,8 @@ fun WearApp(
                 MonitoringScreen(
                     isAmbient = isAmbient,
                     heartRate = currentHeartRate.toInt(),
+                    spo2 = currentSpO2,
+                    isSpO2Supported = isSpO2Supported,
                     sosSent = sosSent,
                     onSosTriggered = { triggerSosUI() }
                 )
@@ -505,7 +618,14 @@ fun PermissionScreen(onClick: () -> Unit) {
 }
 
 @Composable
-fun MonitoringScreen(isAmbient: Boolean, heartRate: Int, sosSent: Boolean, onSosTriggered: () -> Unit) {
+fun MonitoringScreen(
+    isAmbient: Boolean,
+    heartRate: Int,
+    spo2: Int,
+    isSpO2Supported: Boolean,
+    sosSent: Boolean,
+    onSosTriggered: () -> Unit,
+) {
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     var sosConfirming by remember { mutableStateOf(false) }
 
@@ -558,6 +678,34 @@ fun MonitoringScreen(isAmbient: Boolean, heartRate: Int, sosSent: Boolean, onSos
                 color = Color.White,
                 fontSize = 38.sp,
                 fontWeight = FontWeight.Medium
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = 28.dp)  // sits just below the BPM row
+                .background(
+                    Color(0xFF0F172A).copy(alpha = 0.7f),
+                    RoundedCornerShape(999.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = when {
+                    !isSpO2Supported -> "SpO₂ --"
+                    spo2 > 0         -> "SpO₂ $spo2%"
+                    else             -> "SpO₂ …"
+                },
+                color = when {
+                    !isSpO2Supported -> Color(0xFF94A3B8)
+                    spo2 > 0         -> Color(0xFFA7F3D0)
+                    else             -> Color(0xFF64748B)
+                },
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
             )
         }
 

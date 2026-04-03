@@ -149,18 +149,21 @@ class DailyReportViewModel : ViewModel() {
 
         historyListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val history = snapshot.children.mapNotNull { child ->
+                val historyRaw = snapshot.children.mapNotNull { child ->
                     val vitals = child.getValue(VitalsData::class.java)
                     if (vitals != null) {
                         vitals.copy(patientId = userId)
                     } else {
-                        val hr = child.child("heartRate").getValue(Int::class.java) ?: return@mapNotNull null
-                        val glucose = child.child("glucose").getValue(Double::class.java) ?: 0.0
-                        val spo2 = child.child("spo2").getValue(Int::class.java) ?: 0
-                        val ts = child.child("timestamp").getValue(Long::class.java) ?: 0L
+                        val hr = child.child("heartRate").getValue(Number::class.java)?.toInt() ?: 0
+                        val glucose = child.child("glucose").getValue(Number::class.java)?.toDouble() ?: 0.0
+                        val spo2 = child.child("spo2").getValue(Number::class.java)?.toInt() ?: 0
+                        val ts = child.child("timestamp").getValue(Number::class.java)?.toLong() ?: 0L
+                        if (ts <= 0L) return@mapNotNull null
                         VitalsData(patientId = userId, heartRate = hr, glucose = glucose, spo2 = spo2, timestamp = ts)
                     }
                 }.sortedBy { it.timestamp }
+
+                val history = compactHistorySamples(historyRaw)
 
                 _uiState.value = _uiState.value.copy(
                     vitalsHistory = history,
@@ -201,6 +204,20 @@ class DailyReportViewModel : ViewModel() {
         if (pendingLoads == 0) {
             _uiState.value = _uiState.value.copy(isLoading = false)
         }
+    }
+
+    /**
+     * Reduce ruido por escrituras muy frecuentes con el mismo valor en ventanas cortas.
+     */
+    private fun compactHistorySamples(history: List<VitalsData>): List<VitalsData> {
+        if (history.isEmpty()) return emptyList()
+
+        return history
+            .distinctBy {
+                val minuteBucket = it.timestamp / 60_000L
+                Triple(minuteBucket, it.heartRate, it.spo2)
+            }
+            .sortedBy { it.timestamp }
     }
 
     override fun onCleared() {

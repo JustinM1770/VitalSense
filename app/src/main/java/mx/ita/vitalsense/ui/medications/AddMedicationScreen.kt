@@ -47,6 +47,9 @@ import com.google.firebase.database.FirebaseDatabase
 import mx.ita.vitalsense.data.model.Medication
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 
 private val frequencyOptions = listOf(
     "Cada 4 horas",
@@ -76,16 +79,19 @@ fun AddMedicationScreen(
     var frecuencia by remember { mutableStateOf("") }
     var frecuenciaCustom by remember { mutableStateOf("") }
     var duracion by remember { mutableStateOf("") }
+    var recordatorioHora by remember { mutableStateOf("") }
 
     var freqExpanded by remember { mutableStateOf(false) }
     var durExpanded by remember { mutableStateOf(false) }
 
     val frecuenciaFinal = if (frecuencia == "Personalizado") frecuenciaCustom.trim() else frecuencia
+    val horaFinal = recordatorioHora.trim()
+    val horaError = !horaFinal.matches(Regex("^([01]\\d|2[0-3]):([0-5]\\d)$"))
 
     val nombreError = nombre.trim().isBlank()
     val frecuenciaError = frecuenciaFinal.isBlank()
     val duracionError = duracion.isBlank()
-    val formValid = !nombreError && !frecuenciaError && !duracionError && uid.isNotBlank()
+    val formValid = !nombreError && !frecuenciaError && !duracionError && !horaError && uid.isNotBlank()
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Column(
@@ -245,6 +251,29 @@ fun AddMedicationScreen(
 
             Spacer(Modifier.height(18.dp))
 
+            Text("Hora del primer recordatorio", fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = recordatorioHora,
+                onValueChange = { recordatorioHora = it.filter { ch -> ch.isDigit() || ch == ':' }.take(5) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = horaError,
+                placeholder = { Text("Ej. 08:00", color = Color(0xFF9CA3AF)) },
+                shape = RoundedCornerShape(12.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedIndicatorColor = DashBlue,
+                    unfocusedIndicatorColor = Color(0xFFE5E7EB),
+                ),
+            )
+            if (horaError) {
+                Text("Usa formato 24 h HH:mm", color = Color(0xFFD32F2F), fontSize = 12.sp)
+            }
+
+            Spacer(Modifier.height(18.dp))
+
             Text(
                 text = "Extra: este medicamento se mostrara en dashboard y perfil de emergencia.",
                 color = Color(0xFF6B7280),
@@ -267,6 +296,9 @@ fun AddMedicationScreen(
                         duracion = duracion,
                         dosis = frecuenciaFinal,
                         horario = duracion,
+                        recordatorioHora = horaFinal,
+                        reminderEnabled = true,
+                        nextReminderAt = resolveFirstReminderAt(horaFinal),
                         activo = true,
                         createdAt = System.currentTimeMillis(),
                     )
@@ -296,4 +328,15 @@ fun AddMedicationScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+private fun resolveFirstReminderAt(hhmm: String): Long {
+    val parts = hhmm.split(":")
+    if (parts.size != 2) return 0L
+    val hour = parts[0].toIntOrNull() ?: return 0L
+    val minute = parts[1].toIntOrNull() ?: return 0L
+    val localDateTime = LocalDate.now(ZoneId.systemDefault()).atTime(LocalTime.of(hour, minute))
+    val candidate = localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val current = System.currentTimeMillis()
+    return if (candidate >= current) candidate else candidate + 24L * 60L * 60L * 1000L
 }

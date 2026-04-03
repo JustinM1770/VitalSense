@@ -10,6 +10,10 @@ data class Medication(
     val duracion: String = "",
     val dosis: String = "",
     val horario: String = "",
+    val recordatorioHora: String = "",
+    val reminderEnabled: Boolean = true,
+    val nextReminderAt: Long = 0L,
+    val lastReminderAt: Long = 0L,
     val activo: Boolean = true,
     val createdAt: Long = 0L,
 )

@@ -17,6 +17,9 @@ data class HealthConnectVitals(
     val heartRate: Int? = null,
     val glucose: Double? = null,   // mg/dL
     val spo2: Double? = null,      // %
+    val heartRateSampleTimestamp: Long? = null,
+    val glucoseSampleTimestamp: Long? = null,
+    val spo2SampleTimestamp: Long? = null,
 )
 
 class HealthConnectRepository(private val context: Context) {
@@ -50,41 +53,47 @@ class HealthConnectRepository(private val context: Context) {
         val spo2 = readLatestSpo2(range)
         val glucose = readLatestGlucose(range)
 
-        return HealthConnectVitals(heartRate = hr, glucose = glucose, spo2 = spo2)
+        return HealthConnectVitals(
+            heartRate = hr?.first,
+            glucose = glucose?.first,
+            spo2 = spo2?.first,
+            heartRateSampleTimestamp = hr?.second,
+            glucoseSampleTimestamp = glucose?.second,
+            spo2SampleTimestamp = spo2?.second,
+        )
     }
 
-    private suspend fun readLatestHeartRate(range: TimeRangeFilter): Int? {
+    private suspend fun readLatestHeartRate(range: TimeRangeFilter): Pair<Int, Long>? {
         val response = client.readRecords(
             ReadRecordsRequest(HeartRateRecord::class, timeRangeFilter = range)
         )
-        return response.records
+        val sample = response.records
             .flatMap { it.samples }
             .maxByOrNull { it.time }
-            ?.beatsPerMinute
-            ?.toInt()
+            ?: return null
+        return sample.beatsPerMinute.toInt() to sample.time.toEpochMilli()
     }
 
-    private suspend fun readLatestSpo2(range: TimeRangeFilter): Double? {
+    private suspend fun readLatestSpo2(range: TimeRangeFilter): Pair<Double, Long>? {
         val response = client.readRecords(
             ReadRecordsRequest(OxygenSaturationRecord::class, timeRangeFilter = range)
         )
-        return response.records
+        val record = response.records
             .maxByOrNull { it.time }
-            ?.percentage
-            ?.value
+            ?: return null
+        return record.percentage.value to record.time.toEpochMilli()
     }
 
-    private suspend fun readLatestGlucose(range: TimeRangeFilter): Double? {
+    private suspend fun readLatestGlucose(range: TimeRangeFilter): Pair<Double, Long>? {
         val response = client.readRecords(
             ReadRecordsRequest(BloodGlucoseRecord::class, timeRangeFilter = range)
         )
         // Health Connect almacena glucosa en mmol/L — convertir a mg/dL
-        val mmolPerL = response.records
+        val record = response.records
             .maxByOrNull { it.time }
-            ?.level
-            ?.inMillimolesPerLiter
             ?: return null
-        return mmolPerL * 18.0
+        val mmolPerL = record.level.inMillimolesPerLiter
+        return (mmolPerL * 18.0) to record.time.toEpochMilli()
     }
 
     suspend fun readSleepData(start: Instant, end: Instant, context: Context): mx.ita.vitalsense.data.model.SleepData? {

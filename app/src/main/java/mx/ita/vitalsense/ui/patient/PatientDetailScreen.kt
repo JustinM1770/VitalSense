@@ -103,6 +103,10 @@ import mx.ita.vitalsense.ui.theme.SpO2Soft
 import mx.ita.vitalsense.ui.theme.TextMuted
 import mx.ita.vitalsense.ui.theme.TextPrimary
 import mx.ita.vitalsense.ui.theme.TextSecondary
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 // ─── ViewModel ────────────────────────────────────────────────────────────────
 
@@ -131,9 +135,14 @@ class PatientDetailViewModel(patientId: String = "") : ViewModel() {
     val heartRateHistory: Map<String, Float>
         get() {
             val snapshots = history.value
-            val months = listOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio")
-            return months.associateWith { month ->
-                snapshots.filter { it.timestamp > 0 }.map { it.heartRate.toFloat() }.average().toFloat().takeIf { !it.isNaN() } ?: 0f
+            val zone = ZoneId.systemDefault()
+            val lastMonths = (6 downTo 0).map { YearMonth.now(zone).minusMonths(it.toLong()) }
+            return lastMonths.associate { month ->
+                val values = snapshots.filter { snapshot ->
+                    snapshot.timestamp > 0 && YearMonth.from(java.time.Instant.ofEpochMilli(snapshot.timestamp).atZone(zone)) == month
+                }.map { it.heartRate.toFloat() }
+                month.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() } to
+                    (values.takeIf { it.isNotEmpty() }?.average()?.toFloat() ?: 0f)
             }
         }
 
@@ -496,7 +505,8 @@ private fun ExpandedHeartRateCard(history: Map<String, Float>) {
 
             Spacer(Modifier.height(32.dp))
 
-            val months = listOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio")
+            val months = (6 downTo 0).map { YearMonth.now(ZoneId.systemDefault()).minusMonths(it.toLong()) }
+                .map { it.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { ch -> ch.uppercase() } }
             val points = months.map { history[it] ?: 0f }
 
             ExpandedLineChart(

@@ -15,6 +15,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.MonitorHeart
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,13 +34,16 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.ita.vitalsense.ui.components.NeuCard
 import mx.ita.vitalsense.ui.theme.*
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.cos
 import kotlin.math.sin
 import java.util.Locale
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun DailyReportScreen(
     onBack: () -> Unit,
     onNavigateToDetailed: () -> Unit,
@@ -46,11 +51,21 @@ fun DailyReportScreen(
     vm: DailyReportViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = state.selectedDate
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli(),
+    )
 
     Scaffold(
         containerColor = Color.White,
         topBar = {
-            DailyReportTopBar(onBack = onBack)
+            DailyReportTopBar(
+                onBack = onBack,
+                onCalendarClick = { showDatePicker = true },
+            )
         }
     ) { innerPadding ->
         Column(
@@ -85,11 +100,7 @@ fun DailyReportScreen(
             )
             Spacer(Modifier.height(16.dp))
             
-            val latestVitals = state.vitalsHistory.lastOrNull()
             val sleepPct = (state.sleepData?.score ?: 0) / 100f
-            val glucosePct = latestVitals?.glucose?.toFloat()?.div(140f)?.coerceIn(0f, 1f) ?: 0.6f
-            val oxigenoPct = latestVitals?.spo2?.toFloat()?.div(100f)?.coerceIn(0f, 1f) ?: 0.9f
-            val presionPct = latestVitals?.heartRate?.toFloat()?.div(160f)?.coerceIn(0f, 1f) ?: 0f
 
             val hrValues = state.vitalsHistory.map { it.heartRate }.filter { it > 0 }
             val spo2Values = state.vitalsHistory.map { it.spo2 }.filter { it > 0 }
@@ -98,6 +109,9 @@ fun DailyReportScreen(
             val avgHeartRate = if (hrValues.isNotEmpty()) hrValues.average() else 0.0
             val avgSpo2 = if (spo2Values.isNotEmpty()) spo2Values.average() else 0.0
             val avgGlucose = if (glucoseValues.isNotEmpty()) glucoseValues.average() else 0.0
+            val glucosePct = if (avgGlucose > 0.0) (avgGlucose / 140.0).toFloat().coerceIn(0f, 1f) else 0f
+            val oxigenoPct = if (avgSpo2 > 0.0) (avgSpo2 / 100.0).toFloat().coerceIn(0f, 1f) else 0f
+            val presionPct = if (avgHeartRate > 0.0) (avgHeartRate / 160.0).toFloat().coerceIn(0f, 1f) else 0f
             val rangeLabel = vm.getRangeLabel(state)
             
             HealthRadarCard(
@@ -174,10 +188,38 @@ fun DailyReportScreen(
             
             Spacer(Modifier.height(96.dp))
         }
+
+        if (showDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        if (millis != null) {
+                            val selected = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                            vm.onDateSelected(selected)
+                        }
+                        showDatePicker = false
+                    }) {
+                        Text("Aceptar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) {
+                        Text("Cancelar")
+                    }
+                },
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
     }
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun ReportRangeFilterRow(
     selectedFilter: ReportRangeFilter,
     onFilterSelected: (ReportRangeFilter) -> Unit,
@@ -205,7 +247,10 @@ private fun ReportRangeFilterRow(
 }
 
 @Composable
-private fun DailyReportTopBar(onBack: () -> Unit) {
+private fun DailyReportTopBar(
+    onBack: () -> Unit,
+    onCalendarClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -222,7 +267,7 @@ private fun DailyReportTopBar(onBack: () -> Unit) {
             style = MaterialTheme.typography.titleLarge,
             color = TextPrimary
         )
-        IconButton(onClick = { /* Open Calendar */ }) {
+        IconButton(onClick = onCalendarClick) {
             Icon(Icons.Rounded.CalendarMonth, contentDescription = "Calendario", tint = PrimaryBlue)
         }
     }
@@ -233,8 +278,8 @@ private fun DateStrip(
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    val dates = remember {
-        (-3..3).map { LocalDate.now().plusDays(it.toLong()) }
+    val dates = remember(selectedDate) {
+        (-3..3).map { selectedDate.plusDays(it.toLong()) }
     }
 
     LazyRow(

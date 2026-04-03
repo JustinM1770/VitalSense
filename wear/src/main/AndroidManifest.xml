@@ -7,6 +7,13 @@
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -17,6 +24,12 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Required for Health Connect client on Wear OS to resolve the HealthConnect provider -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.samsung.android.app.health" />
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -44,8 +57,14 @@
 
         <service
             android:name=".VitalSignsService"
-            android:foregroundServiceType="health|location"
+            android:foregroundServiceType="health"
             android:exported="false" />
+
+        <!-- PassiveListenerService for background HR + SpO2 delivery when screen is off -->
+        <service
+            android:name=".PassiveDataReceiver"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <receiver android:name=".WearBootReceiver" android:exported="true">
             <intent-filter>

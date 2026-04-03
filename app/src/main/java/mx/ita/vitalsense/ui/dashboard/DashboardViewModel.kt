@@ -34,9 +34,9 @@ import mx.ita.vitalsense.data.model.computeAlerts
 import mx.ita.vitalsense.data.model.computePersonalizedThresholds
 import mx.ita.vitalsense.data.model.detectRapidDegradation
 import mx.ita.vitalsense.data.repository.VitalsRepository
-import mx.ita.vitalsense.data.test.TestDataSeeder
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import java.time.ZoneId
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -75,6 +75,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     private val lastKnownVitals  = mutableMapOf<String, VitalsData>()
     private val notifiedPatients = mutableSetOf<String>()
+    private val lastSavedHrSampleTsByUser = mutableMapOf<String, Long>()
 
     /**
      * Umbrales clínicos del paciente autenticado, personalizados por edad y diagnósticos.
@@ -163,16 +164,49 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val sleepSnapshot = db.getReference("sleep/$userId/$dateKey").get().await()
                 val sleep = sleepSnapshot.getValue(SleepData::class.java)
 
-                // 2. Vitals History (last 10)
-                val vitalsSnapshot = db.getReference("patients").limitToFirst(1).get().await()
-                val patientId = vitalsSnapshot.children.firstOrNull()?.key
+                // 2. Vitals History (últimos 7 días calendario, igual que Reporte Diario)
+                val zone = ZoneId.systemDefault()
+                val startDate = LocalDate.now(zone).minusDays(6)
+                val endDate = LocalDate.now(zone)
+                val startMillis = startDate.atStartOfDay(zone).toInstant().toEpochMilli()
+                val endMillis = endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
                 val historyList = mutableListOf<VitalsData>()
-                if (patientId != null) {
-                    val historySnapshot = db.getReference("patients/$patientId/history").limitToLast(10).get().await()
-                    historySnapshot.children.forEach {
-                        it.getValue(VitalsData::class.java)?.let { v -> historyList.add(v) }
+
+                val historySnapshot = db.getReference("patients/$userId/history")
+                    .orderByChild("timestamp")
+                    .startAt(startMillis.toDouble())
+                    .endAt(endMillis.toDouble())
+                    .get()
+                    .await()
+
+                historySnapshot.children.forEach { child ->
+                    val vitals = child.getValue(VitalsData::class.java)
+                    if (vitals != null) {
+                        historyList.add(vitals.copy(patientId = userId))
+                    } else {
+                        val hr = child.child("heartRate").getValue(Number::class.java)?.toInt() ?: 0
+                        val glucose = child.child("glucose").getValue(Number::class.java)?.toDouble() ?: 0.0
+                        val spo2 = child.child("spo2").getValue(Number::class.java)?.toInt() ?: 0
+                        val ts = child.child("timestamp").getValue(Number::class.java)?.toLong() ?: 0L
+                        if (ts > 0L) {
+                            historyList.add(
+                                VitalsData(
+                                    patientId = userId,
+                                    heartRate = hr,
+                                    glucose = glucose,
+                                    spo2 = spo2,
+                                    timestamp = ts,
+                                ),
+                            )
+                        }
                     }
                 }
+                val compactedHistory = historyList
+                    .distinctBy {
+                        val minuteBucket = it.timestamp / 60_000L
+                        Triple(minuteBucket, it.heartRate, it.spo2)
+                    }
+                    .sortedBy { it.timestamp }
 
                 // 3. Medications
                 val medsSnapshot = db.getReference("medications/$userId").get().await()
@@ -184,13 +218,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.value = when (current) {
                     is DashboardUiState.Success -> current.copy(
                         sleepData = sleep,
-                        vitalsHistory = historyList,
+                        vitalsHistory = compactedHistory,
                         medications = medsList,
                     )
                     else -> DashboardUiState.Success(
                         patients = emptyList(),
                         sleepData = sleep,
-                        vitalsHistory = historyList,
+                        vitalsHistory = compactedHistory,
                         medications = medsList,
                         isWatchPaired = prefs.getBoolean("code_paired", false),
                     )
@@ -203,15 +237,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun observePatients() {
         viewModelScope.launch {
-            // Si Firebase no responde en 5s, cargamos datos mock y seguimos esperando en background
             val firstEmit = withTimeoutOrNull(5_000) {
                 repository.observePatients().collect { result ->
                     applyResult(result)
-                    return@collect // sale del collect en cuanto llega el primer valor
+                    return@collect
                 }
             }
             if (firstEmit == null) {
-                // Timeout: Firebase sin respuesta → mostrar lista vacía
                 _uiState.value = DashboardUiState.Success(
                     patients = emptyList(),
                     isWatchPaired = prefs.getBoolean("code_paired", false),
@@ -219,7 +251,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
 
-            // Seguir escuchando Firebase en background (cuando llegue reemplaza el mock)
+            // Seguir escuchando Firebase en background (cuando llegue reemplaza la lista vacía)
             repository.observePatients().collect { result -> applyResult(result) }
         }
         
@@ -232,14 +264,21 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                     try {
                         val vitals = snapshot.getValue(VitalsData::class.java) ?: return
-                        if (vitals.heartRate > 0 || vitals.spo2 > 0) {
-                            // Sincronizar los datos del reloj al historial
-                            repository.saveSnapshot(userId, vitals)
+                        val hrSampleTs = snapshot.child("heartRateSampleTimestamp").getValue(Long::class.java)
+                            ?: vitals.timestamp
+                        val previousSampleTs = lastSavedHrSampleTsByUser[userId] ?: 0L
+                        val shouldSaveHrSnapshot = vitals.heartRate > 0 && hrSampleTs > previousSampleTs
+
+                        if (shouldSaveHrSnapshot) {
+                            // Sincronizar al historial solo cuando llegue una nueva muestra real de HR
+                            repository.saveSnapshot(userId, vitals.copy(patientId = userId, timestamp = hrSampleTs))
+                            lastSavedHrSampleTsByUser[userId] = hrSampleTs
+
                             // Agregar al historial actual en memoria
                             val current = _uiState.value
                             if (current is DashboardUiState.Success) {
                                 val updated = current.vitalsHistory.toMutableList()
-                                updated.add(vitals.copy(patientId = userId, timestamp = System.currentTimeMillis()))
+                                updated.add(vitals.copy(patientId = userId, timestamp = hrSampleTs))
                                 // Mantener solo últimas 100 entradas
                                 val trimmed = if (updated.size > 100) updated.drop(updated.size - 100) else updated
                                 _uiState.value = current.copy(vitalsHistory = trimmed)
@@ -306,7 +345,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val key = "${patient.patientId}:${patient.timestamp}"
                 if (!notifiedPatients.contains(key)) {
                     notifiedPatients.add(key)
-                    if (!patient.patientId.startsWith("demo_") && previous != null) {
+                    if (previous != null) {
                         sendAlertNotification(patient, alerts.first().title)
                     }
                 }
@@ -320,7 +359,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val degradation = historySnapshots.detectRapidDegradation()
                 if (degradation != null && previous != null &&
-                    !patient.patientId.startsWith("demo_")) {
+                    patient.patientId.isNotBlank()) {
                     sendAlertNotification(patient, degradation.message)
                 }
             }

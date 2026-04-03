@@ -118,7 +118,9 @@ fun DetailedReportScreen(
                 subtitle = "Promedio del periodo",
                 value = if (avgHeartRate > 0) "${"%.0f".format(avgHeartRate)} BPM" else "-- BPM",
                 color = HeartRateRed,
-                points = state.vitalsHistory.takeLast(20).map { it.heartRate.toFloat() },
+                points = state.vitalsHistory
+                    .mapNotNull { it.heartRate.takeIf { value -> value > 0 }?.toFloat() }
+                    .takeLast(20),
                 icon = {
                     Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateRed, modifier = Modifier.size(22.dp))
                 },
@@ -131,7 +133,9 @@ fun DetailedReportScreen(
                 subtitle = "Promedio del periodo",
                 value = if (avgSpo2 > 0) "${"%.0f".format(avgSpo2)}%" else "--%",
                 color = SpO2Green,
-                points = state.vitalsHistory.takeLast(20).map { it.spo2.toFloat() },
+                points = state.vitalsHistory
+                    .mapNotNull { it.spo2.takeIf { value -> value > 0 }?.toFloat() }
+                    .takeLast(20),
                 icon = {
                     Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = SpO2Green, modifier = Modifier.size(22.dp))
                 },
@@ -144,7 +148,9 @@ fun DetailedReportScreen(
                 subtitle = "Promedio del periodo",
                 value = if (avgGlucose > 0.0) "${"%.0f".format(avgGlucose)} mg/dL" else "-- mg/dL",
                 color = Color(0xFF7B61FF),
-                points = state.vitalsHistory.takeLast(20).map { it.glucose.toFloat() },
+                points = state.vitalsHistory
+                    .mapNotNull { it.glucose.takeIf { value -> value > 0.0 }?.toFloat() }
+                    .takeLast(20),
                 icon = {
                     Text("G", color = Color(0xFF7B61FF), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 },

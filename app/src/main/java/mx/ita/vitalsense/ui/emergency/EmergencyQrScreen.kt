@@ -247,11 +247,8 @@ private fun ActiveContent(
 
         // — Indicador de modo (local vs deep link) —
         Text(
-            text = if (state.isLocalServer)
-                "🌐 Servidor local activo — funciona sin internet"
-            else
-                "📱 Requiere app VitalSense instalada",
-            color     = if (state.isLocalServer) Color(0xFF80CBC4) else EmergencyLightRed,
+            text      = "🌐 Funciona en cualquier navegador con internet",
+            color     = Color(0xFF80CBC4),
             fontSize  = 11.sp,
             textAlign = TextAlign.Center,
         )

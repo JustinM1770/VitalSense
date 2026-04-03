@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Medication
@@ -125,6 +126,18 @@ private val HeartRateCurve = Color(0xFFEF4444)
 
 private enum class MetricCardType { SLEEP, SPO2, HR, KCAL }
 
+private fun loadVisibleMetricCards(prefs: SharedPreferences): List<MetricCardType> {
+    val stored = prefs.getString("dashboard_visible_cards", null).orEmpty()
+    val parsed = stored.split(',')
+        .mapNotNull { name -> runCatching { MetricCardType.valueOf(name) }.getOrNull() }
+        .distinct()
+    return if (parsed.isNotEmpty()) parsed else listOf(MetricCardType.SLEEP, MetricCardType.SPO2)
+}
+
+private fun saveVisibleMetricCards(prefs: SharedPreferences, cards: List<MetricCardType>) {
+    prefs.edit().putString("dashboard_visible_cards", cards.joinToString(",") { it.name }).apply()
+}
+
 @Composable
 fun DashboardScreen(
     onNavigateToNotifications: () -> Unit = {},
@@ -156,6 +169,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     val profilePrefs = remember { context.getSharedPreferences("vitalsense_profile", Context.MODE_PRIVATE) }
     val uid = currentUser?.uid.orEmpty()
+    val dashboardPrefs = remember(uid) { context.getSharedPreferences("vitalsense_dashboard_${uid.ifBlank { "guest" }}", Context.MODE_PRIVATE) }
     var libreGlucoseProfile by remember {
         mutableStateOf(
             if (uid.isNotEmpty()) profilePrefs.getString("libre_glucose_profile_$uid", "auto") ?: "auto" else "auto"
@@ -208,6 +222,8 @@ fun DashboardScreen(
                 val libreLastTime = if (uid.isNotEmpty()) profilePrefs.getLong("libre_last_time_$uid", 0L) else 0L
                 val libreLastSource = if (uid.isNotEmpty()) profilePrefs.getString("libre_last_source_$uid", "") ?: "" else ""
                 DashboardContent(
+                    userId = uid,
+                    dashboardPrefs = dashboardPrefs,
                     userName = userName,
                     userAvatarUri = userAvatarUri,
                     patients = patients,
@@ -217,7 +233,7 @@ fun DashboardScreen(
                     onPatientClick = onPatientClick,
                     onReportClick = onReportClick,
                     onProfileClick = { onNavigateToProfile(); onProfileClick() },
-                    onNotifClick = { onNavigateToNotifications(); onNotifClick() },
+                    onNotifClick = { onNotifClick() },
                     onDetailedClick = onNavigateToDetailed,
                     onMedicationClick = onMedicationClick,
                     onLibreScanClick = onLibreScanClick,
@@ -402,6 +418,8 @@ private suspend fun restoreBackupFromFirebase(
 
 @Composable
 private fun DashboardContent(
+    userId: String,
+    dashboardPrefs: SharedPreferences,
     userName: String,
     userAvatarUri: String?,
     patients: List<VitalsData>,
@@ -424,6 +442,14 @@ private fun DashboardContent(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
 ) {
+    val initialCards = remember(userId) { loadVisibleMetricCards(dashboardPrefs) }
+    val visibleCards = remember(userId) { mutableStateListOf<MetricCardType>().apply { addAll(initialCards) } }
+    val dashboardScope = rememberCoroutineScope()
+
+    LaunchedEffect(visibleCards.size) {
+        saveVisibleMetricCards(dashboardPrefs, visibleCards.toList())
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -459,30 +485,28 @@ private fun DashboardContent(
                 .padding(24.dp)
         ) {
             // ── "Esta semana" — sleep / HR / Kcal pager ───────────────────────
-            val visibleCards = remember {
-                mutableStateListOf(MetricCardType.SLEEP, MetricCardType.SPO2)
-            }
-            val dashboardScope = rememberCoroutineScope()
+            val addableCards = listOf(MetricCardType.SLEEP, MetricCardType.SPO2, MetricCardType.HR, MetricCardType.KCAL)
+                .filter { it !in visibleCards }
 
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 SectionHeader(title = "Esta semana", showArrow = true)
                 Spacer(Modifier.weight(1f))
-                Surface(
-                    modifier = Modifier.size(30.dp).clickable {
-                        val next = listOf(MetricCardType.HR, MetricCardType.KCAL)
-                            .firstOrNull { it !in visibleCards }
-                        if (next != null) {
-                            visibleCards.add(next)
-                        } else {
-                            dashboardScope.launch { snackbarHostState.showSnackbar("Ya agregaste todas las tarjetas") }
+                if (addableCards.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier.size(30.dp).clickable {
+                            val next = addableCards.firstOrNull()
+                            if (next != null) {
+                                visibleCards.add(next)
+                                saveVisibleMetricCards(dashboardPrefs, visibleCards.toList())
+                            }
+                        },
+                        shape = CircleShape,
+                        color = Color.White,
+                        shadowElevation = 2.dp,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "+", color = DashBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
-                    },
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 2.dp,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(text = "+", color = DashBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }
                 }
             }
@@ -494,11 +518,31 @@ private fun DashboardContent(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
             ) { page ->
-                when (visibleCards.getOrElse(page) { MetricCardType.SLEEP }) {
-                    MetricCardType.SLEEP -> SleepMetricCard(sleepData = sleepData, onClick = onReportClick)
-                    MetricCardType.SPO2 -> Spo2MiniCard(patients)
-                    MetricCardType.HR -> HrMiniCard(patients)
-                    MetricCardType.KCAL -> KcalMiniCard(patients)
+                val cardType = visibleCards.getOrElse(page) { MetricCardType.SLEEP }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    when (cardType) {
+                        MetricCardType.SLEEP -> SleepMetricCard(sleepData = sleepData, onClick = onReportClick)
+                        MetricCardType.SPO2 -> Spo2MiniCard(patients)
+                        MetricCardType.HR -> HrMiniCard(patients)
+                        MetricCardType.KCAL -> KcalMiniCard(patients)
+                    }
+                    if (visibleCards.size > 1) {
+                        IconButton(
+                            onClick = {
+                                if (visibleCards.size > 1) {
+                                    visibleCards.remove(cardType)
+                                    saveVisibleMetricCards(dashboardPrefs, visibleCards.toList())
+                                    dashboardScope.launch {
+                                        val safeIndex = pagerState.currentPage.coerceAtMost(maxOf(0, visibleCards.lastIndex))
+                                        pagerState.scrollToPage(safeIndex)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.align(Alignment.TopEnd),
+                        ) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Quitar tarjeta", tint = DashBlue)
+                        }
+                    }
                 }
             }
 
@@ -891,7 +935,15 @@ private fun HealthMetricsGraphCard(
     vitalsHistory: List<VitalsData>,
     onSeeAllClick: () -> Unit,
 ) {
-    val displayBpm = vitalsHistory.lastOrNull()?.heartRate ?: patients.firstOrNull()?.heartRate ?: 0
+    val recentHrSamples = vitalsHistory
+        .asReversed()
+        .map { it.heartRate }
+        .filter { it > 0 }
+        .take(5)
+    val displayBpm = when {
+        recentHrSamples.isNotEmpty() -> recentHrSamples.average().toInt()
+        else -> patients.firstOrNull()?.heartRate ?: 0
+    }
 
     WhiteCard(modifier = Modifier.fillMaxWidth().clickable { onSeeAllClick() }) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -933,7 +985,7 @@ private fun HealthMetricsGraphCard(
                     Spacer(Modifier.width(4.dp))
                     Text("$displayBpm BPM", fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Manrope, color = Color(0xFF1A1A2E))
                     Spacer(Modifier.width(4.dp))
-                    Text("Heart Rate", fontSize = 11.sp, color = TextGray, fontFamily = Manrope)
+                    Text("Frecuencia cardíaca", fontSize = 11.sp, color = TextGray, fontFamily = Manrope)
                 }
             }
         }
@@ -1014,6 +1066,7 @@ private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
     val last7Dates = (6 downTo 0).map { today.minusDays(it.toLong()) }
+    val daySet = last7Dates.toSet()
     val dayLabels = last7Dates.map {
         it.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es"))
             .replaceFirstChar { c -> c.uppercase() }
@@ -1024,6 +1077,7 @@ private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
         .groupBy {
             java.time.Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate()
         }
+        .filterKeys { it in daySet }
     val values = last7Dates.map { day ->
         grouped[day]?.map { it.heartRate }?.average()?.toInt() ?: 0
     }
@@ -1050,6 +1104,15 @@ private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
             if (!hasData) return@Canvas
 
             val nonZeroIndices = values.indices.filter { values[it] > 0 }
+            if (nonZeroIndices.size == 1) {
+                val idx = nonZeroIndices.first()
+                val dotX = xOf(idx)
+                val dotY = yOf(values[idx])
+                drawCircle(ChartRed, 6.dp.toPx(), Offset(dotX, dotY))
+                drawCircle(Color.White, 3.dp.toPx(), Offset(dotX, dotY))
+                drawLine(ChartRed.copy(0.4f), Offset(dotX, dotY), Offset(dotX, h), 1.dp.toPx())
+                return@Canvas
+            }
             if (nonZeroIndices.size < 2) return@Canvas
 
             val path = Path().apply {
@@ -1100,7 +1163,7 @@ private fun DateStrip() {
             ) {
                 if (isToday) {
                     Text(
-                        text = "Today, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}",
+                        text = "Hoy, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}",
                         fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1A1A2E),
                     )
                 } else {
@@ -1363,7 +1426,7 @@ private fun QuickActionsCard(
                     ) {
                         Icon(Icons.Rounded.Medication, null, tint = Color(0xFFB45309))
                         Spacer(Modifier.width(8.dp))
-                        Text("Agregar medicamento", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFFB45309))
+                        Text("Ver medicamentos", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFFB45309))
                     }
                 }
             }

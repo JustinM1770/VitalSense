@@ -54,6 +54,7 @@ import mx.ita.vitalsense.ui.emergency.EmergencyViewerScreen
 import mx.ita.vitalsense.ui.emergency.SosViewerScreen
 import mx.ita.vitalsense.ui.libre.LibreScanScreen
 import mx.ita.vitalsense.ui.medications.AddMedicationScreen
+import mx.ita.vitalsense.ui.medications.MedicationListScreen
 import mx.ita.vitalsense.MainActivity
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -83,6 +84,7 @@ object Route {
     const val DATOS_IMPORTANTES     = "datos_importantes"
     const val DOCUMENTOS            = "documentos"
     const val CHAT                  = "chat"
+    const val MEDICATIONS           = "medications"
     const val ADD_MEDICATION        = "add_medication"
     const val LIBRE_SCAN            = "libre_scan"
     // ── Emergencia ──────────────────────────────────────────────────────────
@@ -136,6 +138,15 @@ fun AppNavigation() {
             launchSingleTop = true
         }
         mainActivity.consumePendingNotificationOpen()
+    }
+
+    val openMedicationRequest = mainActivity?.pendingMedicationOpen
+    LaunchedEffect(openMedicationRequest) {
+        if (openMedicationRequest != true) return@LaunchedEffect
+        navController.navigate(Route.MEDICATIONS) {
+            launchSingleTop = true
+        }
+        mainActivity.consumePendingMedicationOpen()
     }
 
     val bottomBarRoutes = listOf(
@@ -301,7 +312,7 @@ fun AppNavigation() {
                         onNavigateToProfile = { navController.navigate(Route.PROFILE) },
                         onNavigateToHome = { /* Already here */ },
                         onNavigateToChat = { navController.navigate(Route.CHAT) },
-                        onMedicationClick = { navController.navigate(Route.ADD_MEDICATION) },
+                        onMedicationClick = { navController.navigate(Route.MEDICATIONS) },
                         onLibreScanClick = { navController.navigate(Route.LIBRE_SCAN) },
                         onEmergency = { vitals ->
                             // La IA detectó anomalía crítica → preparar QR y navegar
@@ -505,6 +516,13 @@ fun AppNavigation() {
                 composable(Route.CHAT) {
                     ChatBotScreen(
                         onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Route.MEDICATIONS) {
+                    MedicationListScreen(
+                        onBack = { navController.popBackStack() },
+                        onAddMedication = { navController.navigate(Route.ADD_MEDICATION) },
                     )
                 }
 
