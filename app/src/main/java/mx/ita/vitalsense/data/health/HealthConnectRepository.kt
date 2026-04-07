@@ -12,6 +12,7 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import java.time.Instant
 import java.time.Duration
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 
 data class HealthConnectVitals(
     val heartRate: Int? = null,
@@ -102,28 +103,34 @@ class HealthConnectRepository(private val context: Context) {
         )
 
         if (response.records.isEmpty()) {
-            return mx.ita.vitalsense.data.model.SleepData(score = 0, horas = 0f, estado = "No durmió")
+            return mx.ita.vitalsense.data.model.SleepData(score = 0, minutosTotales = 0, horasCompletas = 0, sleepStartMillis = 0L, sleepEndMillis = 0L, horas = 0f, estado = "No durmió")
         }
 
         val totalMinutes = response.records.sumOf { session ->
             Duration.between(session.startTime, session.endTime).toMinutes().coerceAtLeast(0)
         }
+        val startMillis = response.records.minOfOrNull { it.startTime.toEpochMilli() } ?: 0L
+        val endMillis = response.records.maxOfOrNull { it.endTime.toEpochMilli() } ?: 0L
 
-        val hours = (totalMinutes / 60f)
-        if (hours <= 0f) {
-            return mx.ita.vitalsense.data.model.SleepData(score = 0, horas = 0f, estado = "No durmió")
+        if (totalMinutes <= 0) {
+            return mx.ita.vitalsense.data.model.SleepData(score = 0, minutosTotales = 0, horasCompletas = 0, sleepStartMillis = startMillis, sleepEndMillis = endMillis, horas = 0f, estado = "No durmió")
         }
 
-        val score = ((hours / 8f) * 100f).toInt().coerceIn(0, 100)
+        val completeHours = totalMinutes / 60
+        val score = ((totalMinutes / 480f) * 100f).roundToInt().coerceIn(0, 100)
         val estado = when {
-            hours < 5f -> "Malo"
-            hours < 7f -> "Regular"
+            totalMinutes < 5 * 60 -> "Malo"
+            totalMinutes < 7 * 60 -> "Regular"
             else -> "Bueno"
         }
 
         return mx.ita.vitalsense.data.model.SleepData(
             score = score,
-            horas = (kotlin.math.round(hours * 10f) / 10f),
+            minutosTotales = totalMinutes.toInt(),
+            horasCompletas = completeHours.toInt(),
+            sleepStartMillis = startMillis,
+            sleepEndMillis = endMillis,
+            horas = completeHours.toFloat(),
             estado = estado,
         )
     }

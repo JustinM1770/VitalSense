@@ -179,7 +179,9 @@ fun WearApp(
     
     // Auth Anónima
     LaunchedEffect(Unit) {
-        if (auth.currentUser == null) {
+        if (auth.currentUser != null) {
+            isAuthenticated = true
+        } else {
             auth.signInAnonymously().addOnSuccessListener { isAuthenticated = true }
         }
     }
@@ -400,25 +402,54 @@ fun WearApp(
         }
     }
 
-    // Vinculación mejorada con persistencia de USER_ID
-    LaunchedEffect(pairingCode, isAuthenticated) {
-        if (isAuthenticated && pairingCode.isNotEmpty()) {
+    // Publicar código a Firebase apenas se autentica
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated && !isPaired && pairingCode.isNotEmpty()) {
             val ref = database.getReference("patients/pairing_codes").child(pairingCode)
-            
-            // Si no está emparejado, inicializamos el código en Firebase
-            if (!isPaired) {
-                ref.setValue(mapOf(
-                    "code" to pairingCode, "active" to true, "paired" to false, 
-                    "deviceName" to Build.MODEL, "timestamp" to System.currentTimeMillis()
-                ))
+            val authUid = auth.currentUser?.uid.orEmpty()
+            ref.setValue(mapOf(
+                "code" to pairingCode,
+                "active" to true,
+                "paired" to false,
+                "deviceName" to Build.MODEL,
+                "timestamp" to System.currentTimeMillis(),
+                "userId" to authUid,
+            )).addOnSuccessListener {
+                Log.d(TAG, "Codigo enviado a Firebase: $pairingCode")
+            }.addOnFailureListener { e ->
+                Log.e(TAG, "Error publicando codigo inicial en Firebase", e)
             }
-            
-            ref.addValueEventListener(object : ValueEventListener {
+        }
+    }
+
+    // Publicar cuando el código cambia
+    LaunchedEffect(pairingCode) {
+        if (isAuthenticated && !isPaired && pairingCode.isNotEmpty()) {
+            val ref = database.getReference("patients/pairing_codes").child(pairingCode)
+            val authUid = auth.currentUser?.uid.orEmpty()
+            ref.setValue(mapOf(
+                "code" to pairingCode,
+                "active" to true,
+                "paired" to false,
+                "deviceName" to Build.MODEL,
+                "timestamp" to System.currentTimeMillis(),
+                "userId" to authUid,
+            )).addOnSuccessListener {
+                Log.d(TAG, "Codigo actualizado en Firebase: $pairingCode")
+            }.addOnFailureListener { e ->
+                Log.e(TAG, "Error actualizando codigo en Firebase", e)
+            }
+        }
+    }
+
+    // Escuchar cambios de emparejamiento
+    DisposableEffect(pairingCode, isPaired) {
+        if (pairingCode.isNotEmpty() && !isPaired) {
+            val ref = database.getReference("patients/pairing_codes").child(pairingCode)
+            var listener: ValueEventListener? = null
+            listener = object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (!snapshot.exists()) {
-                        if (isPaired) {
-                            unpairWatch()
-                        }
                         return
                     }
                     
@@ -426,18 +457,23 @@ fun WearApp(
                     val remoteUid = snapshot.child("userId").getValue(String::class.java) ?: "global"
                     
                     if (paired && !isPaired) {
+                        Log.d(TAG, "¡Emparejamiento detectado! UID remoto: $remoteUid")
                         prefs.edit()
                             .putBoolean(KEY_PAIRED, true)
                             .putString(KEY_USER_ID, remoteUid)
                             .apply()
                         isPaired = true
                         showSuccessScreen = true
-                    } else if (!paired && isPaired) {
-                        unpairWatch()
                     }
                 }
-                override fun onCancelled(error: DatabaseError) {}
-            })
+                override fun onCancelled(error: DatabaseError) {
+                    Log.w(TAG, "Error escuchando emparejamiento: ${error.message}")
+                }
+            }
+            ref.addValueEventListener(listener)
+            onDispose { ref.removeEventListener(listener) }
+        } else {
+            onDispose {}
         }
     }
 
@@ -759,7 +795,11 @@ fun MonitoringScreen(
 }
 
 @Composable
-fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
+fun SosQrScreen(
+    sosId: String,
+    userId: String,
+    onDismiss: () -> Unit,
+) {
     val database = remember { FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com") }
     // El QR codifica userId + sosId para que el socorrista pueda ver los datos de la alerta
     val qrData   = "vitalsense://sos/$userId/$sosId"
@@ -770,9 +810,8 @@ fun SosQrScreen(sosId: String, userId: String, onDismiss: () -> Unit) {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (!snapshot.exists()) { onDismiss(); return }
-                val read   = snapshot.child("read").getValue(Boolean::class.java) ?: false
                 val status = snapshot.child("status").getValue(String::class.java) ?: "active"
-                if (read || status == "accepted" || status == "resolved") onDismiss()
+                if (status == "resolved") onDismiss()
             }
             override fun onCancelled(error: DatabaseError) {}
         }

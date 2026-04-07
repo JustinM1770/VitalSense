@@ -847,12 +847,14 @@ private fun SectionHeader(title: String, showArrow: Boolean = false) {
 
 @Composable
 private fun SleepMetricCard(sleepData: SleepData?, onClick: () -> Unit) {
-    val hasSleepData = sleepData != null && sleepData.horas > 0f
+    val hasSleepData = sleepData?.hasSleep == true
     val score = if (hasSleepData) sleepData?.score?.coerceIn(0, 100) ?: 0 else 0
     val progress = score / 100f
     val scoreText = score.toString()
     val sleepStatus = if (hasSleepData) {
-        sleepData?.estado?.takeIf { it.isNotBlank() } ?: "Regular"
+        val duration = sleepData?.durationLabel().orEmpty()
+        val state = sleepData?.estado?.takeIf { it.isNotBlank() } ?: "Regular"
+        "$duration · $state"
     } else {
         "No durmió"
     }

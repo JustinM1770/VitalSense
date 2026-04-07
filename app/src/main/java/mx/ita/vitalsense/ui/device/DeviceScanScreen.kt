@@ -148,7 +148,12 @@ fun DeviceScanScreen(
         } else {
             CodeEntryPanel(
                 code = pairingCode,
-                onCodeChange = { pairingCode = it.uppercase().take(8) },
+                onCodeChange = {
+                    pairingCode = it
+                        .filter { ch -> ch.isLetterOrDigit() }
+                        .uppercase()
+                        .take(8)
+                },
                 isLoading = connState is BleConnectionState.Connecting,
                 errorMessage = codeError,
                 onPair = { vm.connectWithCode(pairingCode) },

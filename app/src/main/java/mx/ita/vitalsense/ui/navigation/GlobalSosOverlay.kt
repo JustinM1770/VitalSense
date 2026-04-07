@@ -52,19 +52,20 @@ fun GlobalSosOverlay() {
     var sosLat by remember { mutableStateOf(0.0) }
     var sosLng by remember { mutableStateOf(0.0) }
     var lastNotifiedSosId by remember { mutableStateOf<String?>(null) }
+    var dismissedSosId by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(userId) {
         val ref = database.getReference("alerts").child(userId)
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                val previousActiveId = activeSosId
                 var foundId: String? = null
                 var foundLat = 0.0
                 var foundLng = 0.0
                 for (child in snapshot.children) {
-                    val read = child.child("read").getValue(Boolean::class.java) ?: false
                     val status = child.child("status").getValue(String::class.java) ?: ""
                     val type = child.child("type").getValue(String::class.java) ?: ""
-                    if (type == "SOS" && !read && status == "active") {
+                    if (type == "SOS" && status == "active") {
                         foundId = child.key
                         foundLat = child.child("lat").getValue(Double::class.java) ?: 0.0
                         foundLng = child.child("lng").getValue(Double::class.java) ?: 0.0
@@ -74,6 +75,10 @@ fun GlobalSosOverlay() {
                 activeSosId = foundId
                 sosLat = foundLat
                 sosLng = foundLng
+
+                if (foundId != previousActiveId) {
+                    dismissedSosId = null
+                }
 
                 if (!foundId.isNullOrBlank() && foundId != lastNotifiedSosId) {
                     showLocalSosNotification(
@@ -92,6 +97,7 @@ fun GlobalSosOverlay() {
     }
 
     val currentId = activeSosId ?: return
+    if (currentId == dismissedSosId) return
 
     AlertDialog(
         onDismissRequest = { /* require explicit action */ },
@@ -120,34 +126,47 @@ fun GlobalSosOverlay() {
         confirmButton = {
             Button(
                 onClick = {
+                    dismissedSosId = currentId
+                    activeSosId = null
                     database.getReference("alerts")
                         .child(userId)
                         .child(currentId)
-                        .child("read")
-                        .setValue(true)
+                        .updateChildren(
+                            mapOf(
+                                "read" to true,
+                                "status" to "resolved",
+                                "resolvedAt" to System.currentTimeMillis(),
+                                "resolvedBy" to "phone_overlay",
+                            ),
+                        )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = DashBlue)
             ) {
-                Text("Aceptar", color = Color.White)
+                Text("Finalizar SOS", color = Color.White)
             }
         },
         dismissButton = {
-            if (sosLat != 0.0 && sosLng != 0.0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (sosLat != 0.0 && sosLng != 0.0) {
+                    TextButton(
+                        onClick = {
+                            val uri = "geo:$sosLat,$sosLng?q=$sosLat,$sosLng(SOS)"
+                            val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
+                                setPackage("com.google.android.apps.maps")
+                            }
+                            context.startActivity(mapIntent)
+                        }
+                    ) {
+                        Text("Abrir en Maps", color = DashBlue)
+                    }
+                }
+
                 TextButton(
                     onClick = {
-                        database.getReference("alerts")
-                            .child(userId)
-                            .child(currentId)
-                            .child("read")
-                            .setValue(true)
-                        val uri = "geo:$sosLat,$sosLng?q=$sosLat,$sosLng(SOS)"
-                        val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
-                            setPackage("com.google.android.apps.maps")
-                        }
-                        context.startActivity(mapIntent)
+                        dismissedSosId = currentId
                     }
                 ) {
-                    Text("Ver en Mapa", color = DashBlue)
+                    Text("Cerrar", color = DashBlue)
                 }
             }
         },

@@ -57,7 +57,7 @@
 
         <service
             android:name=".VitalSignsService"
-            android:foregroundServiceType="health"
+            android:foregroundServiceType="health|location"
             android:exported="false" />
 
         <!-- PassiveListenerService for background HR + SpO2 delivery when screen is off -->

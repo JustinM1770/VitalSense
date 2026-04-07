@@ -18,6 +18,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.health.services.client.HealthServices
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
@@ -35,6 +37,9 @@ class VitalSignsService : Service() {
         private const val ACTION_CANCEL_SOS = "mx.ita.vitalsense.wear.action.CANCEL_SOS"
         private const val EXTRA_SOS_ID = "extra_sos_id"
         private const val EXTRA_SOS_USER_ID = "extra_sos_user_id"
+        private const val HEART_RATE_STALE_MS = 75_000L
+        private const val SPO2_STALE_MS = 120_000L
+        private const val LOCATION_CACHE_STALE_MS = 5 * 60_000L
     }
 
     private val binder = LocalBinder()
@@ -71,6 +76,9 @@ class VitalSignsService : Service() {
     // Last known location — updated continuously in background so SOS always has coords.
     @Volatile private var cachedLat: Double = 0.0
     @Volatile private var cachedLng: Double = 0.0
+    @Volatile private var lastLocationFixTs: Long = 0L
+    @Volatile private var lastHeartRateSampleTs: Long = 0L
+    @Volatile private var lastSpO2SampleTs: Long = 0L
     private var locationJob: Job? = null
 
     inner class LocalBinder : Binder() {
@@ -100,11 +108,7 @@ class VitalSignsService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_CANCEL_SOS) {
-            val sosId = intent.getStringExtra(EXTRA_SOS_ID).orEmpty()
-            val userId = intent.getStringExtra(EXTRA_SOS_USER_ID).orEmpty()
-            if (sosId.isNotBlank() && userId.isNotBlank()) {
-                resolveSosFromNotification(sosId = sosId, userId = userId)
-            }
+            Log.w("VitalSense", "Cancelacion SOS desde reloj bloqueada: solo telefono puede resolver la alerta")
             return START_STICKY
         }
 
@@ -130,6 +134,7 @@ class VitalSignsService : Service() {
         syncJob = serviceScope.launch {
             hrManager.observeHeartRate().collect { hr ->
                 val sampleTs = System.currentTimeMillis()
+                lastHeartRateSampleTs = sampleTs
                 _currentHeartRate.value = hr
                 database.getReference("vitals/current").child(userId)
                     .updateChildren(
@@ -156,6 +161,7 @@ class VitalSignsService : Service() {
             }
 
             spo2Manager.observeSpO2().collect { spo2 ->
+                lastSpO2SampleTs = System.currentTimeMillis()
                 _currentSpO2.value = spo2
                 database.getReference("vitals/current").child(userId)
                     .updateChildren(mapOf("spo2" to spo2, "timestamp" to System.currentTimeMillis()))
@@ -197,17 +203,25 @@ class VitalSignsService : Service() {
         keepAliveJob = serviceScope.launch {
             while (isActive) {
                 delay(30_000L)
+                val now = System.currentTimeMillis()
                 val hr = _currentHeartRate.value
                 val spo2 = _currentSpO2.value
-                if (hr > 0 || spo2 > 0) {
-                    val updates = mutableMapOf<String, Any>(
-                        "timestamp" to System.currentTimeMillis()
-                    )
-                    if (hr > 0) updates["heartRate"] = hr.toInt()
-                    if (spo2 > 0) updates["spo2"] = spo2
-                    runCatching {
-                        database.getReference("vitals/current/$userId").updateChildren(updates)
-                    }
+                val isHeartRateFresh = lastHeartRateSampleTs > 0L && (now - lastHeartRateSampleTs) <= HEART_RATE_STALE_MS
+                val isSpO2Fresh = lastSpO2SampleTs > 0L && (now - lastSpO2SampleTs) <= SPO2_STALE_MS
+
+                val updates = mutableMapOf<String, Any>()
+                updates["heartRate"] = if (isHeartRateFresh && hr > 0) hr.toInt() else 0
+                if (!isHeartRateFresh) {
+                    _currentHeartRate.value = 0.0
+                }
+
+                if (isSpO2Fresh && spo2 > 0) {
+                    updates["spo2"] = spo2
+                }
+                updates["timestamp"] = now
+
+                runCatching {
+                    database.getReference("vitals/current/$userId").updateChildren(updates)
                 }
             }
         }
@@ -248,6 +262,7 @@ class VitalSignsService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        spo2Manager.stopSensorListener()
         locationJob?.cancel()
         // Unregister passive monitoring so it doesn't fire after the service stops.
         if (passiveRegistered) {
@@ -289,9 +304,7 @@ class VitalSignsService : Service() {
                 return@launch
             }
 
-            withContext(Dispatchers.Main) {
-                sendSosWithBestLocation(remoteUid)
-            }
+            sendSosWithBestLocation(remoteUid)
         }
     }
 
@@ -326,7 +339,7 @@ class VitalSignsService : Service() {
     }
 
     private fun observeActiveSosState(userId: String) {
-        if (userId.isBlank() || userId == "global") {
+        if (userId.isBlank()) {
             _activeSosId.value = null
             return
         }
@@ -340,10 +353,9 @@ class VitalSignsService : Service() {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                 var foundId: String? = null
                 for (child in snapshot.children) {
-                    val read = child.child("read").getValue(Boolean::class.java) ?: false
                     val status = child.child("status").getValue(String::class.java) ?: ""
                     val type = child.child("type").getValue(String::class.java) ?: ""
-                    if (type == "SOS" && !read && status == "active") {
+                    if (type == "SOS" && status != "resolved") {
                         foundId = child.key
                         break
                     }
@@ -360,7 +372,7 @@ class VitalSignsService : Service() {
     }
 
     private suspend fun hasBlockingEmergency(userId: String): Boolean {
-        if (userId.isBlank() || userId == "global") {
+        if (userId.isBlank()) {
             return false
         }
 
@@ -368,10 +380,9 @@ class VitalSignsService : Service() {
             .getOrNull() ?: return false
 
         for (child in alertsSnapshot.children) {
-            val read = child.child("read").getValue(Boolean::class.java) ?: false
             val status = child.child("status").getValue(String::class.java) ?: ""
             val type = child.child("type").getValue(String::class.java) ?: ""
-            if (type == "SOS" && !read && status == "active") {
+            if (type == "SOS" && status != "resolved") {
                 _activeSosId.value = child.key
                 return true
             }
@@ -409,15 +420,13 @@ class VitalSignsService : Service() {
 
     private suspend fun resolveTargetUserId(prefs: android.content.SharedPreferences): String {
         val savedUserId = prefs.getString("user_id", "")?.trim().orEmpty()
-        if (savedUserId.isNotBlank() && savedUserId != "global") {
-            return savedUserId
+        val pairingCode = prefs.getString("pairing_code", "")?.trim().orEmpty()
+        if (pairingCode.isBlank()) {
+            return if (savedUserId.isNotBlank()) savedUserId else "global"
         }
 
-        val pairingCode = prefs.getString("pairing_code", "")?.trim().orEmpty()
-        if (pairingCode.isBlank()) return "global"
-
         return runCatching {
-            val resolved = database
+            val resolvedByKey = database
                 .getReference("patients/pairing_codes")
                 .child(pairingCode)
                 .child("userId")
@@ -427,11 +436,34 @@ class VitalSignsService : Service() {
                 .orEmpty()
                 .trim()
 
-            if (resolved.isNotBlank() && resolved != "global") {
-                prefs.edit().putString("user_id", resolved).apply()
-                resolved
-            } else {
-                "global"
+            if (resolvedByKey.isNotBlank() && resolvedByKey != "global") {
+                prefs.edit().putString("user_id", resolvedByKey).apply()
+                return@runCatching resolvedByKey
+            }
+
+            val byField = database
+                .getReference("patients/pairing_codes")
+                .orderByChild("code")
+                .equalTo(pairingCode)
+                .limitToFirst(1)
+                .get()
+                .await()
+                .children
+                .firstOrNull()
+
+            val resolvedByField = byField
+                ?.child("userId")
+                ?.getValue(String::class.java)
+                .orEmpty()
+                .trim()
+
+            when {
+                resolvedByField.isNotBlank() && resolvedByField != "global" -> {
+                    prefs.edit().putString("user_id", resolvedByField).apply()
+                    resolvedByField
+                }
+                savedUserId.isNotBlank() -> savedUserId
+                else -> "global"
             }
         }.getOrDefault("global")
     }
@@ -462,6 +494,7 @@ class VitalSignsService : Service() {
             if (loc != null) {
                 cachedLat = loc.latitude
                 cachedLng = loc.longitude
+                lastLocationFixTs = System.currentTimeMillis()
                 Log.d("VitalSignsService", "Seeded location: $cachedLat, $cachedLng")
             }
         }
@@ -478,6 +511,7 @@ class VitalSignsService : Service() {
                 val loc = result.lastLocation ?: return
                 cachedLat = loc.latitude
                 cachedLng = loc.longitude
+                lastLocationFixTs = System.currentTimeMillis()
                 Log.d("VitalSignsService", "Location updated: $cachedLat, $cachedLng (acc=${loc.accuracy}m)")
             }
         }
@@ -502,46 +536,68 @@ class VitalSignsService : Service() {
      * Sends the SOS alert immediately using [cachedLat]/[cachedLng] (available instantly).
      * Then tries to get a fresher high-accuracy fix within 10 s and updates Firebase if found.
      */
-    private fun sendSosWithBestLocation(remoteUid: String) {
-        // Fire SOS immediately with whatever we have (even 0,0 is better than waiting)
-        pushSosAlert(remoteUid, cachedLat, cachedLng)
+    private suspend fun sendSosWithBestLocation(remoteUid: String) {
+        val now = System.currentTimeMillis()
+        val hasFreshCachedLocation = cachedLat != 0.0 && cachedLng != 0.0 &&
+            (now - lastLocationFixTs) <= LOCATION_CACHE_STALE_MS
 
-        // If we already have a valid cached location, try to refine it in the background
+        // Fire SOS immediately with cached location if fresh, otherwise fallback to 0/0.
+        pushSosAlert(
+            remoteUid,
+            lat = if (hasFreshCachedLocation) cachedLat else 0.0,
+            lng = if (hasFreshCachedLocation) cachedLng else 0.0,
+        )
+
+        // Try to get a fresh fix regardless, so the alert gets real coordinates ASAP.
         val hasFinePermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarsePermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-        if (!hasFinePermission || (cachedLat != 0.0 && cachedLng != 0.0)) {
-            // Already have a good location or can't get a better one — nothing more to do
+        if (!hasFinePermission && !hasCoarsePermission) {
+            Log.w("VitalSignsService", "SOS sin coordenadas: no hay permisos de ubicacion")
             return
         }
 
-        // No cached location yet — try to get a fresh one and update Firebase
-        @android.annotation.SuppressLint("MissingPermission")
-        val client = LocationServices.getFusedLocationProviderClient(this)
-        val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
-            com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
-            1_000L,
-        ).setMaxUpdates(1)
-            .setDurationMillis(10_000L)
-            .build()
-
-        val alertRef = database.getReference("alerts").child(remoteUid)
-        val callback = object : com.google.android.gms.location.LocationCallback() {
-            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                client.removeLocationUpdates(this)
-                val loc = result.lastLocation ?: return
-                cachedLat = loc.latitude
-                cachedLng = loc.longitude
-                // Update the most recent alert with the real coordinates
-                val sosId = _activeSosId.value ?: return
-                alertRef.child(sosId).updateChildren(
-                    mapOf("lat" to loc.latitude, "lng" to loc.longitude)
-                )
-                Log.d("VitalSignsService", "SOS location refined: ${loc.latitude}, ${loc.longitude}")
+        val sosId = _activeSosId.value ?: return
+        try {
+            val client = LocationServices.getFusedLocationProviderClient(this@VitalSignsService)
+            val priority = if (hasFinePermission) {
+                Priority.PRIORITY_HIGH_ACCURACY
+            } else {
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY
             }
+
+            val currentLocation = withTimeoutOrNull(12_000L) {
+                val cts = CancellationTokenSource()
+                client.getCurrentLocation(priority, cts.token).await()
+            }
+
+            val loc = currentLocation ?: withTimeoutOrNull(5_000L) { client.lastLocation.await() }
+            if (loc == null) {
+                Log.w("VitalSignsService", "SOS sin coordenadas: no se obtuvo fix de ubicacion")
+                return
+            }
+
+            cachedLat = loc.latitude
+            cachedLng = loc.longitude
+            lastLocationFixTs = System.currentTimeMillis()
+
+            database.getReference("alerts").child(remoteUid).child(sosId).updateChildren(
+                mapOf(
+                    "lat" to loc.latitude,
+                    "lng" to loc.longitude,
+                    "locationTimestamp" to lastLocationFixTs,
+                    "locationAccuracy" to loc.accuracy.toDouble(),
+                ),
+            )
+
+            Log.d("VitalSignsService", "SOS location refined: ${loc.latitude}, ${loc.longitude} (acc=${loc.accuracy})")
+        } catch (e: Exception) {
+            Log.e("VitalSignsService", "Error obteniendo ubicacion para SOS", e)
         }
-        client.requestLocationUpdates(locationRequest, callback, android.os.Looper.getMainLooper())
     }
 
     private fun pushSosAlert(remoteUid: String, lat: Double, lng: Double) {
@@ -594,18 +650,6 @@ class VitalSignsService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val cancelIntent = Intent(this, VitalSignsService::class.java).apply {
-            action = ACTION_CANCEL_SOS
-            putExtra(EXTRA_SOS_ID, sosId)
-            putExtra(EXTRA_SOS_USER_ID, remoteUid)
-        }
-        val cancelPendingIntent = PendingIntent.getService(
-            this,
-            sosId.hashCode() + 10_000,
-            cancelIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
         val notification = NotificationCompat.Builder(this, "sos_channel")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("Alerta SOS enviada")
@@ -614,11 +658,6 @@ class VitalSignsService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(pendingIntent)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "Cancelar SOS",
-                cancelPendingIntent,
-            )
             .setAutoCancel(true)
             .build()
 

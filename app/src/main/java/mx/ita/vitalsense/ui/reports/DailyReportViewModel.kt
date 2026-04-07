@@ -180,11 +180,14 @@ class DailyReportViewModel : ViewModel() {
 
     private fun mergeSleepData(sleepList: List<SleepData>): SleepData {
         if (sleepList.isEmpty()) {
-            return SleepData(score = 0, horas = 0f, estado = "No durmio")
+            return SleepData(score = 0, minutosTotales = 0, horasCompletas = 0, sleepStartMillis = 0L, sleepEndMillis = 0L, horas = 0f, estado = "No durmio")
         }
 
-        val avgScore = sleepList.map { it.score }.average().roundToInt().coerceIn(0, 100)
-        val avgHours = sleepList.map { it.horas.toDouble() }.average().toFloat().coerceAtLeast(0f)
+        val totalMinutes = sleepList.sumOf { it.totalMinutes }
+        val avgScore = ((totalMinutes / 480f) * 100f).roundToInt().coerceIn(0, 100)
+        val completeHours = totalMinutes / 60
+        val startMillis = sleepList.mapNotNull { it.sleepStartMillis.takeIf { millis -> millis > 0L } }.minOrNull() ?: 0L
+        val endMillis = sleepList.mapNotNull { it.sleepEndMillis.takeIf { millis -> millis > 0L } }.maxOrNull() ?: 0L
         val status = when {
             avgScore >= 85 -> "Excelente"
             avgScore >= 70 -> "Bueno"
@@ -194,7 +197,11 @@ class DailyReportViewModel : ViewModel() {
 
         return SleepData(
             score = avgScore,
-            horas = avgHours,
+            minutosTotales = totalMinutes,
+            horasCompletas = completeHours,
+            sleepStartMillis = startMillis,
+            sleepEndMillis = endMillis,
+            horas = completeHours.toFloat(),
             estado = status,
         )
     }

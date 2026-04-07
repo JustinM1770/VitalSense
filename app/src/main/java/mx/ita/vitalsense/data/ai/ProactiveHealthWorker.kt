@@ -146,7 +146,7 @@ class ProactiveHealthWorker(
         val avgHr      = data.vitals.map { it.heartRate }.average()
         val avgGlucose = data.vitals.filter { it.glucose > 0 }.map { it.glucose }.average()
         val avgSpo2    = data.vitals.filter { it.spo2 > 0 }.map { it.spo2 }.average()
-        val avgSleep   = data.sleep.filter { it.horas > 0 }.map { it.horas }.average()
+        val avgSleepMinutes = data.sleep.filter { it.totalMinutes > 0 }.map { it.totalMinutes }.average()
         val avgSleepScore = data.sleep.filter { it.score > 0 }.map { it.score }.average()
 
         // Tendencia de glucosa: compara primera mitad vs segunda mitad del historial
@@ -212,7 +212,18 @@ class ProactiveHealthWorker(
             if (!avgHr.isNaN())      appendLine("- FC promedio: ${"%.0f".format(avgHr)} BPM — tendencia: $hrTrend")
             if (!avgGlucose.isNaN()) appendLine("- Glucosa promedio: ${"%.0f".format(avgGlucose)} mg/dL — tendencia: $glucoseTrend")
             if (!avgSpo2.isNaN())    appendLine("- SpO₂ promedio: ${"%.0f".format(avgSpo2)}%")
-            if (!avgSleep.isNaN())   appendLine("- Sueño: ${"%.1f".format(avgSleep)} h/noche, score ${"%.0f".format(avgSleepScore)}/100 (${data.sleep.size} noches registradas)")
+            if (!avgSleepMinutes.isNaN()) {
+                val minutes = avgSleepMinutes.toInt()
+                val hours = minutes / 60
+                val remainder = minutes % 60
+                val sleepLabel = when {
+                    minutes <= 0 -> "ND"
+                    hours > 0 && remainder > 0 -> "${hours} h ${remainder} min"
+                    hours > 0 -> "${hours} h"
+                    else -> "${minutes} min"
+                }
+                appendLine("- Sueño: $sleepLabel/noche, score ${"%.0f".format(avgSleepScore)}/100 (${data.sleep.size} noches registradas)")
+            }
             appendLine()
             appendLine("¿Hay algún patrón de riesgo para enfermedades crónicas que justifique una notificación preventiva?")
         }

@@ -32,11 +32,10 @@ class SpO2Manager(private val context: Context) {
     companion object {
         private const val TAG = "SpO2Manager"
         // Some OEMs expose SpO2 as sensor type 65572 or similar.
-        // TYPE_HEART_RATE = 21 on standard Android; OEM SpO2 types vary.
+        // OEM SpO2 types vary.
         private val KNOWN_SPO2_SENSOR_TYPES = setOf(
             65572,       // Samsung Galaxy Watch
             65633,       // Pixel Watch
-            Sensor.TYPE_HEART_RATE + 1, // Generic offset sometimes used
         )
     }
 
@@ -120,6 +119,9 @@ class SpO2Manager(private val context: Context) {
     // ── SensorManager (fallback for devices that still expose it) ───────────────
 
     @Volatile private var lastSensorValue: Int = 0
+    @Volatile private var sensorListenerStarted: Boolean = false
+    private var sensorListener: SensorEventListener? = null
+    private var activeSensor: Sensor? = null
 
     private fun findSpo2Sensor(): Sensor? {
         // Try well-known OEM sensor types first
@@ -129,24 +131,45 @@ class SpO2Manager(private val context: Context) {
         // Scan all sensors for any that mention SpO2/oxygen in their name
         return sensorManager.getSensorList(Sensor.TYPE_ALL).firstOrNull { sensor ->
             val name = sensor.name.lowercase()
-            name.contains("spo2") || name.contains("oxygen") || name.contains("oximetry")
+            val type = sensor.stringType.lowercase()
+            name.contains("spo2") || name.contains("oxygen") || name.contains("oximetry") ||
+                type.contains("spo2") || type.contains("oxygen") || type.contains("oximetry")
         }
     }
 
     /** Call this once to start receiving background SensorManager SpO2 events. */
     fun startSensorListener() {
+        if (sensorListenerStarted) return
         val sensor = findSpo2Sensor() ?: return
+
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                val value = event.values[0].toInt().coerceIn(1, 100)
-                if (value in 50..100) {
+                val value = event.values
+                    .filter { it.isFinite() && it > 0f }
+                    .map { raw -> if (raw <= 1f) raw * 100f else raw }
+                    .map { it.toInt() }
+                    .firstOrNull { it in 70..100 }
+
+                if (value != null) {
                     Log.d(TAG, "Sensor SpO2 = $value%")
                     lastSensorValue = value
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
         }
-        sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+
+        sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+        sensorListener = listener
+        activeSensor = sensor
+        sensorListenerStarted = true
         Log.d(TAG, "SensorManager SpO2 listener registered for: ${sensor.name}")
+    }
+
+    fun stopSensorListener() {
+        val listener = sensorListener ?: return
+        sensorManager.unregisterListener(listener, activeSensor)
+        sensorListener = null
+        activeSensor = null
+        sensorListenerStarted = false
     }
 }

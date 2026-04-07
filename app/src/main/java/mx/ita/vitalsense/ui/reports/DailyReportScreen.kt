@@ -47,7 +47,7 @@ import java.util.Locale
 fun DailyReportScreen(
     onBack: () -> Unit,
     onNavigateToDetailed: () -> Unit,
-    onNavigateToSleepDetail: (Int, Float, String) -> Unit = { _, _, _ -> },
+    onNavigateToSleepDetail: (Int, Int, Long, Long, String) -> Unit = { _, _, _, _, _ -> },
     vm: DailyReportViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
@@ -177,10 +177,13 @@ fun DailyReportScreen(
             SleepMetricCardDaily(
                 sleepData = state.sleepData,
                 rangeLabel = rangeLabel,
+                durationLabel = state.sleepData?.durationLabel() ?: "Sin Datos",
                 onClick = {
                     onNavigateToSleepDetail(
                         state.sleepData?.score ?: 0,
-                        state.sleepData?.horas ?: 0f,
+                        state.sleepData?.totalMinutes ?: 0,
+                        state.sleepData?.sleepStartMillis ?: 0L,
+                        state.sleepData?.sleepEndMillis ?: 0L,
                         state.sleepData?.estado ?: "Sin Datos",
                     )
                 },
@@ -566,6 +569,7 @@ fun LineChart(modifier: Modifier = Modifier, color: Color, points: List<Float>) 
 fun SleepMetricCardDaily(
     sleepData: mx.ita.vitalsense.data.model.SleepData?,
     rangeLabel: String,
+    durationLabel: String,
     onClick: () -> Unit,
 ) {
     val progress = (sleepData?.score ?: 0) / 100f
@@ -592,6 +596,7 @@ fun SleepMetricCardDaily(
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
                 Text("Promedio: $rangeLabel", fontSize = 11.sp, color = TextSecondary)
+                Text(durationLabel, fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
                 Text(sleepData?.estado ?: "Sin Datos", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }

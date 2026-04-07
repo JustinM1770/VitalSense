@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,16 +33,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun SleepDetailScreen(
     score: Int,
-    horas: Float,
+    minutos: Int,
+    sleepStartMillis: Long,
+    sleepEndMillis: Long,
     estado: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val safeScore = score.coerceIn(0, 100)
-    val safeHours = horas.coerceAtLeast(0f)
+    val safeMinutes = minutos.coerceAtLeast(0)
+    val totalHours = safeMinutes / 60f
     val qualityColor = when {
         safeScore >= 85 -> Color(0xFF10B981)
         safeScore >= 70 -> Color(0xFF22C55E)
@@ -51,9 +58,11 @@ fun SleepDetailScreen(
         else -> Color(0xFFEF4444)
     }
 
-    val deepHours = (safeHours * 0.25f).coerceAtMost(safeHours)
-    val remHours = (safeHours * 0.20f).coerceAtMost((safeHours - deepHours).coerceAtLeast(0f))
-    val lightHours = (safeHours - deepHours - remHours).coerceAtLeast(0f)
+    val deepHours = (totalHours * 0.25f).coerceAtMost(totalHours)
+    val remHours = (totalHours * 0.20f).coerceAtMost((totalHours - deepHours).coerceAtLeast(0f))
+    val lightHours = (totalHours - deepHours - remHours).coerceAtLeast(0f)
+    val durationLabel = formatDurationLabel(safeMinutes)
+    val windowLabel = formatSleepWindowLabel(sleepStartMillis, sleepEndMillis)
 
     Scaffold(
         containerColor = Color(0xFFF8FAFC),
@@ -104,8 +113,20 @@ fun SleepDetailScreen(
                     Column {
                         Text("Calidad del sueño", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 17.sp)
                         Text(estado.ifBlank { "Sin datos" }, color = qualityColor, fontWeight = FontWeight.SemiBold)
-                        Text("Duración: ${"%.1f".format(safeHours)} h", color = Color(0xFF64748B), fontSize = 12.sp)
+                        Text(durationLabel, color = Color(0xFF64748B), fontSize = 12.sp)
                     }
+                }
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Horario real", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(windowLabel, color = Color(0xFF334155), fontSize = 13.sp)
+                    Text("Registrado: $durationLabel", color = Color(0xFF334155), fontSize = 13.sp)
                 }
             }
 
@@ -114,19 +135,19 @@ fun SleepDetailScreen(
                 deepHours = deepHours,
                 remHours = remHours,
                 lightHours = lightHours,
-                totalHours = safeHours,
+                totalHours = totalHours,
             )
 
             Card(
-                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                shape = RoundedCornerShape(20.dp),
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Resumen clínico", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text("• Tu puntaje indica ${sleepInterpretation(safeScore)}.", color = Color(0xFF334155), fontSize = 13.sp)
                     Text("• La duración ideal recomendada para adultos es 7-9 horas.", color = Color(0xFF334155), fontSize = 13.sp)
-                    Text("• Prioriza horario constante y evita pantallas 60 min antes de dormir.", color = Color(0xFF334155), fontSize = 13.sp)
+                    Text("• Horario real: $windowLabel.", color = Color(0xFF334155), fontSize = 13.sp)
                 }
             }
         }
@@ -163,10 +184,11 @@ private fun StageCard(
 
 @Composable
 private fun SleepStageRow(label: String, hours: Float, percent: Float, color: Color) {
+    val minutes = (hours * 60f).roundToInt().coerceAtLeast(0)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, color = Color(0xFF334155), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text("${"%.1f".format(hours)} h", color = Color(0xFF334155), fontSize = 12.sp)
+            Text(formatDurationLabel(minutes), color = Color(0xFF334155), fontSize = 12.sp)
         }
         Box(
             modifier = Modifier
@@ -182,6 +204,22 @@ private fun SleepStageRow(label: String, hours: Float, percent: Float, color: Co
             )
         }
     }
+}
+
+private fun formatDurationLabel(minutes: Int): String = when {
+    minutes <= 0 -> "0 min"
+    minutes >= 60 && minutes % 60 > 0 -> "${minutes / 60} h ${minutes % 60} min"
+    minutes >= 60 -> "${minutes / 60} h"
+    else -> "${minutes} min"
+}
+
+private fun formatSleepWindowLabel(startMillis: Long, endMillis: Long): String {
+    if (startMillis <= 0L || endMillis <= 0L || endMillis < startMillis) return "Horario no disponible"
+    val formatter = DateTimeFormatter.ofPattern("HH:mm", Locale.forLanguageTag("es"))
+    val zone = ZoneId.systemDefault()
+    val start = Instant.ofEpochMilli(startMillis).atZone(zone).toLocalTime().format(formatter)
+    val end = Instant.ofEpochMilli(endMillis).atZone(zone).toLocalTime().format(formatter)
+    return "De $start a $end"
 }
 
 private fun sleepInterpretation(score: Int): String {

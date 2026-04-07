@@ -64,6 +64,8 @@ import java.util.Locale
 // ── Data model ───────────────────────────────────────────────────────────────
 data class NotifItem(
     val firebaseKey: String = "",
+    val type: String = "",
+    val status: String = "",
     val icon: ImageVector,
     val title: String,
     val body: String,
@@ -144,6 +146,7 @@ fun NotificacionesScreen(
                     @Suppress("UNCHECKED_CAST")
                     val data = child.value as? Map<String, Any> ?: continue
                     val type = data["type"] as? String ?: "SOS"
+                    val status = data["status"] as? String ?: "active"
                     val lat = (data["lat"] as? Number)?.toDouble() ?: 0.0
                     val lng = (data["lng"] as? Number)?.toDouble() ?: 0.0
                     val ts = (data["timestamp"] as? Number)?.toLong()
@@ -162,6 +165,8 @@ fun NotificacionesScreen(
                     items.add(
                         NotifItem(
                             firebaseKey = child.key ?: "",
+                            type = type,
+                            status = status,
                             icon = if (type == "SOS") Icons.Outlined.Warning
                             else Icons.Outlined.FavoriteBorder,
                             title = title,
@@ -433,6 +438,7 @@ fun NotificacionesScreen(
 
         val detail = selectedItem
         if (detail != null) {
+            val isSosActive = detail.type == "SOS" && detail.status != "resolved"
             AlertDialog(
                 onDismissRequest = { selectedItem = null },
                 title = {
@@ -463,26 +469,46 @@ fun NotificacionesScreen(
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            selectedItem = null
-                            if (detail.lat != 0.0 && detail.lng != 0.0) {
-                                val uri = "geo:${detail.lat},${detail.lng}?q=${detail.lat},${detail.lng}(SOS)"
-                                val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
-                                    setPackage("com.google.android.apps.maps")
-                                }
-                                context.startActivity(mapIntent)
-                            }
-                        },
-                        enabled = detail.lat != 0.0 && detail.lng != 0.0,
-                        colors = ButtonDefaults.buttonColors(containerColor = DashBlue),
-                    ) {
-                        Text("Abrir en Maps", color = Color.White)
+                    if (isSosActive && detail.firebaseKey.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                database.getReference("alerts")
+                                    .child(userId)
+                                    .child(detail.firebaseKey)
+                                    .updateChildren(
+                                        mapOf(
+                                            "read" to true,
+                                            "status" to "resolved",
+                                            "resolvedAt" to System.currentTimeMillis(),
+                                            "resolvedBy" to "phone_notifications",
+                                        ),
+                                    )
+                                selectedItem = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                        ) {
+                            Text("Finalizar SOS", color = Color.White)
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { selectedItem = null }) {
-                        Text("Cerrar", color = DashBlue)
+                    Row {
+                        if (detail.lat != 0.0 && detail.lng != 0.0) {
+                            TextButton(
+                                onClick = {
+                                    val uri = "geo:${detail.lat},${detail.lng}?q=${detail.lat},${detail.lng}(SOS)"
+                                    val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
+                                        setPackage("com.google.android.apps.maps")
+                                    }
+                                    context.startActivity(mapIntent)
+                                },
+                            ) {
+                                Text("Abrir en Maps", color = DashBlue)
+                            }
+                        }
+                        TextButton(onClick = { selectedItem = null }) {
+                            Text("Cerrar", color = DashBlue)
+                        }
                     }
                 },
                 containerColor = Color.White,

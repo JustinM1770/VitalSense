@@ -372,6 +372,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             })
             put("sueno", JSONObject().apply {
                 put("score",  context.sleepData?.score  ?: JSONObject.NULL)
+                put("minutos", context.sleepData?.totalMinutes ?: JSONObject.NULL)
+                put("horas_completas", context.sleepData?.completeHours ?: JSONObject.NULL)
                 put("horas",  context.sleepData?.horas  ?: JSONObject.NULL)
                 put("estado", context.sleepData?.estado ?: JSONObject.NULL)
             })
@@ -466,8 +468,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             append("%, glucosa ")
             append(latest?.glucose?.takeIf { it > 0.0 }?.let { "%.0f".format(it) } ?: "ND")
             append(" mg/dL, sueno ")
-            append(sleep?.horas?.takeIf { it > 0f }?.let { "%.1f".format(it) } ?: "ND")
-            append(" h.")
+            append(sleep?.durationLabel()?.takeIf { it != "Sin datos" } ?: "ND")
+            append(".")
         }
 
         return when {

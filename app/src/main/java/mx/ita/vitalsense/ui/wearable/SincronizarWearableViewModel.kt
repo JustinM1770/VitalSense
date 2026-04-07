@@ -26,12 +26,16 @@ data class SincronizarUiState(
 
 class SincronizarWearableViewModel : ViewModel() {
 
+    private companion object {
+        const val REQUIRED_PAIRING_CODE_LENGTH = 8
+    }
+
     private val _uiState = MutableStateFlow(SincronizarUiState())
     val uiState: StateFlow<SincronizarUiState> = _uiState.asStateFlow()
 
     fun onCodeChange(newCode: String) {
-        // Only alphanumeric, max 6 chars, uppercase
-        val filtered = newCode.filter { it.isLetterOrDigit() }.uppercase().take(6)
+        // Solo alfanumerico, maximo 8 chars, en mayusculas.
+        val filtered = newCode.filter { it.isLetterOrDigit() }.uppercase().take(REQUIRED_PAIRING_CODE_LENGTH)
         _uiState.update { it.copy(code = filtered) }
     }
 
@@ -44,8 +48,8 @@ class SincronizarWearableViewModel : ViewModel() {
         context: Context,
         onNeedPermissions: (Set<String>) -> Unit,
     ) {
-        if (_uiState.value.code.length < 6) {
-            _uiState.update { it.copy(syncState = SyncState.Error("Ingresa los 6 caracteres del código")) }
+        if (_uiState.value.code.length < REQUIRED_PAIRING_CODE_LENGTH) {
+            _uiState.update { it.copy(syncState = SyncState.Error("Ingresa los 8 caracteres del codigo")) }
             return
         }
 

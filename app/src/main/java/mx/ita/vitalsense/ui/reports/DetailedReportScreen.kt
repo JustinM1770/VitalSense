@@ -161,7 +161,7 @@ fun DetailedReportScreen(
             SleepDetailCard(
                 score = state.sleepData?.score ?: 0,
                 status = state.sleepData?.estado ?: "No durmió",
-                hours = state.sleepData?.horas ?: 0f,
+                durationLabel = state.sleepData?.durationLabel() ?: "Sin Datos",
             )
 
             Spacer(Modifier.height(32.dp))
@@ -284,10 +284,9 @@ private fun normalize(values: List<Float>): List<Float> {
 }
 
 @Composable
-private fun SleepDetailCard(score: Int, status: String, hours: Float) {
+private fun SleepDetailCard(score: Int, status: String, durationLabel: String) {
     val safeScore = score.coerceIn(0, 100)
-    val safeHours = if (hours > 0f) hours else 0f
-    val statusColor = if (safeHours > 0f) Color(0xFF10B981) else TextSecondary
+    val statusColor = if (durationLabel != "Sin Datos") Color(0xFF10B981) else TextSecondary
 
     NeuCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -304,7 +303,7 @@ private fun SleepDetailCard(score: Int, status: String, hours: Float) {
             Spacer(Modifier.width(16.dp))
             Column {
                 Text("Sueño", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
-                Text(if (safeHours > 0f) "${"%.1f".format(safeHours)} horas" else "0.0 horas", color = TextSecondary, fontSize = 12.sp)
+                Text(durationLabel, color = TextSecondary, fontSize = 12.sp)
                 Text(status, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }

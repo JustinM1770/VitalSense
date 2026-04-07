@@ -76,6 +76,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val lastKnownVitals  = mutableMapOf<String, VitalsData>()
     private val notifiedPatients = mutableSetOf<String>()
     private val lastSavedHrSampleTsByUser = mutableMapOf<String, Long>()
+    private var medicationsListener: com.google.firebase.database.ValueEventListener? = null
+    private var medicationsRef: com.google.firebase.database.DatabaseReference? = null
 
     /**
      * Umbrales clínicos del paciente autenticado, personalizados por edad y diagnósticos.
@@ -97,11 +99,18 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseDatabase.getInstance()
+    private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        firebaseAuth.currentUser?.uid?.let { userId ->
+            ensureDashboardLoaded(userId)
+        }
+    }
+    private var loadedUserId: String? = null
 
     init {
-        loadPatientProfile()
-        observePatients()
-        loadAdditionalData()
+        auth.addAuthStateListener(authListener)
+        auth.currentUser?.uid?.let { userId ->
+            ensureDashboardLoaded(userId)
+        }
         // Ensure paired state is always up to date
         val isPaired = prefs.getBoolean("code_paired", false)
         viewModelScope.launch {
@@ -117,8 +126,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
      * personalizados (edad, EPOC, diabetes, etc.) según AHA/ADA/BTS/WHO.
      * Opera en background; si falla se mantienen los umbrales estándar.
      */
-    private fun loadPatientProfile() {
-        val userId = auth.currentUser?.uid ?: return
+    private fun loadPatientProfile(userId: String) {
         viewModelScope.launch {
             try {
                 val snap = db.getReference("users/$userId/datosMedicos").get().await()
@@ -130,6 +138,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 // Mantener umbrales estándar si el perfil no está disponible
             }
         }
+    }
+
+    private fun ensureDashboardLoaded(userId: String) {
+        if (loadedUserId == userId) return
+        loadedUserId = userId
+        loadPatientProfile(userId)
+        observePatients(userId)
+        loadAdditionalData(userId)
     }
 
     fun disconnectWatch() {
@@ -154,15 +170,22 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun loadAdditionalData() {
-        val userId = auth.currentUser?.uid ?: return
-        val dateKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+    private fun loadAdditionalData(userId: String) {
+        val today = LocalDate.now()
+        val dateKey = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val yesterdayKey = today.minusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
 
         viewModelScope.launch {
             try {
-                // 1. Sleep data
-                val sleepSnapshot = db.getReference("sleep/$userId/$dateKey").get().await()
-                val sleep = sleepSnapshot.getValue(SleepData::class.java)
+                // 1. Sleep data (hoy + ayer para evitar falsos "No durmió" por desfase de fecha)
+                val sleepSnapshot = db.getReference("sleep/$userId")
+                    .orderByKey()
+                    .startAt(yesterdayKey)
+                    .endAt(dateKey)
+                    .get()
+                    .await()
+                val sleepByDate = sleepSnapshot.children.associate { it.key.orEmpty() to it.getValue(SleepData::class.java) }
+                val sleep = selectLatestSleepData(sleepByDate)
 
                 // 2. Vitals History (últimos 7 días calendario, igual que Reporte Diario)
                 val zone = ZoneId.systemDefault()
@@ -208,34 +231,46 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     .sortedBy { it.timestamp }
 
-                // 3. Medications
-                val medsSnapshot = db.getReference("medications/$userId").get().await()
-                val medsList = medsSnapshot.children.mapNotNull {
-                    it.getValue(Medication::class.java)
-                }.filter { it.activo }
-
                 val current = _uiState.value
                 _uiState.value = when (current) {
                     is DashboardUiState.Success -> current.copy(
-                        sleepData = sleep,
+                        sleepData = sleep ?: current.sleepData,
                         vitalsHistory = compactedHistory,
-                        medications = medsList,
                     )
                     else -> DashboardUiState.Success(
                         patients = emptyList(),
                         sleepData = sleep,
                         vitalsHistory = compactedHistory,
-                        medications = medsList,
                         isWatchPaired = prefs.getBoolean("code_paired", false),
                     )
                 }
+
+                medicationsRef?.removeEventListener(medicationsListener ?: return@launch)
+                medicationsRef = db.getReference("medications/$userId")
+                medicationsListener = object : com.google.firebase.database.ValueEventListener {
+                    override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                        val medsList = snapshot.children.mapNotNull { child ->
+                            child.getValue(Medication::class.java)?.copy(id = child.key ?: "")
+                        }.filter { med ->
+                            med.nombre.isNotBlank() && (med.activo || med.reminderEnabled || med.nextReminderAt > 0L)
+                        }.sortedByDescending { it.createdAt }
+
+                        val currentState = _uiState.value
+                        if (currentState is DashboardUiState.Success) {
+                            _uiState.value = currentState.copy(medications = medsList)
+                        }
+                    }
+
+                    override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+                }
+                medicationsRef?.addValueEventListener(medicationsListener!!)
             } catch (e: Exception) {
                 // Non-fatal: additional data failed, keep existing state
             }
         }
     }
 
-    private fun observePatients() {
+    private fun observePatients(userId: String) {
         viewModelScope.launch {
             val firstEmit = withTimeoutOrNull(5_000) {
                 repository.observePatients().collect { result ->
@@ -257,7 +292,6 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         
         // Observar datos del reloj en vitals/current/<userId>
         viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: return@launch
             val vitalsRef = db.getReference("vitals/current/$userId")
             
             vitalsRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
@@ -294,16 +328,25 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         
         // Observar datos de sueño en tiempo real para el día actual
         viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: return@launch
-            val dateKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-            val sleepRef = db.getReference("sleep/$userId/$dateKey")
+            val today = LocalDate.now()
+            val dateKey = today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            val yesterdayKey = today.minusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            val sleepRef = db.getReference("sleep/$userId")
+                .orderByKey()
+                .startAt(yesterdayKey)
+                .endAt(dateKey)
 
             sleepRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
                 override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    val sleep = snapshot.getValue(SleepData::class.java)
+                    val sleepByDate = snapshot.children.associate {
+                        it.key.orEmpty() to it.getValue(SleepData::class.java)
+                    }
+                    val sleep = selectLatestSleepData(sleepByDate)
                     val current = _uiState.value
                     if (current is DashboardUiState.Success) {
-                        _uiState.value = current.copy(sleepData = sleep)
+                        if (sleep != null && sleep.hasSleep) {
+                            _uiState.value = current.copy(sleepData = sleep)
+                        }
                     }
                 }
                 override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
@@ -373,6 +416,24 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Prioriza hoy cuando tiene horas válidas; si no, usa ayer para reflejar el sueño nocturno.
+     */
+    private fun selectRecentSleepData(today: SleepData?, yesterday: SleepData?): SleepData? {
+        return when {
+            today?.hasSleep == true -> today
+            yesterday?.hasSleep == true -> yesterday
+            else -> null
+        }
+    }
+
+    private fun selectLatestSleepData(sleepMap: Map<String, SleepData?>): SleepData? {
+        return sleepMap.entries
+            .sortedByDescending { it.key }
+            .mapNotNull { (_, value) -> value?.takeIf { it.hasSleep } }
+            .firstOrNull()
+    }
+
+    /**
      * Determina si los signos vitales requieren activar el protocolo de emergencia QR.
      *
      * Umbrales aplicados (personalizados según perfil del paciente):
@@ -388,6 +449,12 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         (spo2 in 1..thresholds.spo2HypoxemiaCritical) ||
         (glucose > 0.0 && glucose < thresholds.glucoseHypoL2) ||
         (glucose >= thresholds.glucoseHyperCrisis)
+
+    override fun onCleared() {
+        medicationsListener?.let { medicationsRef?.removeEventListener(it) }
+        auth.removeAuthStateListener(authListener)
+        super.onCleared()
+    }
 
     private fun sendAlertNotification(patient: VitalsData, alertTitle: String) {
         val ctx = getApplication<Application>()
