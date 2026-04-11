@@ -2,7 +2,7 @@
 <resources>
 
     <!-- App theme (used after splash) -->
-    <style name="Theme.VitalSense" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.VitalSense" parent="Theme.AppCompat.Light.NoActionBar" />
 
     <!--
         System SplashScreen theme (Android 12+).
@@ -12,7 +12,7 @@
     -->
     <style name="Theme.VitalSense.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#FFFFFF</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_logo_eye</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/icono</item>
         <item name="windowSplashScreenIconBackgroundColor">#FFFFFF</item>
         <item name="postSplashScreenTheme">@style/Theme.VitalSense</item>
     </style>

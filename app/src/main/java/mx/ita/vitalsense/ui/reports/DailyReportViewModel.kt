@@ -1,6 +1,8 @@
 package mx.ita.vitalsense.ui.reports
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.annotation.StringRes
+import androidx.lifecycle.AndroidViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -8,6 +10,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
 import java.time.LocalDate
@@ -15,12 +18,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
-enum class ReportRangeFilter(val label: String) {
-    TODAY("Hoy"),
-    YESTERDAY("Ayer"),
-    LAST_7_DAYS("7 dias"),
-    THIS_MONTH("Mes"),
-    SELECTED_DAY("Dia")
+enum class ReportRangeFilter(@StringRes val labelRes: Int) {
+    TODAY(R.string.report_range_today),
+    YESTERDAY(R.string.report_range_yesterday),
+    LAST_7_DAYS(R.string.report_range_last_7_days),
+    THIS_MONTH(R.string.report_range_this_month),
+    SELECTED_DAY(R.string.report_range_selected_day)
 }
 
 data class DailyReportUiState(
@@ -31,7 +34,7 @@ data class DailyReportUiState(
     val isLoading: Boolean = false
 )
 
-class DailyReportViewModel : ViewModel() {
+class DailyReportViewModel(application: Application) : AndroidViewModel(application) {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseDatabase.getInstance()
     private var sleepRef: com.google.firebase.database.Query? = null
@@ -70,9 +73,9 @@ class DailyReportViewModel : ViewModel() {
 
     fun getRangeLabel(state: DailyReportUiState): String {
         return when (state.selectedFilter) {
-            ReportRangeFilter.TODAY -> "Hoy"
-            ReportRangeFilter.YESTERDAY -> "Ayer"
-            ReportRangeFilter.LAST_7_DAYS -> "Ultimos 7 dias"
+            ReportRangeFilter.TODAY -> getApplication<Application>().getString(R.string.report_range_today)
+            ReportRangeFilter.YESTERDAY -> getApplication<Application>().getString(R.string.report_range_yesterday)
+            ReportRangeFilter.LAST_7_DAYS -> getApplication<Application>().getString(R.string.report_range_last_7_days)
             ReportRangeFilter.THIS_MONTH -> {
                 val start = state.selectedDate.withDayOfMonth(1)
                 start.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
@@ -180,7 +183,15 @@ class DailyReportViewModel : ViewModel() {
 
     private fun mergeSleepData(sleepList: List<SleepData>): SleepData {
         if (sleepList.isEmpty()) {
-            return SleepData(score = 0, minutosTotales = 0, horasCompletas = 0, sleepStartMillis = 0L, sleepEndMillis = 0L, horas = 0f, estado = "No durmio")
+            return SleepData(
+                score = 0,
+                minutosTotales = 0,
+                horasCompletas = 0,
+                sleepStartMillis = 0L,
+                sleepEndMillis = 0L,
+                horas = 0f,
+                estado = getApplication<Application>().getString(R.string.sleep_not_slept),
+            )
         }
 
         val totalMinutes = sleepList.sumOf { it.totalMinutes }
@@ -189,10 +200,10 @@ class DailyReportViewModel : ViewModel() {
         val startMillis = sleepList.mapNotNull { it.sleepStartMillis.takeIf { millis -> millis > 0L } }.minOrNull() ?: 0L
         val endMillis = sleepList.mapNotNull { it.sleepEndMillis.takeIf { millis -> millis > 0L } }.maxOrNull() ?: 0L
         val status = when {
-            avgScore >= 85 -> "Excelente"
-            avgScore >= 70 -> "Bueno"
-            avgScore >= 50 -> "Regular"
-            else -> "Malo"
+            avgScore >= 85 -> getApplication<Application>().getString(R.string.sleep_interpretation_excellent)
+            avgScore >= 70 -> getApplication<Application>().getString(R.string.sleep_interpretation_good)
+            avgScore >= 50 -> getApplication<Application>().getString(R.string.sleep_interpretation_regular)
+            else -> getApplication<Application>().getString(R.string.sleep_interpretation_low)
         }
 
         return SleepData(

@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -54,20 +55,21 @@ private data class OnboardingPage(
     @param:DrawableRes val illustration: Int?,
 )
 
-private val pages = listOf(
+@Composable
+private fun onboardingPages(): List<OnboardingPage> = listOf(
     OnboardingPage(
-        title = "Bienvenido a VitalSense",
-        body = "Conectamos tecnología y cuidado medico para proteger a quienes mas quieres. No solo medimos, predecimos para actuar a tiempo",
+        title = stringResource(R.string.onboarding_title_1),
+        body = stringResource(R.string.onboarding_body_1),
         illustration = R.drawable.illus_stethoscope,
     ),
     OnboardingPage(
-        title = "Actua con ventaja.",
-        body = "Ante una crisis, la app te guia. Gestiona alertas automaticas a servicios de emergencia y comparte el historial medico mediante un QR dinamico para atencion medica precisa",
+        title = stringResource(R.string.onboarding_title_2),
+        body = stringResource(R.string.onboarding_body_2),
         illustration = R.drawable.illus_qr,
     ),
     OnboardingPage(
-        title = "Prevencion basada en datos.",
-        body = "No necesitas estar pegado a la pantalla. Nuestra IA analiza el rito cardiaco y niveles de glucosa por ti, notificandote de inmediato solo si detecta un patron de riesgo.",
+        title = stringResource(R.string.onboarding_title_3),
+        body = stringResource(R.string.onboarding_body_3),
         illustration = R.drawable.corazon,
     ),
 )
@@ -79,6 +81,7 @@ fun OnboardingScreen(
     onSkip: () -> Unit,        // "Omitir" → va directo a Register/Login
     onGetStarted: () -> Unit,  // "Comenzar" (última página) → flujo registro
 ) {
+    val pages = onboardingPages()
     val onFinish = onGetStarted // alias interno para no cambiar toda la lógica
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
@@ -114,7 +117,7 @@ fun OnboardingScreen(
                 .padding(top = 52.dp, end = 16.dp),
         ) {
             Text(
-                text = "Omitir",
+                text = stringResource(R.string.onboarding_skip),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Black,
             )
@@ -153,7 +156,11 @@ fun OnboardingScreen(
                 ),
             ) {
                 Text(
-                    text = if (pagerState.currentPage < pages.lastIndex) "Siguiente" else "Comenzar",
+                    text = if (pagerState.currentPage < pages.lastIndex) {
+                        stringResource(R.string.onboarding_next)
+                    } else {
+                        stringResource(R.string.onboarding_start)
+                    },
                     style = MaterialTheme.typography.labelLarge,
                     color = OnboardingButtonText,
                 )

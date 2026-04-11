@@ -26,6 +26,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import mx.ita.vitalsense.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -125,17 +128,17 @@ fun SosViewerScreen(
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(color = Color.White)
-                    Text("Cargando alerta SOS...", color = Color.White.copy(alpha = 0.8f))
+                    Text(stringResource(R.string.sos_loading), color = Color.White.copy(alpha = 0.8f))
                 }
             }
 
             alert == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Filled.Warning, null, tint = Color.White, modifier = Modifier.size(64.dp))
-                    Text("Alerta no encontrada", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Puede haber expirado o ya fue resuelta.", color = Color.White.copy(0.7f), textAlign = TextAlign.Center)
+                    Text(stringResource(R.string.sos_not_found_title), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.sos_not_found_body), color = Color.White.copy(0.7f), textAlign = TextAlign.Center)
                     OutlinedButton(onClick = onBack, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
-                        Text("Cerrar")
+                        Text(stringResource(R.string.common_close))
                     }
                 }
             }
@@ -157,7 +160,7 @@ fun SosViewerScreen(
                             Icon(Icons.Filled.Warning, null, tint = Color.White, modifier = Modifier.size(28.dp))
                         }
                         Column {
-                            Text("ALERTA SOS", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                            Text(stringResource(R.string.sos_alert_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                             if (data.timestamp > 0L) {
                                 Text(
                                     SimpleDateFormat("HH:mm:ss · dd/MM/yyyy", Locale.getDefault()).format(Date(data.timestamp)),
@@ -169,11 +172,11 @@ fun SosViewerScreen(
 
                     // — Paciente —
                     if (data.patientName.isNotEmpty()) {
-                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.15f))) {
+                        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Person, null, tint = Color.White, modifier = Modifier.size(22.dp))
                                 Column {
-                                    Text("Paciente", color = Color.White.copy(0.7f), fontSize = 11.sp)
+                                    Text(stringResource(R.string.sos_patient), color = Color.White.copy(0.7f), fontSize = 11.sp)
                                     Text(data.patientName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
@@ -181,11 +184,11 @@ fun SosViewerScreen(
                     }
 
                     // — Ubicación —
-                    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.15f))) {
+                    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.LocationOn, null, tint = Color.White, modifier = Modifier.size(22.dp))
-                                Text("Ubicación GPS", color = Color.White.copy(0.7f), fontSize = 11.sp)
+                                Text(stringResource(R.string.sos_gps_location), color = Color.White.copy(0.7f), fontSize = 11.sp)
                             }
                             if (data.lat != 0.0 && data.lng != 0.0) {
                                 Text(
@@ -197,16 +200,16 @@ fun SosViewerScreen(
                                         val uri = Uri.parse("geo:${data.lat},${data.lng}?q=${data.lat},${data.lng}(SOS)")
                                         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                                     shape  = RoundedCornerShape(10.dp),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Icon(Icons.Filled.LocationOn, null, tint = SosRed, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.size(8.dp))
-                                    Text("Abrir en Maps", color = SosRed, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.sos_open_maps), color = SosRed, fontWeight = FontWeight.Bold)
                                 }
                             } else {
-                                Text("Ubicación GPS no disponible", color = Color.White.copy(0.6f), fontSize = 13.sp)
+                                Text(stringResource(R.string.sos_gps_unavailable), color = Color.White.copy(0.6f), fontSize = 13.sp)
                             }
                         }
                     }
@@ -215,7 +218,7 @@ fun SosViewerScreen(
                     if (resolved) {
                         Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF2E7D32).copy(0.8f))) {
                             Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                Text("✓  Alerta atendida", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text(stringResource(R.string.sos_attended), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                             }
                         }
                     }
@@ -229,7 +232,7 @@ fun SosViewerScreen(
                             colors  = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border  = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(0.5f)),
                             modifier = Modifier.weight(1f),
-                        ) { Text("Cerrar") }
+                        ) { Text(stringResource(R.string.common_close)) }
 
                         if (!resolved) {
                             Button(
@@ -238,11 +241,11 @@ fun SosViewerScreen(
                                     db.getReference("alerts/$userId/$sosId/read").setValue(true)
                                     resolved = true
                                 },
-                                colors   = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                                 shape    = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f),
                             ) {
-                                Text("En camino", color = SosRed, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.sos_on_the_way), color = SosRed, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

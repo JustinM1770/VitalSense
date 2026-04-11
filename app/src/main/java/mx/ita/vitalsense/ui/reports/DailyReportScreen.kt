@@ -27,11 +27,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.ita.vitalsense.R
+import mx.ita.vitalsense.ui.common.LockLandscapeOrientation
 import mx.ita.vitalsense.ui.components.NeuCard
 import mx.ita.vitalsense.ui.theme.*
 import java.time.Instant
@@ -41,6 +44,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.cos
 import kotlin.math.sin
 import java.util.Locale
+import androidx.compose.foundation.isSystemInDarkTheme
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,6 +54,7 @@ fun DailyReportScreen(
     onNavigateToSleepDetail: (Int, Int, Long, Long, String) -> Unit = { _, _, _, _, _ -> },
     vm: DailyReportViewModel = viewModel()
 ) {
+    LockLandscapeOrientation()
     val state by vm.uiState.collectAsState()
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
@@ -60,7 +65,7 @@ fun DailyReportScreen(
     )
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             DailyReportTopBar(
                 onBack = onBack,
@@ -94,9 +99,9 @@ fun DailyReportScreen(
             
             // --- Health Pentagon (Radar Chart) ---
             Text(
-                text = "Estado de Salud",
+                text = stringResource(R.string.report_health_status_title),
                 style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(16.dp))
             
@@ -113,11 +118,15 @@ fun DailyReportScreen(
             val oxigenoPct = if (avgSpo2 > 0.0) (avgSpo2 / 100.0).toFloat().coerceIn(0f, 1f) else 0f
             val presionPct = if (avgHeartRate > 0.0) (avgHeartRate / 160.0).toFloat().coerceIn(0f, 1f) else 0f
             val rangeLabel = vm.getRangeLabel(state)
+            val sleepNoDataLabel = stringResource(R.string.sleep_no_data)
+            val sleepStatusLabel = state.sleepData?.estado
+                ?.takeUnless { status -> status.equals("Sin datos", ignoreCase = true) || status.equals("Sin Datos", ignoreCase = true) || status.equals("No data", ignoreCase = true) || status.equals("Sem dados", ignoreCase = true) }
+                ?: sleepNoDataLabel
             
             HealthRadarCard(
                 reportLabel = rangeLabel,
                 score = state.sleepData?.score ?: 0,
-                status = state.sleepData?.estado ?: "Sin datos",
+                status = sleepStatusLabel,
                 grade = vm.scoreToGrade(state.sleepData?.score ?: 0),
                 sleepPct = sleepPct,
                 glucosePct = glucosePct,
@@ -140,9 +149,9 @@ fun DailyReportScreen(
             
             // --- Metrics Chart Section ---
             Text(
-                text = "Métricas de Salud",
+                text = stringResource(R.string.report_health_metrics_title),
                 style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(16.dp))
             
@@ -166,7 +175,7 @@ fun DailyReportScreen(
                         )
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("Oxigenación SpO₂", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                            Text(stringResource(R.string.report_spo2_oxygenation), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("$latestSpo2%", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = SpO2Green)
                         }
                     }
@@ -177,14 +186,14 @@ fun DailyReportScreen(
             SleepMetricCardDaily(
                 sleepData = state.sleepData,
                 rangeLabel = rangeLabel,
-                durationLabel = state.sleepData?.durationLabel() ?: "Sin Datos",
+                durationLabel = state.sleepData?.durationLabel() ?: stringResource(R.string.sleep_no_data),
                 onClick = {
                     onNavigateToSleepDetail(
                         state.sleepData?.score ?: 0,
                         state.sleepData?.totalMinutes ?: 0,
                         state.sleepData?.sleepStartMillis ?: 0L,
                         state.sleepData?.sleepEndMillis ?: 0L,
-                        state.sleepData?.estado ?: "Sin Datos",
+                        sleepStatusLabel,
                     )
                 },
             )
@@ -206,12 +215,12 @@ fun DailyReportScreen(
                         }
                         showDatePicker = false
                     }) {
-                        Text("Aceptar")
+                        Text(stringResource(R.string.common_ok))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDatePicker = false }) {
-                        Text("Cancelar")
+                        Text(stringResource(R.string.common_cancel))
                     }
                 },
             ) {
@@ -243,7 +252,7 @@ private fun ReportRangeFilterRow(
             FilterChip(
                 selected = selectedFilter == filter,
                 onClick = { onFilterSelected(filter) },
-                label = { Text(filter.label) },
+                label = { Text(stringResource(filter.labelRes)) },
             )
         }
     }
@@ -263,15 +272,23 @@ private fun DailyReportTopBar(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Regresar", tint = TextPrimary)
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = stringResource(R.string.back),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
         }
         Text(
-            text = "Reporte Diario",
+            text = stringResource(R.string.report_daily_title),
             style = MaterialTheme.typography.titleLarge,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
         IconButton(onClick = onCalendarClick) {
-            Icon(Icons.Rounded.CalendarMonth, contentDescription = "Calendario", tint = PrimaryBlue)
+            Icon(
+                Icons.Rounded.CalendarMonth,
+                contentDescription = stringResource(R.string.report_calendar),
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -292,7 +309,7 @@ private fun DateStrip(
         items(dates) { date ->
             val isToday = date == LocalDate.now()
             val isSelected = date == selectedDate
-            val monthEs = date.format(DateTimeFormatter.ofPattern("MMM", Locale.forLanguageTag("es")))
+            val monthEs = date.format(DateTimeFormatter.ofPattern("MMM", Locale.getDefault()))
                 .replaceFirstChar { it.uppercase() }
 
             Box(
@@ -304,10 +321,10 @@ private fun DateStrip(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (isToday) "Hoy, ${date.dayOfMonth} $monthEs" else date.dayOfMonth.toString(),
+                    text = if (isToday) stringResource(R.string.dashboard_today_date, date.dayOfMonth, monthEs) else date.dayOfMonth.toString(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) Color.White else TextSecondary
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -331,7 +348,9 @@ private fun HealthRadarCard(
             .fillMaxWidth()
             .clickable { onNavigate() },
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFBDD9F2)) // DashBg
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -348,22 +367,22 @@ private fun HealthRadarCard(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
-                            .background(SpO2Green.copy(alpha = 0.1f)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(grade, color = SpO2Green, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(grade, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("Salud", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
-                        Text(status, color = SpO2Green, fontSize = 12.sp)
+                        Text(stringResource(R.string.report_health_short), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                 }
                 
                 Text(
                     reportLabel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             
@@ -396,30 +415,30 @@ private fun PeriodAverageCard(
     NeuCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Promedios: $rangeLabel",
+                text = stringResource(R.string.report_averages_period, rangeLabel),
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(10.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    text = "HR ${if (avgHeartRate > 0) "%.0f".format(avgHeartRate) else "--"}",
-                    color = HeartRateRed,
+                    text = stringResource(R.string.report_hr_abbrev, if (avgHeartRate > 0) "%.0f".format(avgHeartRate) else "--"),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "SpO2 ${if (avgSpo2 > 0) "%.0f%%".format(avgSpo2) else "--"}",
-                    color = SpO2Green,
+                    text = stringResource(R.string.report_spo2_abbrev, if (avgSpo2 > 0) "%.0f".format(avgSpo2) else "--"),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Glu ${if (avgGlucose > 0) "%.0f".format(avgGlucose) else "--"}",
-                    color = PrimaryBlue,
+                    text = stringResource(R.string.report_glucose_abbrev, if (avgGlucose > 0) "%.0f".format(avgGlucose) else "--"),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Sueno $avgSleepScore%",
-                    color = Color(0xFF10B981),
+                    text = stringResource(R.string.report_sleep_abbrev, avgSleepScore),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -436,7 +455,12 @@ private fun HealthRadarChart(
     oxigenoPct: Float
 ) {
     // Ejes: Sueño, Glucosa, Presión arterial, Oxígeno
+    val colorScheme = MaterialTheme.colorScheme
     val values = listOf(sleepPct, glucosePct, presionPct, oxigenoPct)
+    val bgColor = colorScheme.surface
+    val gridColor = colorScheme.onSurfaceVariant.copy(alpha = if (isSystemInDarkTheme()) 0.30f else 0.22f)
+    val dataColor = colorScheme.primary
+    val dataFillColor = colorScheme.primary.copy(alpha = 0.28f)
     
     Canvas(modifier = modifier) {
         val centerX = size.width / 2
@@ -453,14 +477,14 @@ private fun HealthRadarChart(
             if (index == 0) bgPath.moveTo(x, y) else bgPath.lineTo(x, y)
         }
         bgPath.close()
-        drawPath(bgPath, color = Color(0xFFF0F2F5), style = Fill) // InputBg gris claro
-        drawPath(bgPath, color = Color.Gray.copy(alpha = 0.3f), style = Stroke(width = 1.dp.toPx()))
+        drawPath(bgPath, color = bgColor, style = Fill)
+        drawPath(bgPath, color = gridColor, style = Stroke(width = 1.dp.toPx()))
 
         // Ejes (Background lines)
         angles.forEach { angleDeg ->
             val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
             drawLine(
-                color = Color.Gray.copy(alpha = 0.3f),
+                color = gridColor,
                 start = Offset(centerX, centerY),
                 end = Offset(
                     centerX + radius * cos(angleRad),
@@ -480,14 +504,14 @@ private fun HealthRadarChart(
         }
         path.close()
         
-        drawPath(path, color = Color(0xFF00C48C).copy(alpha = 0.3f), style = Fill) // SleepGreen area
-        drawPath(path, color = Color(0xFF00C48C), style = Stroke(width = 2.dp.toPx())) // Verde teal borde
+        drawPath(path, color = dataFillColor, style = Fill)
+        drawPath(path, color = dataColor, style = Stroke(width = 2.dp.toPx()))
         
         // Data points
         values.forEachIndexed { index, pct ->
             val angleRad = Math.toRadians(angles[index].toDouble()).toFloat()
             drawCircle(
-                color = Color(0xFF00C48C),
+                color = dataColor,
                 radius = 4.dp.toPx(),
                 center = Offset(
                     centerX + radius * pct * cos(angleRad),
@@ -510,11 +534,11 @@ private fun HeartRateTrendCard(history: List<mx.ita.vitalsense.data.model.Vitals
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateRed, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Ritmo Cardíaco", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(stringResource(R.string.report_heart_rate_title), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 }
-                Text("$latestBpm BPM", color = HeartRateRed, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("$latestBpm BPM", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
             
             Spacer(Modifier.height(24.dp))
@@ -523,7 +547,7 @@ private fun HeartRateTrendCard(history: List<mx.ita.vitalsense.data.model.Vitals
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
-                color = HeartRateRed,
+                color = MaterialTheme.colorScheme.primary,
                 points = history.takeLast(10).map { it.heartRate.toFloat() / 200f } // Normalized
             )
             
@@ -534,7 +558,7 @@ private fun HeartRateTrendCard(history: List<mx.ita.vitalsense.data.model.Vitals
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 listOf("00:00", "06:00", "12:00", "18:00", "23:59").forEach { time ->
-                    Text(time, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -574,6 +598,8 @@ fun SleepMetricCardDaily(
 ) {
     val progress = (sleepData?.score ?: 0) / 100f
     val scoreText = sleepData?.score?.toString() ?: "0"
+    val colorScheme = MaterialTheme.colorScheme
+    val successColor = colorScheme.primary
 
     mx.ita.vitalsense.ui.components.NeuCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
         Row(
@@ -585,19 +611,19 @@ fun SleepMetricCardDaily(
                 CircularProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.size(60.dp),
-                    color = Color(0xFF10B981), // SuccessGreen
+                    color = successColor,
                     strokeWidth = 6.dp,
-                    trackColor = Color(0xFF10B981).copy(alpha = 0.1f)
+                    trackColor = successColor.copy(alpha = 0.18f)
                 )
-                Text("$scoreText%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text("$scoreText%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colorScheme.onSurface)
             }
             Spacer(Modifier.width(16.dp))
-            Text("Sueño", color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(stringResource(R.string.sleep_title), color = colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.End) {
-                Text("Promedio: $rangeLabel", fontSize = 11.sp, color = TextSecondary)
-                Text(durationLabel, fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
-                Text(sleepData?.estado ?: "Sin Datos", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.sleep_average_label, rangeLabel), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(durationLabel, fontSize = 12.sp, color = colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                Text(sleepData?.estado ?: stringResource(R.string.sleep_no_data), color = colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

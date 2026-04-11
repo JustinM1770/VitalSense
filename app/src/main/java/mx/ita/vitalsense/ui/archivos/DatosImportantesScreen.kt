@@ -31,6 +31,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,7 +60,6 @@ import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.data.emergency.StorageDoc
 import mx.ita.vitalsense.ui.components.BottomNav
 import mx.ita.vitalsense.ui.components.BottomNavTab
-import mx.ita.vitalsense.ui.theme.DashBg
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
 
@@ -172,7 +172,9 @@ fun DatosImportantesScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(DashBg)) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Box(modifier = Modifier.fillMaxSize().background(colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -236,7 +238,7 @@ fun DatosImportantesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                    .background(Color.White)
+                    .background(colorScheme.surface)
                     .padding(24.dp),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -246,7 +248,7 @@ fun DatosImportantesScreen(
                         fontFamily = Manrope,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
-                        color = Color(0xFF1A1A2E),
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.fillMaxWidth(),
                     )
 
@@ -454,7 +456,7 @@ private fun StorageDocCard(
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
-                    color = Color(0xFF1A1A2E),
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
             }

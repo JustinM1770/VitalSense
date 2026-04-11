@@ -187,9 +187,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val sleepByDate = sleepSnapshot.children.associate { it.key.orEmpty() to it.getValue(SleepData::class.java) }
                 val sleep = selectLatestSleepData(sleepByDate)
 
-                // 2. Vitals History (últimos 7 días calendario, igual que Reporte Diario)
+                // 2. Vitals History (últimos 30 días calendario para soportar resumen 24h/7d/30d)
                 val zone = ZoneId.systemDefault()
-                val startDate = LocalDate.now(zone).minusDays(6)
+                val startDate = LocalDate.now(zone).minusDays(29)
                 val endDate = LocalDate.now(zone)
                 val startMillis = startDate.atStartOfDay(zone).toInstant().toEpochMilli()
                 val endMillis = endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
@@ -356,10 +356,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun applyResult(result: Result<List<VitalsData>>) {
         val current = _uiState.value
-        val (sleep, history, meds) = when (current) {
-            is DashboardUiState.Success -> Triple(current.sleepData, current.vitalsHistory, current.medications)
-            else -> Triple(null, emptyList(), emptyList())
-        }
+        val currentSuccess = current as? DashboardUiState.Success
+        val sleep = currentSuccess?.sleepData
+        val history = currentSuccess?.vitalsHistory.orEmpty()
+        val meds = currentSuccess?.medications.orEmpty()
         val isWatchPaired = prefs.getBoolean("code_paired", false)
         val deviceName = prefs.getString("paired_device_name", "Wearable") ?: "Wearable"
         _uiState.value = result.fold(
@@ -368,7 +368,11 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 DashboardUiState.Success(patients, history, sleep, meds, isWatchPaired, deviceName)
             },
             onFailure = { e ->
-                DashboardUiState.Error(e.message ?: "Error al cargar pacientes")
+                if (currentSuccess != null) {
+                    currentSuccess.copy(error = e.message ?: "Error al cargar pacientes")
+                } else {
+                    DashboardUiState.Error(e.message ?: "Error al cargar pacientes")
+                }
             },
         )
     }

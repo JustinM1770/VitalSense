@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.emergency.EmergencyTokenData
 import mx.ita.vitalsense.data.emergency.EmergencyTokenRepository
 
@@ -118,7 +120,7 @@ fun EmergencyViewerScreen(
             is ViewerState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CircularProgressIndicator(color = EmergencyRed)
-                    Text("Cargando perfil de emergencia...", color = TextGray, fontSize = 14.sp)
+                    Text(stringResource(R.string.emergency_loading_profile), color = TextGray, fontSize = 14.sp)
                 }
             }
 
@@ -187,7 +189,7 @@ private fun PinEntryView(
         Spacer(Modifier.height(20.dp))
 
         Text(
-            text       = "Ingresa el PIN de emergencia",
+            text       = stringResource(R.string.emergency_enter_pin_title),
             fontSize   = 20.sp,
             fontWeight = FontWeight.Bold,
             color      = TextDark,
@@ -197,7 +199,7 @@ private fun PinEntryView(
         Spacer(Modifier.height(8.dp))
 
         Text(
-            text      = "El PIN fue anunciado por llamada de voz a los servicios de emergencia.",
+            text      = stringResource(R.string.emergency_pin_voice_notice),
             fontSize  = 13.sp,
             color     = TextGray,
             textAlign = TextAlign.Center,
@@ -213,7 +215,7 @@ private fun PinEntryView(
                     showError = false
                 }
             },
-            label              = { Text("PIN de 4 dígitos") },
+            label              = { Text(stringResource(R.string.emergency_pin_4_digits)) },
             singleLine         = true,
             isError            = showError,
             keyboardOptions    = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
@@ -228,7 +230,7 @@ private fun PinEntryView(
         if (showError) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text     = "PIN incorrecto. Intento $attempts de $maxAttempts.",
+                text     = stringResource(R.string.emergency_pin_invalid_attempt, attempts, maxAttempts),
                 color    = Color(0xFFFF5252),
                 fontSize = 12.sp,
             )
@@ -237,7 +239,7 @@ private fun PinEntryView(
         if (attempts >= maxAttempts) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text     = "Demasiados intentos. Contacta al equipo médico.",
+                text     = stringResource(R.string.emergency_too_many_attempts),
                 color    = EmergencyRed,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -253,7 +255,7 @@ private fun PinEntryView(
                 colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFFBDBDBD)),
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Cancelar", color = Color.White)
+                Text(stringResource(R.string.common_cancel), color = Color.White)
             }
             Button(
                 onClick  = {
@@ -267,7 +269,7 @@ private fun PinEntryView(
                 colors   = ButtonDefaults.buttonColors(containerColor = EmergencyRed),
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Verificar", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.common_verify), color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -533,12 +535,12 @@ private fun ErrorView(message: String, onBack: () -> Unit) {
     ) {
         Icon(Icons.Filled.Warning, null, tint = EmergencyRed, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(16.dp))
-        Text("Acceso no disponible", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextDark)
+        Text(stringResource(R.string.emergency_access_unavailable), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextDark)
         Spacer(Modifier.height(8.dp))
         Text(message, fontSize = 14.sp, color = TextGray, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
         Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed)) {
-            Text("Cerrar", color = Color.White)
+            Text(stringResource(R.string.common_close), color = Color.White)
         }
     }
 }

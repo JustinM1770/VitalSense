@@ -29,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,10 +42,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.ita.vitalsense.R
 
 // ─── Paleta de emergencia ─────────────────────────────────────────────────────
 private val EmergencyRed      = Color(0xFFD32F2F)
@@ -112,7 +115,7 @@ private fun LoadingContent() {
     ) {
         PulsingIcon()
         Text(
-            text       = "Generando perfil de emergencia...",
+            text       = stringResource(R.string.emergency_generating_profile),
             color      = OnEmergency,
             fontSize   = 16.sp,
             fontWeight = FontWeight.Medium,
@@ -140,7 +143,7 @@ private fun ActiveContent(
         PulsingIcon()
 
         Text(
-            text       = "EMERGENCIA DETECTADA",
+            text       = stringResource(R.string.emergency_detected_title),
             color      = OnEmergency,
             fontSize   = 20.sp,
             fontWeight = FontWeight.Bold,
@@ -175,11 +178,11 @@ private fun ActiveContent(
         Card(
             shape     = RoundedCornerShape(20.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
-            colors    = CardDefaults.cardColors(containerColor = Color.White),
+            colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         ) {
             Image(
                 bitmap              = state.qrBitmap.asImageBitmap(),
-                contentDescription  = "Código QR de emergencia",
+                contentDescription  = stringResource(R.string.emergency_qr_content_description),
                 modifier            = Modifier
                     .size(240.dp)
                     .padding(16.dp),
@@ -192,7 +195,7 @@ private fun ActiveContent(
         val isUrgent = remainingSecs < 300    // últimos 5 min → amarillo
 
         Text(
-            text       = "Expira en %02d:%02d".format(mins, secs),
+            text       = stringResource(R.string.emergency_expires_in, mins, secs),
             color      = if (isUrgent) YellowWarning else OnEmergency,
             fontSize   = 14.sp,
             fontWeight = if (isUrgent) FontWeight.Bold else FontWeight.Normal,
@@ -201,7 +204,7 @@ private fun ActiveContent(
         // — PIN de acceso —
         Card(
             shape     = RoundedCornerShape(16.dp),
-            colors    = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.15f)),
+            colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             elevation = CardDefaults.cardElevation(0.dp),
         ) {
             Column(
@@ -210,7 +213,7 @@ private fun ActiveContent(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text       = "PIN de acceso",
+                    text       = stringResource(R.string.emergency_access_pin),
                     color      = EmergencyLightRed,
                     fontSize   = 11.sp,
                     fontWeight = FontWeight.Medium,
@@ -237,7 +240,7 @@ private fun ActiveContent(
                     }
                 }
                 Text(
-                    text      = "El paramédico necesita este PIN para ver el perfil médico",
+                    text      = stringResource(R.string.emergency_paramedic_pin_notice),
                     color     = EmergencyLightRed,
                     fontSize  = 10.sp,
                     textAlign = TextAlign.Center,
@@ -247,7 +250,7 @@ private fun ActiveContent(
 
         // — Indicador de modo (local vs deep link) —
         Text(
-            text      = "🌐 Funciona en cualquier navegador con internet",
+            text      = stringResource(R.string.emergency_browser_notice),
             color     = Color(0xFF80CBC4),
             fontSize  = 11.sp,
             textAlign = TextAlign.Center,
@@ -255,7 +258,7 @@ private fun ActiveContent(
 
         // — Instrucción —
         Text(
-            text      = "Muestra este QR al paramédico.\nEscanéalo e ingresa el PIN para ver el perfil médico.",
+            text      = stringResource(R.string.emergency_qr_instruction),
             color     = EmergencyLightRed,
             fontSize  = 13.sp,
             textAlign = TextAlign.Center,
@@ -270,7 +273,7 @@ private fun ActiveContent(
             colors  = ButtonDefaults.outlinedButtonColors(contentColor = OnEmergency),
             border  = androidx.compose.foundation.BorderStroke(1.dp, OnEmergency.copy(alpha = 0.5f)),
         ) {
-            Text("Emergencia resuelta — cerrar QR")
+            Text(stringResource(R.string.emergency_resolved_close_qr))
         }
     }
 }
@@ -291,13 +294,13 @@ private fun ExpiredContent(anomalyType: String, onClose: () -> Unit) {
             modifier           = Modifier.size(64.dp),
         )
         Text(
-            text       = "QR Expirado",
+            text       = stringResource(R.string.emergency_qr_expired),
             color      = OnEmergency,
             fontSize   = 22.sp,
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text      = "El acceso de emergencia para\n\"$anomalyType\" ha caducado.",
+            text      = stringResource(R.string.emergency_access_expired, anomalyType),
             color     = EmergencyLightRed,
             fontSize  = 14.sp,
             textAlign = TextAlign.Center,
@@ -306,7 +309,7 @@ private fun ExpiredContent(anomalyType: String, onClose: () -> Unit) {
             onClick = onClose,
             colors  = ButtonDefaults.buttonColors(containerColor = OnEmergency, contentColor = EmergencyRed),
         ) {
-            Text("Cerrar", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.common_close), fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -331,7 +334,7 @@ private fun ErrorContent(
             modifier           = Modifier.size(64.dp),
         )
         Text(
-            text       = "No se pudo generar el QR",
+            text       = stringResource(R.string.emergency_qr_generate_error),
             color      = OnEmergency,
             fontSize   = 20.sp,
             fontWeight = FontWeight.Bold,
@@ -348,13 +351,13 @@ private fun ErrorContent(
                 onClick = onClose,
                 colors  = ButtonDefaults.outlinedButtonColors(contentColor = OnEmergency),
             ) {
-                Text("Cerrar")
+                Text(stringResource(R.string.common_close))
             }
             Button(
                 onClick = onRetry,
                 colors  = ButtonDefaults.buttonColors(containerColor = OnEmergency, contentColor = EmergencyRed),
             ) {
-                Text("Reintentar", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.common_retry), fontWeight = FontWeight.Bold)
             }
         }
     }

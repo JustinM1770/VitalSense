@@ -33,6 +33,7 @@ import com.google.firebase.auth.FirebaseAuth
 import mx.ita.vitalsense.ui.archivos.DatosImportantesScreen
 import mx.ita.vitalsense.ui.cuestionario.CuestionarioScreen
 import mx.ita.vitalsense.ui.dashboard.DashboardScreen
+import mx.ita.vitalsense.ui.dashboard.DashboardViewModel
 import mx.ita.vitalsense.ui.device.DeviceScanScreen
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +46,7 @@ import mx.ita.vitalsense.ui.patient.PatientDetailScreen
 import mx.ita.vitalsense.ui.profile.ProfileScreen
 import mx.ita.vitalsense.ui.register.RegisterScreen
 import mx.ita.vitalsense.ui.reports.DailyReportScreen
+import mx.ita.vitalsense.ui.reports.HealthSummaryScreen
 import mx.ita.vitalsense.ui.splash.SplashScreen
 import mx.ita.vitalsense.ui.chat.ChatBotScreen
 import mx.ita.vitalsense.ui.components.GlobalBottomNavigationBar
@@ -55,6 +57,9 @@ import mx.ita.vitalsense.ui.emergency.SosViewerScreen
 import mx.ita.vitalsense.ui.libre.LibreScanScreen
 import mx.ita.vitalsense.ui.medications.AddMedicationScreen
 import mx.ita.vitalsense.ui.medications.MedicationListScreen
+import mx.ita.vitalsense.ui.contact.ContactScreen
+import mx.ita.vitalsense.ui.legal.LegalHelpScreen
+import mx.ita.vitalsense.ui.rating.RatingScreen
 import mx.ita.vitalsense.MainActivity
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -76,6 +81,7 @@ object Route {
     const val PATIENT_DETAIL        = "patient_detail"
     const val REPORTE_DIARIO        = "reporte_diario"
     const val DAILY_REPORT          = "daily_report"
+    const val HEALTH_SUMMARY        = "health_summary"
     const val REPORTE_DETALLADO     = "reporte_detallado"
     const val DETAILED_REPORT       = "detailed_report"
     const val SLEEP_DETAIL          = "sleep_detail"
@@ -91,6 +97,9 @@ object Route {
     const val EMERGENCY_QR          = "emergency_qr"
     const val EMERGENCY_VIEWER      = "emergency_viewer"   // + /{tokenId}
     const val SOS_VIEWER            = "sos_viewer"         // + /{userId}/{sosId}
+    const val CONTACT               = "contact"
+    const val LEGAL_HELP            = "legal_help"
+    const val RATING                = "rating"
 }
 
 @Composable
@@ -101,6 +110,7 @@ fun AppNavigation() {
 
     // ViewModel de emergencia con scope del NavHost (sobrevive cambios de pantalla)
     val emergencyVm: EmergencyQrViewModel = viewModel()
+    val dashboardVm: DashboardViewModel = viewModel()
 
     // Manejo de deep links vitalsense:// cuando la app se abre desde el QR
     val context = LocalContext.current
@@ -312,7 +322,11 @@ fun AppNavigation() {
                         onLibreScanClick = { navController.navigate(Route.LIBRE_SCAN) },
                         onProfileClick = { navController.navigate(Route.EDITAR_PERFIL) },
                         onReportClick = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onSummaryClick = { navController.navigate(Route.HEALTH_SUMMARY) },
                         onNotifClick = { navController.navigate(Route.NOTIFICACIONES) },
+                        onContactClick = { navController.navigate(Route.CONTACT) },
+                        onLegalHelpClick = { navController.navigate(Route.LEGAL_HELP) },
+                        onRatingClick = { navController.navigate(Route.RATING) },
                         onEmergency = { vitals ->
                             val anomalyType = when {
                                 vitals.heartRate > 130 -> "Taquicardia severa (${vitals.heartRate} BPM)"
@@ -326,6 +340,7 @@ fun AppNavigation() {
                                 popUpTo(Route.DASHBOARD) { inclusive = true }
                             }
                         },
+                        vm = dashboardVm,
                     )
                 }
 
@@ -400,6 +415,13 @@ fun AppNavigation() {
                         onNavigateToSleepDetail = { score, minutos, sleepStartMillis, sleepEndMillis, estado ->
                             navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$sleepStartMillis&end=$sleepEndMillis&estado=$estado")
                         }
+                    )
+                }
+
+                composable(Route.HEALTH_SUMMARY) {
+                    HealthSummaryScreen(
+                        onBack = { navController.popBackStack() },
+                        vm = dashboardVm,
                     )
                 }
 
@@ -642,6 +664,18 @@ fun AppNavigation() {
                     LibreScanScreen(
                         onBack = { navController.popBackStack() },
                     )
+                }
+
+                composable(Route.CONTACT) {
+                    ContactScreen(onBack = { navController.popBackStack() })
+                }
+
+                composable(Route.LEGAL_HELP) {
+                    LegalHelpScreen(onBack = { navController.popBackStack() })
+                }
+
+                composable(Route.RATING) {
+                    RatingScreen(onBack = { navController.popBackStack() })
                 }
 
                 // ── Pantalla de QR de emergencia (paciente) ───────────────────

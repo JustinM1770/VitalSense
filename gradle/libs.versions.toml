@@ -31,11 +31,13 @@ biometric = "1.2.0-alpha05"
 imageCropper = "4.5.0"
 coil = "2.6.0"
 workManager = "2.10.1"
+appcompat = "1.7.1"
 
 [libraries]
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

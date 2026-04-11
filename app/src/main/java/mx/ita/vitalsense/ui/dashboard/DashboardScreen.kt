@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,14 +39,23 @@ import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Message
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -76,6 +87,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -84,13 +96,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.model.Medication
 import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
-import mx.ita.vitalsense.ui.components.BottomNav
-import mx.ita.vitalsense.ui.components.BottomNavTab
+import mx.ita.vitalsense.settings.AppSettings
+import mx.ita.vitalsense.ui.common.LockLandscapeOrientation
 import mx.ita.vitalsense.ui.theme.ChartRed
 import mx.ita.vitalsense.ui.theme.DashBg
 import mx.ita.vitalsense.ui.theme.DashBlue
@@ -114,6 +128,18 @@ private enum class LibreContextMode(val key: String, val label: String) {
     AUTO("auto", "Auto"),
     AYUNO("ayuno", "Ayuno"),
     POSTPRANDIAL("postprandial", "Postprandial"),
+}
+
+private enum class LanguageOption(val key: String, val labelRes: Int) {
+    ES("es", R.string.language_es),
+    EN("en", R.string.language_en),
+    PT("pt", R.string.language_pt),
+}
+
+private enum class ThemeOption(val key: String, val labelRes: Int) {
+    SYSTEM("system", R.string.theme_system),
+    LIGHT("light", R.string.theme_light),
+    DARK("dark", R.string.theme_dark),
 }
 
 // ─── Figma / Image design tokens ──────────────────────────────────────────────
@@ -153,9 +179,14 @@ fun DashboardScreen(
     onProfileClick: () -> Unit = {},
     onReportClick: () -> Unit = {},
     onNotifClick: () -> Unit = {},
+    onContactClick: () -> Unit = {},
+    onLegalHelpClick: () -> Unit = {},
+    onRatingClick: () -> Unit = {},
+    onSummaryClick: () -> Unit = {},
     onEmergency: (VitalsData) -> Unit = {},
     vm: DashboardViewModel = viewModel(),
 ) {
+    LockLandscapeOrientation()
     // Observar anomalías críticas detectadas por el ViewModel y disparar la pantalla de QR
     LaunchedEffect(vm) {
         vm.emergencyTrigger.collect { vitals ->
@@ -184,10 +215,12 @@ fun DashboardScreen(
     LaunchedEffect(uid) {
         if (uid.isEmpty()) return@LaunchedEffect
         try {
-            val snapshot = com.google.firebase.database.FirebaseDatabase.getInstance()
-                .getReference("patients/$uid/profile")
-                .get()
-                .await()
+            val snapshot = withContext(Dispatchers.IO) {
+                com.google.firebase.database.FirebaseDatabase.getInstance()
+                    .getReference("patients/$uid/profile")
+                    .get()
+                    .await()
+            }
             val remoteProfile = snapshot.child("glucoseProfileMode").getValue(String::class.java)
             val remoteContext = snapshot.child("glucoseContextMode").getValue(String::class.java)
             if (!remoteProfile.isNullOrBlank()) {
@@ -208,7 +241,8 @@ fun DashboardScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    Box(modifier = Modifier.fillMaxSize().background(DashBg)) {
+    val isDarkTheme = isSystemInDarkTheme()
+    Box(modifier = Modifier.fillMaxSize().background(if (isDarkTheme) MaterialTheme.colorScheme.background else DashBg)) {
         when (val state = uiState) {
             is DashboardUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = DashBlue, strokeWidth = 3.dp)
@@ -244,25 +278,13 @@ fun DashboardScreen(
                     libreGlucoseContext = libreGlucoseContext,
                     snackbarHostState = snackbarHostState,
                     onSearchClick = {
-                        coroutineScope.launch { snackbarHostState.showSnackbar("Función de búsqueda en desarrollo") }
+                        coroutineScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.dashboard_search_in_development)) }
                     },
                     onSettingsClick = { showSettingsDialog = true },
+                    onSummaryClick = onSummaryClick,
                 )
             }
         }
-
-        BottomNav(
-            selected = BottomNavTab.HOME,
-            onSelect = { tab ->
-                when (tab) {
-                    BottomNavTab.HEALTH  -> { onReportClick(); onNavigateToReports() }
-                    BottomNavTab.PROFILE -> { onProfileClick(); onNavigateToProfile() }
-                    BottomNavTab.CHAT    -> { onNotifClick(); onNavigateToChat() }
-                    else -> {}
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
 
         SnackbarHost(
             hostState = snackbarHostState,
@@ -303,7 +325,7 @@ fun DashboardScreen(
                 },
                 onRestoreBackupClick = {
                     if (uid.isBlank()) {
-                        coroutineScope.launch { snackbarHostState.showSnackbar("Inicia sesión para restaurar respaldo") }
+                        coroutineScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.dashboard_login_restore_backup)) }
                     } else {
                         coroutineScope.launch {
                             val result = restoreBackupFromFirebase(
@@ -320,6 +342,18 @@ fun DashboardScreen(
                             snackbarHostState.showSnackbar(result.message)
                         }
                     }
+                },
+                onContactClick = {
+                    showSettingsDialog = false
+                    onContactClick()
+                },
+                onLegalHelpClick = {
+                    showSettingsDialog = false
+                    onLegalHelpClick()
+                },
+                onRatingClick = {
+                    showSettingsDialog = false
+                    onRatingClick()
                 }
             )
         }
@@ -338,7 +372,8 @@ private suspend fun restoreBackupFromFirebase(
     profilePrefs: SharedPreferences,
     watchPrefs: SharedPreferences,
 ): RestoreBackupResult {
-    return try {
+    return withContext(Dispatchers.IO) {
+        try {
         val db = com.google.firebase.database.FirebaseDatabase.getInstance()
 
         val profileSnapshot = db.getReference("patients/$uid/profile").get().await()
@@ -413,8 +448,7 @@ private suspend fun restoreBackupFromFirebase(
         )
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
+}
 
 @Composable
 private fun DashboardContent(
@@ -441,6 +475,7 @@ private fun DashboardContent(
     snackbarHostState: SnackbarHostState,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onSummaryClick: () -> Unit,
 ) {
     val initialCards = remember(userId) { loadVisibleMetricCards(dashboardPrefs) }
     val visibleCards = remember(userId) { mutableStateListOf<MetricCardType>().apply { addAll(initialCards) } }
@@ -481,7 +516,7 @@ private fun DashboardContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
-                .background(BlueCardBg)
+                .background(if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceVariant else BlueCardBg)
                 .padding(24.dp)
         ) {
             // ── "Esta semana" — sleep / HR / Kcal pager ───────────────────────
@@ -489,7 +524,11 @@ private fun DashboardContent(
                 .filter { it !in visibleCards }
 
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader(title = "Esta semana", showArrow = true)
+                SectionHeader(
+                    title = stringResource(R.string.dashboard_this_week),
+                    showArrow = true,
+                    onClick = onSummaryClick,
+                )
                 Spacer(Modifier.weight(1f))
                 if (addableCards.isNotEmpty()) {
                     Surface(
@@ -540,7 +579,7 @@ private fun DashboardContent(
                             },
                             modifier = Modifier.align(Alignment.TopEnd),
                         ) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Quitar tarjeta", tint = DashBlue)
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.dashboard_remove_card), tint = DashBlue)
                         }
                     }
                 }
@@ -640,7 +679,7 @@ private fun UserHeader(
             if (!avatarUri.isNullOrBlank()) {
                 AsyncImage(
                     model = Uri.parse(avatarUri),
-                    contentDescription = "Avatar",
+                    contentDescription = stringResource(R.string.dashboard_avatar),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -658,7 +697,7 @@ private fun UserHeader(
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text("Bienvenido", color = TextGray, fontSize = 14.sp, fontFamily = Manrope)
+            Text(stringResource(R.string.dashboard_welcome), color = TextGray, fontSize = 14.sp, fontFamily = Manrope)
             Text(name, color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
         }
 
@@ -672,7 +711,7 @@ private fun UserHeader(
             ) {
                 Icon(
                     Icons.Filled.Notifications,
-                    contentDescription = "Notificaciones",
+                    contentDescription = stringResource(R.string.dashboard_notifications),
                     modifier = Modifier.padding(12.dp),
                     tint = TextDark
                 )
@@ -695,6 +734,7 @@ private fun UserHeader(
 
 @Composable
 private fun SearchBar(onSearchClick: () -> Unit, onSettingsClick: () -> Unit) {
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -707,27 +747,29 @@ private fun SearchBar(onSearchClick: () -> Unit, onSettingsClick: () -> Unit) {
                 .height(56.dp)
                 .clickable { onSearchClick() },
             shape = RoundedCornerShape(16.dp),
-            color = Color.White.copy(alpha = 0.5f)
+                color = colorScheme.surface,
+                tonalElevation = 2.dp,
+                shadowElevation = 0.dp,
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = TextGray)
+                Icon(Icons.Filled.Search, contentDescription = null, tint = colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(8.dp))
-                Text("Buscar paciente...", color = TextGray, fontFamily = Manrope)
+                Text(stringResource(R.string.dashboard_search_patient), color = colorScheme.onSurfaceVariant, fontFamily = Manrope)
             }
         }
         Spacer(Modifier.width(16.dp))
         Surface(
             modifier = Modifier.size(56.dp).clickable { onSettingsClick() },
             shape = RoundedCornerShape(16.dp),
-            color = PrimaryBlue
+            color = colorScheme.primary,
         ) {
             Icon(
                 Icons.Filled.Tune,
-                contentDescription = "Configuración",
-                tint = Color.White,
+                contentDescription = stringResource(R.string.settings_title),
+                tint = colorScheme.onPrimary,
                 modifier = Modifier.padding(16.dp)
             )
         }
@@ -760,8 +802,8 @@ private fun DeviceConnectionCard(onClick: () -> Unit) {
             }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Vincular Reloj / Sensor", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("Sincroniza tus signos vitales", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                Text(stringResource(R.string.dashboard_pair_watch_sensor), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(stringResource(R.string.dashboard_sync_vitals), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
             }
             Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = Color.White)
         }
@@ -797,13 +839,13 @@ private fun WatchStatusCard(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "$deviceName vinculado",
+                    stringResource(R.string.dashboard_device_linked, deviceName),
                     color = SuccessGreen,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp
                 )
                 Spacer(Modifier.weight(1f))
-                Text("Sincronizado", color = SuccessGreen, fontSize = 11.sp)
+                Text(stringResource(R.string.dashboard_synced), color = SuccessGreen, fontSize = 11.sp)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -814,7 +856,7 @@ private fun WatchStatusCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    "El reloj está enviando datos en tiempo real.",
+                    stringResource(R.string.dashboard_watch_realtime),
                     fontSize = 12.sp,
                     color = TextGray,
                     modifier = Modifier.weight(1f)
@@ -823,7 +865,7 @@ private fun WatchStatusCard(
                     onClick = onDisconnect,
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
                 ) {
-                    Text("Desvincular", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.dashboard_unpair), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -833,12 +875,50 @@ private fun WatchStatusCard(
 // ─── Section header ───────────────────────────────────────────────────────────
 
 @Composable
-private fun SectionHeader(title: String, showArrow: Boolean = false) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun SectionHeader(title: String, showArrow: Boolean = false, onClick: (() -> Unit)? = null) {
+    val rowModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    Row(modifier = rowModifier, verticalAlignment = Alignment.CenterVertically) {
         Text(title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
         if (showArrow) {
             Spacer(Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp), tint = TextDark)
+        }
+    }
+}
+
+@Composable
+private fun SummaryPreviewCard(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = DashBlue.copy(alpha = 0.14f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.MonitorHeart,
+                contentDescription = null,
+                tint = DashBlue,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = stringResource(R.string.dashboard_open_summary),
+                fontFamily = Manrope,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                contentDescription = null,
+                tint = DashBlue,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -856,7 +936,7 @@ private fun SleepMetricCard(sleepData: SleepData?, onClick: () -> Unit) {
         val state = sleepData?.estado?.takeIf { it.isNotBlank() } ?: "Regular"
         "$duration · $state"
     } else {
-        "No durmió"
+        stringResource(R.string.sleep_not_slept)
     }
     val sleepStatusColor = if (hasSleepData) SuccessGreen else TextGray
 
@@ -873,14 +953,14 @@ private fun SleepMetricCard(sleepData: SleepData?, onClick: () -> Unit) {
                     strokeWidth = 6.dp,
                     trackColor = SuccessGreen.copy(0.1f)
                 )
-                Text("$scoreText%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A2E), fontFamily = Manrope)
+                Text("$scoreText%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontFamily = Manrope)
             }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Sueño", color = SleepGreen, fontWeight = FontWeight.Bold, fontSize = 18.sp, fontFamily = Manrope)
+                Text(stringResource(R.string.sleep_title), color = SleepGreen, fontWeight = FontWeight.Bold, fontSize = 18.sp, fontFamily = Manrope)
                 val today = LocalDate.now()
                 Text(
-                    text = "${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }} ${today.year}",
+                    text = "${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).replaceFirstChar { it.uppercase() }} ${today.year}",
                     fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A),
                 )
                 Text(sleepStatus, color = sleepStatusColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
@@ -897,8 +977,8 @@ private fun HrMiniCard(patients: List<VitalsData>) {
             Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateCurve, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column {
-                Text("Ritmo cardiaco", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
-                Text(if (hr != null) "$hr BPM" else "-- BPM", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF1A1A2E))
+                Text(stringResource(R.string.dashboard_heart_rate_label), fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
+                Text(if (hr != null) "$hr BPM" else "-- BPM", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -908,8 +988,8 @@ private fun HrMiniCard(patients: List<VitalsData>) {
 private fun KcalMiniCard(patients: List<VitalsData>) {
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("--", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 36.sp, color = Color(0xFF1A1A2E))
-            Text("Kcal hoy", fontFamily = Manrope, fontSize = 14.sp, color = Color(0xFF8A8A8A))
+            Text("--", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 36.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.dashboard_kcal_today), fontFamily = Manrope, fontSize = 14.sp, color = Color(0xFF8A8A8A))
         }
     }
 }
@@ -923,7 +1003,7 @@ private fun Spo2MiniCard(patients: List<VitalsData>) {
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("SpO₂", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
-                Text("$spo2%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF1A1A2E))
+                Text("$spo2%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -955,15 +1035,15 @@ private fun HealthMetricsGraphCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Metricas de Salud",
+                    text = stringResource(R.string.dashboard_health_metrics),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = Color(0xFF1A1A2E),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Ver todo",
+                        stringResource(R.string.dashboard_view_all),
                         color = TextGray,
                         fontSize = 12.sp,
                         fontFamily = Manrope,
@@ -985,9 +1065,9 @@ private fun HealthMetricsGraphCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Favorite, null, tint = HeartRateCurve, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("$displayBpm BPM", fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Manrope, color = Color(0xFF1A1A2E))
+                    Text("$displayBpm BPM", fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Manrope, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.width(4.dp))
-                    Text("Frecuencia cardíaca", fontSize = 11.sp, color = TextGray, fontFamily = Manrope)
+                    Text(stringResource(R.string.dashboard_heart_rate_label), fontSize = 11.sp, color = TextGray, fontFamily = Manrope)
                 }
             }
         }
@@ -1010,22 +1090,22 @@ private fun MedicationsCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Medicamentos",
+                        text = stringResource(R.string.dashboard_medications),
                         fontFamily = Manrope,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color(0xFF1A1A2E),
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.width(4.dp))
                     Icon(
                         Icons.AutoMirrored.Outlined.ArrowForward,
                         contentDescription = null,
-                        tint = Color(0xFF1A1A2E),
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(16.dp),
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Ver todo", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF1A1A2E))
+                    Text(stringResource(R.string.dashboard_view_all), fontFamily = Manrope, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.width(8.dp))
                     ArrowCircle(onClick = onSeeAllClick)
                 }
@@ -1037,7 +1117,7 @@ private fun MedicationsCard(
 
             if (medications.isEmpty()) {
                 Text(
-                    text = "Sin medicamentos activos",
+                    text = stringResource(R.string.dashboard_no_active_medications),
                     fontFamily = Manrope,
                     fontSize = 13.sp,
                     color = Color(0xFF8A8A8A),
@@ -1070,7 +1150,7 @@ private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
     val last7Dates = (6 downTo 0).map { today.minusDays(it.toLong()) }
     val daySet = last7Dates.toSet()
     val dayLabels = last7Dates.map {
-        it.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es"))
+        it.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
             .replaceFirstChar { c -> c.uppercase() }
     }
 
@@ -1159,14 +1239,24 @@ private fun DateStrip() {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (isToday) DashBg.copy(alpha = 0.4f) else Color.Transparent)
+                    .background(
+                        if (isToday) {
+                            if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceVariant else DashBg.copy(alpha = 0.4f)
+                        } else {
+                            Color.Transparent
+                        }
+                    )
                     .padding(horizontal = if (isToday) 8.dp else 4.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 if (isToday) {
                     Text(
-                        text = "Hoy, ${day.dayOfMonth} ${day.month.getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("es")).replaceFirstChar { it.uppercase() }}",
-                        fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1A1A2E),
+                        text = stringResource(
+                            R.string.dashboard_today_date,
+                            day.dayOfMonth,
+                            day.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).replaceFirstChar { it.uppercase() }
+                        ),
+                        fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface,
                     )
                 } else {
                     Text("${day.dayOfMonth}", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFFB0B0B0))
@@ -1209,7 +1299,8 @@ private fun ArrowCircle(onClick: () -> Unit) {
 
 @Composable
 fun WhiteCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(modifier = modifier.clip(RoundedCornerShape(20.dp)).background(DashCard)) { content() }
+    val surfaceColor = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surface else DashCard
+    Box(modifier = modifier.clip(RoundedCornerShape(20.dp)).background(surfaceColor)) { content() }
 }
 
 @Composable
@@ -1221,12 +1312,27 @@ private fun LibreQuickCard(
     contextMode: String,
     onScanClick: () -> Unit,
 ) {
+    val libreLabels = LibreClinicalLabels(
+        noReading = stringResource(R.string.dashboard_glucose_status_no_reading),
+        generalProfile = stringResource(R.string.dashboard_glucose_profile_general),
+        diabetesProfile = stringResource(R.string.dashboard_glucose_profile_diabetes),
+        currentContext = stringResource(R.string.dashboard_glucose_context_current),
+        fastingContext = stringResource(R.string.dashboard_glucose_context_fasting),
+        postprandialContext = stringResource(R.string.dashboard_glucose_context_postprandial),
+        severeHypo = stringResource(R.string.dashboard_glucose_status_severe_hypo),
+        low = stringResource(R.string.dashboard_glucose_status_low),
+        inRange = stringResource(R.string.dashboard_glucose_status_in_range),
+        high = stringResource(R.string.dashboard_glucose_status_high),
+        veryHigh = stringResource(R.string.dashboard_glucose_status_very_high),
+        watch = stringResource(R.string.dashboard_glucose_status_watch),
+    )
     val clinical = evaluateLibreClinicalStatus(
         glucose = glucose,
         timestamp = timestamp,
         source = source,
         profileMode = profileMode,
         contextMode = contextMode,
+        labels = libreLabels,
     )
 
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
@@ -1235,7 +1341,7 @@ private fun LibreQuickCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = DashBlue)
                     Spacer(Modifier.width(8.dp))
-                    Text("Sensor de glucosa", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1A1A2E))
+                    Text(stringResource(R.string.dashboard_glucose_sensor), fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                 }
                 Spacer(Modifier.weight(1f))
                 Surface(
@@ -1244,7 +1350,7 @@ private fun LibreQuickCard(
                     modifier = Modifier.clickable { onScanClick() },
                 ) {
                     Text(
-                        "Escanear",
+                        stringResource(R.string.dashboard_scan),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = Color.White,
                         fontFamily = Manrope,
@@ -1271,20 +1377,20 @@ private fun LibreQuickCard(
             }
 
             Text(
-                text = "Objetivo ${clinical.contextLabel}: ${clinical.targetRange}",
+                text = stringResource(R.string.dashboard_glucose_target, clinical.contextLabel, clinical.targetRange),
                 fontFamily = Manrope,
                 fontSize = 11.sp,
                 color = Color(0xFF6B7280),
             )
             Text(
-                text = "Perfil clinico: ${clinical.profileLabel}",
+                text = stringResource(R.string.dashboard_clinical_profile, clinical.profileLabel),
                 fontFamily = Manrope,
                 fontSize = 11.sp,
                 color = Color(0xFF6B7280),
             )
 
             Text(
-                text = if (glucose > 0.0) "${"%.0f".format(glucose)} mg/dL" else "Sin lectura reciente",
+                text = if (glucose > 0.0) "${"%.0f".format(glucose)} mg/dL" else stringResource(R.string.dashboard_no_recent_reading),
                 fontFamily = Manrope,
                 fontWeight = FontWeight.Bold,
                 fontSize = 26.sp,
@@ -1292,9 +1398,12 @@ private fun LibreQuickCard(
             )
             Text(
                 text = if (timestamp > 0L) {
-                    "Actualizado: ${SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag("es")).format(Date(timestamp))}"
+                    stringResource(
+                        R.string.dashboard_updated_at,
+                        SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(timestamp))
+                    )
                 } else {
-                    "Acerca el sensor al telefono para guardar lectura"
+                    stringResource(R.string.dashboard_sensor_prompt)
                 },
                 fontFamily = Manrope,
                 fontSize = 12.sp,
@@ -1302,7 +1411,7 @@ private fun LibreQuickCard(
             )
             if (source.isNotBlank()) {
                 Text(
-                    text = "Fuente: $source",
+                    text = stringResource(R.string.dashboard_source, source),
                     fontFamily = Manrope,
                     fontSize = 11.sp,
                     color = Color(0xFF6B7280),
@@ -1320,20 +1429,36 @@ private data class LibreClinicalStatus(
     val contextLabel: String,
 )
 
+private data class LibreClinicalLabels(
+    val noReading: String,
+    val generalProfile: String,
+    val diabetesProfile: String,
+    val currentContext: String,
+    val fastingContext: String,
+    val postprandialContext: String,
+    val severeHypo: String,
+    val low: String,
+    val inRange: String,
+    val high: String,
+    val veryHigh: String,
+    val watch: String,
+)
+
 private fun evaluateLibreClinicalStatus(
     glucose: Double,
     timestamp: Long,
     source: String,
     profileMode: String,
     contextMode: String,
+    labels: LibreClinicalLabels,
 ): LibreClinicalStatus {
     if (glucose <= 0.0) {
         return LibreClinicalStatus(
-            statusText = "Sin lectura",
+            statusText = labels.noReading,
             statusColor = Color(0xFF9CA3AF),
             targetRange = "-",
-            profileLabel = "General",
-            contextLabel = "actual",
+            profileLabel = labels.generalProfile,
+            contextLabel = labels.currentContext,
         )
     }
 
@@ -1349,8 +1474,8 @@ private fun evaluateLibreClinicalStatus(
         else -> inferGlucoseContext(timestamp)
     }
 
-    val profileLabel = if (resolvedProfile == "diabetes") "Diabetes" else "General"
-    val contextLabel = if (resolvedContext == "postprandial") "postprandial" else "ayuno"
+    val profileLabel = if (resolvedProfile == "diabetes") labels.diabetesProfile else labels.generalProfile
+    val contextLabel = if (resolvedContext == "postprandial") labels.postprandialContext else labels.fastingContext
 
     val (targetMin, targetMax) = when {
         resolvedProfile == "diabetes" && resolvedContext == "postprandial" -> Pair(70.0, 180.0)
@@ -1363,12 +1488,12 @@ private fun evaluateLibreClinicalStatus(
     val isCriticalLow = glucose < 54.0
 
     val (statusText, statusColor) = when {
-        isCriticalLow -> Pair("Hipoglucemia severa", Color(0xFFB91C1C))
-        glucose < 70.0 -> Pair("Bajo", Color(0xFFEF4444))
-        glucose in targetMin..targetMax -> Pair("En rango", Color(0xFF10B981))
-        isCriticalHigh -> Pair("Muy alto", Color(0xFFB91C1C))
-        glucose > targetMax -> Pair("Alto", Color(0xFFF59E0B))
-        else -> Pair("Vigilar", Color(0xFFF59E0B))
+        isCriticalLow -> Pair(labels.severeHypo, Color(0xFFB91C1C))
+        glucose < 70.0 -> Pair(labels.low, Color(0xFFEF4444))
+        glucose in targetMin..targetMax -> Pair(labels.inRange, Color(0xFF10B981))
+        isCriticalHigh -> Pair(labels.veryHigh, Color(0xFFB91C1C))
+        glucose > targetMax -> Pair(labels.high, Color(0xFFF59E0B))
+        else -> Pair(labels.watch, Color(0xFFF59E0B))
     }
 
     return LibreClinicalStatus(
@@ -1395,11 +1520,11 @@ private fun QuickActionsCard(
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                "Acciones rápidas",
+                stringResource(R.string.dashboard_quick_actions),
                 fontFamily = Manrope,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = Color(0xFF1A1A2E),
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Surface(
@@ -1413,7 +1538,7 @@ private fun QuickActionsCard(
                     ) {
                         Icon(Icons.Rounded.MonitorHeart, null, tint = DashBlue)
                         Spacer(Modifier.width(8.dp))
-                        Text("Escanear glucosa", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DashBlue)
+                        Text(stringResource(R.string.dashboard_scan_glucose), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DashBlue)
                     }
                 }
 
@@ -1428,7 +1553,7 @@ private fun QuickActionsCard(
                     ) {
                         Icon(Icons.Rounded.Medication, null, tint = Color(0xFFB45309))
                         Spacer(Modifier.width(8.dp))
-                        Text("Ver medicamentos", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFFB45309))
+                        Text(stringResource(R.string.dashboard_view_medications), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFFB45309))
                     }
                 }
             }
@@ -1442,6 +1567,7 @@ fun DashWhiteCard(modifier: Modifier = Modifier, content: @Composable () -> Unit
 
 // ─── Settings Dialog ──────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsDialog(
     isWatchPaired: Boolean,
@@ -1452,41 +1578,60 @@ fun SettingsDialog(
     onLibreClick: () -> Unit,
     onLibreModeChanged: (String, String) -> Unit,
     onRestoreBackupClick: () -> Unit,
+    onContactClick: () -> Unit,
+    onLegalHelpClick: () -> Unit,
+    onRatingClick: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val colorScheme = MaterialTheme.colorScheme
     val prefs = remember { context.getSharedPreferences("vitalsense_watch_prefs", android.content.Context.MODE_PRIVATE) }
     var requireBiometric by remember { mutableStateOf(prefs.getBoolean("require_biometric", false)) }
     var selectedProfile by remember { mutableStateOf(libreProfileMode) }
     var selectedContext by remember { mutableStateOf(libreContextMode) }
+    var selectedLanguage by remember { mutableStateOf(AppSettings.getSavedLanguage(context)) }
+    var selectedTheme by remember { mutableStateOf(AppSettings.getSavedTheme(context)) }
+    var languageExpanded by remember { mutableStateOf(false) }
+    var themeExpanded by remember { mutableStateOf(false) }
 
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
     ) { granted ->
         if (granted.containsAll(mx.ita.vitalsense.data.health.HealthConnectRepository.PERMISSIONS)) {
-            android.widget.Toast.makeText(context, "Health Connect vinculado exitosamente", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, context.getString(R.string.dashboard_health_connect_linked), android.widget.Toast.LENGTH_SHORT).show()
         } else {
-            android.widget.Toast.makeText(context, "Permisos de Health Connect denegados", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, context.getString(R.string.dashboard_health_connect_denied), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = colorScheme.surface,
         title = {
-            Text("Configuración", fontWeight = FontWeight.Bold, color = TextDark)
+            Text(stringResource(R.string.settings_title), fontWeight = FontWeight.Bold, color = colorScheme.onSurface)
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 // Wearable
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
                     onWearableClick()
                 }) {
-                    Box(modifier = Modifier.size(40.dp).background(PrimaryBlue.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Watch, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(24.dp))
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.primary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Watch, contentDescription = null, tint = colorScheme.primary, modifier = Modifier.size(24.dp))
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Wearable", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
-                        Text(if (isWatchPaired) "Conectado y enviando datos" else "Desconectado", fontSize = 12.sp, color = TextGray)
+                        Text(stringResource(R.string.dashboard_wearable), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                        Text(
+                            if (isWatchPaired) stringResource(R.string.dashboard_connected_sending) else stringResource(R.string.dashboard_disconnected),
+                            fontSize = 12.sp,
+                            color = colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 
@@ -1495,41 +1640,41 @@ fun SettingsDialog(
                     if (mx.ita.vitalsense.data.health.HealthConnectRepository.isAvailable(context)) {
                         permissionLauncher.launch(mx.ita.vitalsense.data.health.HealthConnectRepository.PERMISSIONS)
                     } else {
-                        android.widget.Toast.makeText(context, "Health Connect no disponible en este dispositivo", android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.dashboard_health_connect_unavailable), android.widget.Toast.LENGTH_LONG).show()
                     }
                 }) {
-                    Box(modifier = Modifier.size(40.dp).background(SuccessGreen.copy(0.1f), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Favorite, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(24.dp))
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.secondary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Favorite, contentDescription = null, tint = colorScheme.secondary, modifier = Modifier.size(24.dp))
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Sincronizar Sueño", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
-                        Text("Vincular con Health Connect", fontSize = 12.sp, color = TextGray)
+                        Text(stringResource(R.string.dashboard_sync_sleep), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                        Text(stringResource(R.string.dashboard_link_health_connect), fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                     }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
                     onRestoreBackupClick()
                 }) {
-                    Box(modifier = Modifier.size(40.dp).background(Color(0xFFEEF2FF), CircleShape), contentAlignment = Alignment.Center) {
-                        Text("R", color = PrimaryBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.primary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Text("R", color = colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Restaurar respaldo", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
-                        Text("Forzar sincronización desde Firebase", fontSize = 12.sp, color = TextGray)
+                        Text(stringResource(R.string.dashboard_restore_backup), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                        Text(stringResource(R.string.dashboard_force_sync_firebase), fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                     }
                 }
 
                 // Biometrics
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(40.dp).background(Color(0xFFE0E0E0), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Fingerprint, contentDescription = null, tint = TextDark, modifier = Modifier.size(24.dp))
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Fingerprint, contentDescription = null, tint = colorScheme.onSurface, modifier = Modifier.size(24.dp))
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Seguridad Biométrica", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
-                        Text("Huella o rostro al iniciar app", fontSize = 12.sp, color = TextGray)
+                        Text(stringResource(R.string.dashboard_biometric_security), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                        Text(stringResource(R.string.dashboard_fingerprint_face), fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                     }
                     Switch(
                         checked = requireBiometric,
@@ -1541,29 +1686,141 @@ fun SettingsDialog(
                     )
                 }
 
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.settings_language), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = colorScheme.onSurface)
+                    ExposedDropdownMenuBox(
+                        expanded = languageExpanded,
+                        onExpandedChange = { languageExpanded = !languageExpanded },
+                    ) {
+                        OutlinedTextField(
+                            value = LanguageOption.entries.firstOrNull { it.key == selectedLanguage }?.let { stringResource(it.labelRes) }
+                                ?: stringResource(R.string.language_es),
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = languageExpanded) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colorScheme.onSurface,
+                                unfocusedTextColor = colorScheme.onSurface,
+                                focusedBorderColor = colorScheme.primary,
+                                unfocusedBorderColor = colorScheme.outline,
+                                focusedContainerColor = colorScheme.surface,
+                                unfocusedContainerColor = colorScheme.surface,
+                                focusedTrailingIconColor = colorScheme.onSurfaceVariant,
+                                unfocusedTrailingIconColor = colorScheme.onSurfaceVariant,
+                            ),
+                        )
+                        DropdownMenu(
+                            expanded = languageExpanded,
+                            onDismissRequest = { languageExpanded = false },
+                        ) {
+                            LanguageOption.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(option.labelRes)) },
+                                    onClick = {
+                                        selectedLanguage = option.key
+                                        languageExpanded = false
+                                        AppSettings.setLanguage(context, option.key)
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    Text(stringResource(R.string.settings_theme), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = colorScheme.onSurface)
+                    ExposedDropdownMenuBox(
+                        expanded = themeExpanded,
+                        onExpandedChange = { themeExpanded = !themeExpanded },
+                    ) {
+                        OutlinedTextField(
+                            value = ThemeOption.entries.firstOrNull { it.key == selectedTheme }?.let { stringResource(it.labelRes) }
+                                ?: stringResource(R.string.theme_system),
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colorScheme.onSurface,
+                                unfocusedTextColor = colorScheme.onSurface,
+                                focusedBorderColor = colorScheme.primary,
+                                unfocusedBorderColor = colorScheme.outline,
+                                focusedContainerColor = colorScheme.surface,
+                                unfocusedContainerColor = colorScheme.surface,
+                                focusedTrailingIconColor = colorScheme.onSurfaceVariant,
+                                unfocusedTrailingIconColor = colorScheme.onSurfaceVariant,
+                            ),
+                        )
+                        DropdownMenu(
+                            expanded = themeExpanded,
+                            onDismissRequest = { themeExpanded = false },
+                        ) {
+                            ThemeOption.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(option.labelRes)) },
+                                    onClick = {
+                                        selectedTheme = option.key
+                                        themeExpanded = false
+                                        AppSettings.setTheme(context, option.key)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onContactClick() }) {
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.primary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Message, contentDescription = null, tint = colorScheme.primary, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Text(stringResource(R.string.settings_contact), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onLegalHelpClick() }) {
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.primary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Favorite, contentDescription = null, tint = colorScheme.primary, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Text(stringResource(R.string.settings_legal_help), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { onRatingClick() }) {
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.tertiary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Favorite, contentDescription = null, tint = colorScheme.tertiary, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Text(stringResource(R.string.settings_rate_app), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                }
+
                 // Libre NFC
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
                     onLibreClick()
                 }) {
-                    Box(modifier = Modifier.size(40.dp).background(Color(0xFFFFF3E0), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = Color(0xFFF57C00), modifier = Modifier.size(24.dp))
+                    Box(modifier = Modifier.size(40.dp).background(colorScheme.secondary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = colorScheme.secondary, modifier = Modifier.size(24.dp))
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Escanear glucosa", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = TextDark)
-                        Text("Lectura NFC sin app del fabricante", fontSize = 12.sp, color = TextGray)
+                        Text(stringResource(R.string.dashboard_scan_glucose), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colorScheme.onSurface)
+                        Text(stringResource(R.string.dashboard_nfc_reading_no_vendor_app), fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                     }
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Objetivo clínico de glucosa", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextDark)
+                    Text(stringResource(R.string.dashboard_glucose_clinical_target), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = colorScheme.onSurface)
                     Text(
-                        "Define como interpretar lecturas: perfil del paciente y momento de medicion.",
+                        stringResource(R.string.dashboard_glucose_target_help),
                         fontSize = 11.sp,
-                        color = TextGray,
+                        color = colorScheme.onSurfaceVariant,
                     )
 
-                    Text("Perfil", fontSize = 12.sp, color = TextGray)
+                    Text(stringResource(R.string.dashboard_profile_label), fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -1571,7 +1828,7 @@ fun SettingsDialog(
                         LibreProfileMode.entries.forEach { mode ->
                             Surface(
                                 shape = RoundedCornerShape(999.dp),
-                                color = if (selectedProfile == mode.key) PrimaryBlue else Color(0xFFEAF2FF),
+                                color = if (selectedProfile == mode.key) colorScheme.primary else colorScheme.surfaceVariant,
                                 modifier = Modifier.clickable {
                                     selectedProfile = mode.key
                                     onLibreModeChanged(selectedProfile, selectedContext)
@@ -1580,7 +1837,7 @@ fun SettingsDialog(
                                 Text(
                                     text = mode.label,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                    color = if (selectedProfile == mode.key) Color.White else PrimaryBlue,
+                                    color = if (selectedProfile == mode.key) colorScheme.onPrimary else colorScheme.onSurface,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -1588,7 +1845,7 @@ fun SettingsDialog(
                         }
                     }
 
-                    Text("Contexto de lectura", fontSize = 12.sp, color = TextGray)
+                    Text(stringResource(R.string.dashboard_reading_context), fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -1596,7 +1853,7 @@ fun SettingsDialog(
                         LibreContextMode.entries.forEach { mode ->
                             Surface(
                                 shape = RoundedCornerShape(999.dp),
-                                color = if (selectedContext == mode.key) PrimaryBlue else Color(0xFFEAF2FF),
+                                color = if (selectedContext == mode.key) colorScheme.primary else colorScheme.surfaceVariant,
                                 modifier = Modifier.clickable {
                                     selectedContext = mode.key
                                     onLibreModeChanged(selectedProfile, selectedContext)
@@ -1605,7 +1862,7 @@ fun SettingsDialog(
                                 Text(
                                     text = mode.label,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                    color = if (selectedContext == mode.key) Color.White else PrimaryBlue,
+                                    color = if (selectedContext == mode.key) colorScheme.onPrimary else colorScheme.onSurface,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -1617,9 +1874,8 @@ fun SettingsDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Listo", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.dashboard_done), color = colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         },
-        containerColor = Color.White
     )
 }

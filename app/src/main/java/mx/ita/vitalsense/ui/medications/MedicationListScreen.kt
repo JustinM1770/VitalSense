@@ -27,6 +27,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +51,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.model.Medication
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
@@ -58,7 +61,7 @@ fun MedicationListScreen(
     onBack: () -> Unit,
     onAddMedication: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
     val auth = remember { FirebaseAuth.getInstance() }
     val database = remember { FirebaseDatabase.getInstance() }
     val userId = auth.currentUser?.uid.orEmpty()
@@ -91,7 +94,7 @@ fun MedicationListScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF7FAFF))) {
+    Box(modifier = Modifier.fillMaxSize().background(colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -110,15 +113,15 @@ fun MedicationListScreen(
                         .clickable { onBack() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar", tint = DashBlue)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back), tint = DashBlue)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Medicamentos", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = DashBlue)
-                    Text("Visualiza, elimina y agrega tus tratamientos", fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF6B7280))
+                    Text(stringResource(R.string.dashboard_medications), fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = colorScheme.onSurface)
+                    Text(stringResource(R.string.medication_manage_subtitle), fontFamily = Manrope, fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onAddMedication) {
-                    Icon(Icons.Filled.Add, contentDescription = "Agregar medicamento", tint = DashBlue)
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.medication_add), tint = DashBlue)
                 }
             }
 
@@ -126,7 +129,7 @@ fun MedicationListScreen(
 
             Surface(
                 shape = RoundedCornerShape(18.dp),
-                color = Color.White,
+                color = colorScheme.surface,
                 shadowElevation = 2.dp,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -136,11 +139,11 @@ fun MedicationListScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column {
-                        Text("Total registrados", fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF6B7280))
-                        Text("${medications.size}", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color(0xFF111827))
+                        Text(stringResource(R.string.medication_total_registered), fontFamily = Manrope, fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
+                        Text("${medications.size}", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = colorScheme.onSurface)
                     }
                     TextButton(onClick = onAddMedication, colors = ButtonDefaults.textButtonColors(contentColor = DashBlue)) {
-                        Text("Agregar otro", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.medication_add_another), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -154,7 +157,7 @@ fun MedicationListScreen(
             } else if (medications.isEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
+                    color = colorScheme.surface,
                     shadowElevation = 1.dp,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -162,12 +165,12 @@ fun MedicationListScreen(
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text("Todavía no has agregado medicamentos", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFF111827))
+                        Text(stringResource(R.string.medication_empty_title), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = colorScheme.onSurface)
                         Spacer(Modifier.height(8.dp))
-                        Text("Agrega el primero para empezar a recibir recordatorios.", fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF6B7280))
+                        Text(stringResource(R.string.medication_empty_body), fontFamily = Manrope, fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(16.dp))
                         Button(onClick = onAddMedication, colors = ButtonDefaults.buttonColors(containerColor = DashBlue)) {
-                            Text("Agregar medicamento", color = Color.White)
+                            Text(stringResource(R.string.medication_add), color = Color.White)
                         }
                     }
                 }
@@ -187,8 +190,8 @@ fun MedicationListScreen(
         if (pendingDelete != null) {
             AlertDialog(
                 onDismissRequest = { pendingDelete = null },
-                title = { Text("Eliminar medicamento") },
-                text = { Text("Esta acción eliminará ${pendingDelete?.nombre ?: "este medicamento"} de tu lista.") },
+                title = { Text(stringResource(R.string.medication_delete_title)) },
+                text = { Text(stringResource(R.string.medication_delete_message, pendingDelete?.nombre ?: stringResource(R.string.medication_this_item))) },
                 confirmButton = {
                     TextButton(onClick = {
                         val med = pendingDelete ?: return@TextButton
@@ -196,12 +199,12 @@ fun MedicationListScreen(
                         ref.removeValue()
                         pendingDelete = null
                     }) {
-                        Text("Eliminar", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.medication_delete_confirm), color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { pendingDelete = null }) {
-                        Text("Cancelar", color = DashBlue)
+                        Text(stringResource(R.string.common_cancel), color = DashBlue)
                     }
                 },
             )
@@ -217,7 +220,7 @@ private fun MedicationCard(
 ) {
     Surface(
         shape = RoundedCornerShape(18.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -234,26 +237,26 @@ private fun MedicationCard(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(medication.nombre, fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF111827))
-                    Text(medication.cadaCuanto.ifBlank { "Sin frecuencia" }, fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF6B7280))
+                    Text(medication.nombre, fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(medication.cadaCuanto.ifBlank { stringResource(R.string.medication_no_frequency) }, fontFamily = Manrope, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Eliminar", tint = Color(0xFFDC2626))
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.medication_delete_confirm), tint = Color(0xFFDC2626))
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill(medication.duracion.ifBlank { "Sin duración" })
-                Pill(medication.recordatorioHora.ifBlank { "Sin hora" })
-                Pill(if (medication.activo) "Activo" else "Inactivo")
+                Pill(medication.duracion.ifBlank { stringResource(R.string.medication_no_duration) })
+                Pill(medication.recordatorioHora.ifBlank { stringResource(R.string.medication_no_time) })
+                Pill(if (medication.activo) stringResource(R.string.medication_active) else stringResource(R.string.medication_inactive))
             }
 
             Spacer(Modifier.height(12.dp))
 
             TextButton(onClick = onOpen, colors = ButtonDefaults.textButtonColors(contentColor = DashBlue)) {
-                Text("Agregar otro", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.medication_add_another), fontWeight = FontWeight.Bold)
             }
         }
     }
