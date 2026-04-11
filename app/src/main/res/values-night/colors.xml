@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark mode theme colors for splash and system bars -->
+    <color name="background">#0B1220</color>
+    <color name="on_background">#E2E8F0</color>
+</resources>

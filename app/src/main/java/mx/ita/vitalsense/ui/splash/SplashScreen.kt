@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -129,19 +130,33 @@ fun SplashScreen(
         ).authenticate(buildPromptInfo())
     }
 
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = MaterialTheme.colorScheme.background
+    
+    // Gradiente adaptativo: en modo oscuro usa degradado a un azul más oscuro,
+    // en modo claro mantiene el gradiente original
+    val gradientBrush = if (isDarkTheme) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.00f to backgroundColor,
+                1.00f to backgroundColor,
+            ),
+        )
+    } else {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.00f to GradientStart,
+                0.50f to GradientStart,
+                0.90f to GradientEnd,
+                1.00f to GradientEnd,
+            ),
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.00f to GradientStart,
-                        0.50f to GradientStart,
-                        0.90f to GradientEnd,
-                        1.00f to GradientEnd,
-                    ),
-                ),
-            ),
+            .background(gradientBrush),
         contentAlignment = Alignment.Center,
     ) {
         Column(
