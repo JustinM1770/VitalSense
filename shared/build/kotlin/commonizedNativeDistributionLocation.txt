@@ -1,1 +1,1 @@
-C:\Users\jonny\.konan\kotlin-native-prebuilt-windows-x86_64-2.2.10\klib\commonized\2.2.10
+/Users/justin/.konan/kotlin-native-prebuilt-macos-aarch64-2.2.10/klib/commonized/2.2.10

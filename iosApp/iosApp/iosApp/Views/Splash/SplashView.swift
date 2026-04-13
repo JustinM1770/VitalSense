@@ -1,38 +1,132 @@
+#if os(iOS)
 import SwiftUI
+import LocalAuthentication
+import FirebaseAuth
 
 struct SplashView: View {
     let onFinish: () -> Void
-    @State private var opacity = 0.0
+    @State private var opacity  = 0.0
+    @State private var showFaceID = false
+    @State private var authError: String? = nil
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color.white, Color(hex: "#B6D8FF")],
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            Color(hex: "#FFFEFE").ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                Image(systemName: "eye.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 80, height: 80)
-                    .foregroundColor(Color(hex: "#1169FF"))
+            // Elipse decorativa de fondo (Figma: Ellipse 259 #FFFEFE)
+            Ellipse()
+                .fill(Color.onboardingButtonText.opacity(0.4))
+                .frame(width: 350, height: 350)
+                .offset(y: -100)
+                .blur(radius: 60)
 
+            VStack(spacing: 16) {
+                // Logo — usa asset si existe, sino SF Symbol
+                if UIImage(named: "ic_logo_eye") != nil {
+                    Image("ic_logo_eye")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 180, height: 120)
+                } else {
+                    Image(systemName: "eye.circle.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 90, height: 90)
+                        .foregroundColor(Color.primaryBlue)
+                }
+
+                // "VitalSense" branding
                 HStack(spacing: 0) {
                     Text("Vital")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color(hex: "#0A2540"))
+                        .font(.manropeBold(size: 36))
+                        .foregroundColor(Color(hex: "#0F172A"))
                     Text("Sense")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Color(hex: "#52A2C4"))
+                        .font(.manropeBold(size: 36))
+                        .foregroundColor(Color.primaryBlue)
+                }
+
+                if showFaceID {
+                    VStack(spacing: 8) {
+                        Image(systemName: "faceid")
+                            .font(.manropeBold(size: 36))
+                            .foregroundColor(Color.primaryBlue)
+                            .padding(.top, 16)
+
+                        Text("Autenticando...")
+                            .font(.manrope(size: 14))
+                            .foregroundColor(Color.textSecondary)
+
+                        if let error = authError {
+                            Text(error)
+                                .font(.manrope(size: 12))
+                                .foregroundColor(Color.heartRateRed)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+
+                            Button("Reintentar") {
+                                authError = nil
+                                authenticateWithBiometrics()
+                            }
+                            .font(.manropeSemiBold(size: 14))
+                            .foregroundColor(Color.primaryBlue)
+                            .padding(.top, 4)
+
+                            Button("Continuar sin Face ID") {
+                                onFinish()
+                            }
+                            .font(.manrope(size: 13))
+                            .foregroundColor(Color.textSecondary)
+                        }
+                    }
                 }
             }
             .opacity(opacity)
         }
         .onAppear {
-            withAnimation(.easeIn(duration: 0.8)) { opacity = 1.0 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { onFinish() }
+            withAnimation(.easeInOut(duration: 0.8)) { opacity = 1.0 }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                let user = Auth.auth().currentUser
+                guard user != nil else {
+                    onFinish()
+                    return
+                }
+
+                let uid = user!.uid
+                let hasBiometric = UserDefaults.standard.bool(forKey: "require_biometric_\(uid)")
+
+                if hasBiometric {
+                    showFaceID = true
+                    authenticateWithBiometrics()
+                } else {
+                    onFinish()
+                }
+            }
+        }
+    }
+
+    private func authenticateWithBiometrics() {
+        let ctx = LAContext()
+        var error: NSError?
+
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            onFinish()
+            return
+        }
+
+        ctx.evaluatePolicy(
+            .deviceOwnerAuthenticationWithBiometrics,
+            localizedReason: "Verifica tu identidad para acceder a VitalSense"
+        ) { success, evalError in
+            DispatchQueue.main.async {
+                if success {
+                    onFinish()
+                } else {
+                    authError = evalError?.localizedDescription ?? "Autenticación fallida"
+                }
+            }
         }
     }
 }
+
+#endif

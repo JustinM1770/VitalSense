@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.dt.InterfaceBuilder3.CocoaTouch.WatchKit.Storyboard" version="3.0"
+    toolsVersion="21701"
+    targetRuntime="watchOS"
+    propertyAccessControl="none"
+    useAutolayout="YES"
+    useTraitCollections="YES">
+    <dependencies>
+        <deployment identifier="watchOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21678"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!-- ═══════════════════════════════════════════════════════
+             Main Interface Controller — entry point
+        ═══════════════════════════════════════════════════════ -->
+        <scene sceneID="BiometricWatch-scene-001">
+            <objects>
+                <interfaceController
+                    id="BiometricWatch-ic-001"
+                    customClass="InterfaceController"
+                    sceneMemberID="viewController"
+                    initialViewController="YES">
+
+                    <items>
+                        <!-- Heart Rate label -->
+                        <label
+                            id="BiometricWatch-label-hr"
+                            text="-- bpm"
+                            textColor="#FFFFFF"
+                            font="UICTFontTextStyleHeadline"
+                            alpha="1"
+                            horizontalAlignment="center"
+                            key="body">
+                            <connections>
+                                <outlet property="heartRateLabel" destination="BiometricWatch-ic-001" id="BiometricWatch-outlet-hr"/>
+                            </connections>
+                        </label>
+
+                        <!-- Status / SpO2 / Emergency label -->
+                        <label
+                            id="BiometricWatch-label-status"
+                            text="Iniciando..."
+                            textColor="#AAAAAA"
+                            font="UICTFontTextStyleCaption1"
+                            alpha="1"
+                            horizontalAlignment="center"
+                            key="body">
+                            <connections>
+                                <outlet property="statusLabel" destination="BiometricWatch-ic-001" id="BiometricWatch-outlet-status"/>
+                            </connections>
+                        </label>
+
+                        <!-- SOS Button -->
+                        <button
+                            id="BiometricWatch-btn-sos"
+                            title="SOS"
+                            contentInsets="{4,8,4,8}"
+                            key="body">
+                            <connections>
+                                <outlet property="sosButton" destination="BiometricWatch-ic-001" id="BiometricWatch-outlet-sos"/>
+                                <action selector="sosTapped" destination="BiometricWatch-ic-001" id="BiometricWatch-action-sos"/>
+                            </connections>
+                        </button>
+                    </items>
+
+                    <point key="canvasLocation" x="20" y="20"/>
+                </interfaceController>
+            </objects>
+            <point key="canvasLocation" x="0" y="0"/>
+        </scene>
+    </scenes>
+</document>

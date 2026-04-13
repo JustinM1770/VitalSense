@@ -7,16 +7,67 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0E5AAB7806354B9F81CCDC87 /* PairingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27172D67F1D542D68EA2E69A /* PairingManager.swift */; };
+		1F74B081AD8B44C8A1C6BB5F /* HealthKitWatchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7AFCF4C7D7A40509F582269 /* HealthKitWatchManager.swift */; };
+		4AC502AF833F44DDAAF927AB /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A72DA75F0E41ECA8497B84 /* WatchConnectivityManager.swift */; };
+		738D18D10E1C4843B85F2A6D /* ShakeDetectorWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A81663855145D38ED85B93 /* ShakeDetectorWatch.swift */; };
+		8B392AD98F6D4256871D2BB1 /* InterfaceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5BD041D67E542E8A4905B93 /* InterfaceController.swift */; };
+		9CB0856C6B2E40A8A373E2A9 /* SosQrInterfaceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B93B2E545AE143938E04205B /* SosQrInterfaceController.swift */; };
+		AA00001100AA00BB00CC00DD /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = AA00001000AA00BB00CC00DD /* GoogleSignIn */; };
+		B8043479BF2B48949CC9F127 /* PairingInterfaceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC194D12CC44CBC8B18923C /* PairingInterfaceController.swift */; };
 		BB10002CAABB12DE00CCDD00 /* shared.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB10001CAABB12DE00CCDD00 /* shared.xcframework */; };
+		C95F9CF6AF3D4E65BD675AA2 /* WatchFirebaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B267161E4349B182CB244D /* WatchFirebaseService.swift */; };
+		CC00002200CC00DD00EE00FF /* FallDetectorWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00001100CC00DD00EE00FF /* FallDetectorWatch.swift */; };
 		D050919D2F6C625C00B5DB2F /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D050919C2F6C625C00B5DB2F /* FirebaseAuth */; };
 		D050919F2F6C626000B5DB2F /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = D050919E2F6C626000B5DB2F /* FirebaseDatabase */; };
-		D05091A12F6C626A00B5DB2F /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = D05091A02F6C626A00B5DB2F /* FirebaseCore */; };
-		AA00001100AA00BB00CC00DD /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = AA00001000AA00BB00CC00DD /* GoogleSignIn */; };
+		D07907972F7ED28300DB5B1C /* biometricwatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D079078D2F7ED28000DB5B1C /* biometricwatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D4D6EC8131514BA6802D7116 /* VitalSignsServiceWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F2C539A22D421BBA0C0956 /* VitalSignsServiceWatch.swift */; };
+		DA095A9252594E16B287E18A /* QRCodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42C403AD410D43318F557610 /* QRCodeGenerator.swift */; };
+		E0C1318ED1E24B3FBE15471E /* SpO2ManagerWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C2509704CF74B89AA63C613 /* SpO2ManagerWatch.swift */; };
+		E9C19B34A12B497483A68166 /* EmergencyQrInterfaceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5F0B4745254888A5022C3A /* EmergencyQrInterfaceController.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		D07907952F7ED28300DB5B1C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D05091302F6C5AC200B5DB2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D079078C2F7ED28000DB5B1C;
+			remoteInfo = "biometricwatch Watch App";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D07907982F7ED28300DB5B1C /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				D07907972F7ED28300DB5B1C /* biometricwatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		09B267161E4349B182CB244D /* WatchFirebaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WatchFirebaseService.swift; path = ../BiometricWatch/WatchFirebaseService.swift; sourceTree = "<group>"; };
+		27172D67F1D542D68EA2E69A /* PairingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PairingManager.swift; path = ../BiometricWatch/PairingManager.swift; sourceTree = "<group>"; };
+		37A81663855145D38ED85B93 /* ShakeDetectorWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ShakeDetectorWatch.swift; path = ../BiometricWatch/ShakeDetectorWatch.swift; sourceTree = "<group>"; };
+		42C403AD410D43318F557610 /* QRCodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = QRCodeGenerator.swift; path = ../BiometricWatch/QRCodeGenerator.swift; sourceTree = "<group>"; };
+		6C2509704CF74B89AA63C613 /* SpO2ManagerWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SpO2ManagerWatch.swift; path = ../BiometricWatch/SpO2ManagerWatch.swift; sourceTree = "<group>"; };
+		6F5F0B4745254888A5022C3A /* EmergencyQrInterfaceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EmergencyQrInterfaceController.swift; path = ../BiometricWatch/EmergencyQrInterfaceController.swift; sourceTree = "<group>"; };
+		77F2C539A22D421BBA0C0956 /* VitalSignsServiceWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VitalSignsServiceWatch.swift; path = ../BiometricWatch/VitalSignsServiceWatch.swift; sourceTree = "<group>"; };
+		9DC194D12CC44CBC8B18923C /* PairingInterfaceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PairingInterfaceController.swift; path = ../BiometricWatch/PairingInterfaceController.swift; sourceTree = "<group>"; };
+		A7AFCF4C7D7A40509F582269 /* HealthKitWatchManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HealthKitWatchManager.swift; path = ../BiometricWatch/HealthKitWatchManager.swift; sourceTree = "<group>"; };
+		B93B2E545AE143938E04205B /* SosQrInterfaceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SosQrInterfaceController.swift; path = ../BiometricWatch/SosQrInterfaceController.swift; sourceTree = "<group>"; };
 		BB10001CAABB12DE00CCDD00 /* shared.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = shared.xcframework; path = ../../shared/build/XCFrameworks/release/shared.xcframework; sourceTree = SOURCE_ROOT; };
+		CC00001100CC00DD00EE00FF /* FallDetectorWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FallDetectorWatch.swift; path = ../BiometricWatch/FallDetectorWatch.swift; sourceTree = "<group>"; };
 		D05091382F6C5AC200B5DB2F /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D079078D2F7ED28000DB5B1C /* biometricwatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "biometricwatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D5BD041D67E542E8A4905B93 /* InterfaceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InterfaceController.swift; path = ../BiometricWatch/InterfaceController.swift; sourceTree = "<group>"; };
+		F8A72DA75F0E41ECA8497B84 /* WatchConnectivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WatchConnectivityManager.swift; path = ../BiometricWatch/WatchConnectivityManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -38,6 +89,11 @@
 			path = iosApp;
 			sourceTree = "<group>";
 		};
+		D079078E2F7ED28000DB5B1C /* biometricwatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "biometricwatch Watch App";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,10 +102,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				D050919F2F6C626000B5DB2F /* FirebaseDatabase in Frameworks */,
-				D05091A12F6C626A00B5DB2F /* FirebaseCore in Frameworks */,
 				D050919D2F6C625C00B5DB2F /* FirebaseAuth in Frameworks */,
 				AA00001100AA00BB00CC00DD /* GoogleSignIn in Frameworks */,
 				BB10002CAABB12DE00CCDD00 /* shared.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D079078A2F7ED28000DB5B1C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,8 +122,10 @@
 			isa = PBXGroup;
 			children = (
 				D050913A2F6C5AC200B5DB2F /* iosApp */,
+				D079078E2F7ED28000DB5B1C /* biometricwatch Watch App */,
 				D050919B2F6C625C00B5DB2F /* Frameworks */,
 				D05091392F6C5AC200B5DB2F /* Products */,
+				D07D982C2F7F044600574EF8 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -69,6 +133,7 @@
 			isa = PBXGroup;
 			children = (
 				D05091382F6C5AC200B5DB2F /* iosApp.app */,
+				D079078D2F7ED28000DB5B1C /* biometricwatch Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -81,6 +146,26 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		D07D982C2F7F044600574EF8 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				6F5F0B4745254888A5022C3A /* EmergencyQrInterfaceController.swift */,
+				A7AFCF4C7D7A40509F582269 /* HealthKitWatchManager.swift */,
+				D5BD041D67E542E8A4905B93 /* InterfaceController.swift */,
+				9DC194D12CC44CBC8B18923C /* PairingInterfaceController.swift */,
+				27172D67F1D542D68EA2E69A /* PairingManager.swift */,
+				42C403AD410D43318F557610 /* QRCodeGenerator.swift */,
+				37A81663855145D38ED85B93 /* ShakeDetectorWatch.swift */,
+				B93B2E545AE143938E04205B /* SosQrInterfaceController.swift */,
+				6C2509704CF74B89AA63C613 /* SpO2ManagerWatch.swift */,
+				77F2C539A22D421BBA0C0956 /* VitalSignsServiceWatch.swift */,
+				F8A72DA75F0E41ECA8497B84 /* WatchConnectivityManager.swift */,
+				09B267161E4349B182CB244D /* WatchFirebaseService.swift */,
+				CC00001100CC00DD00EE00FF /* FallDetectorWatch.swift */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -91,10 +176,12 @@
 				D05091342F6C5AC200B5DB2F /* Sources */,
 				D05091352F6C5AC200B5DB2F /* Frameworks */,
 				D05091362F6C5AC200B5DB2F /* Resources */,
+				D07907982F7ED28300DB5B1C /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D07907962F7ED28300DB5B1C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				D050913A2F6C5AC200B5DB2F /* iosApp */,
@@ -103,11 +190,32 @@
 			packageProductDependencies = (
 				D050919C2F6C625C00B5DB2F /* FirebaseAuth */,
 				D050919E2F6C626000B5DB2F /* FirebaseDatabase */,
-				D05091A02F6C626A00B5DB2F /* FirebaseCore */,
 				AA00001000AA00BB00CC00DD /* GoogleSignIn */,
 			);
 			productName = iosApp;
 			productReference = D05091382F6C5AC200B5DB2F /* iosApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D079078C2F7ED28000DB5B1C /* biometricwatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D079079B2F7ED28300DB5B1C /* Build configuration list for PBXNativeTarget "biometricwatch Watch App" */;
+			buildPhases = (
+				D07907892F7ED28000DB5B1C /* Sources */,
+				D079078A2F7ED28000DB5B1C /* Frameworks */,
+				D079078B2F7ED28000DB5B1C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D079078E2F7ED28000DB5B1C /* biometricwatch Watch App */,
+			);
+			name = "biometricwatch Watch App";
+			packageProductDependencies = (
+			);
+			productName = "biometricwatch Watch App";
+			productReference = D079078D2F7ED28000DB5B1C /* biometricwatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -117,11 +225,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					D05091372F6C5AC200B5DB2F = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					D079078C2F7ED28000DB5B1C = {
+						CreatedOnToolsVersion = 26.4;
 					};
 				};
 			};
@@ -136,7 +247,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-				AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "google-signin-ios" */,
+				AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D05091392F6C5AC200B5DB2F /* Products */;
@@ -144,12 +255,20 @@
 			projectRoot = "";
 			targets = (
 				D05091372F6C5AC200B5DB2F /* iosApp */,
+				D079078C2F7ED28000DB5B1C /* biometricwatch Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		D05091362F6C5AC200B5DB2F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D079078B2F7ED28000DB5B1C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -166,7 +285,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D07907892F7ED28000DB5B1C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E9C19B34A12B497483A68166 /* EmergencyQrInterfaceController.swift in Sources */,
+				1F74B081AD8B44C8A1C6BB5F /* HealthKitWatchManager.swift in Sources */,
+				8B392AD98F6D4256871D2BB1 /* InterfaceController.swift in Sources */,
+				B8043479BF2B48949CC9F127 /* PairingInterfaceController.swift in Sources */,
+				0E5AAB7806354B9F81CCDC87 /* PairingManager.swift in Sources */,
+				DA095A9252594E16B287E18A /* QRCodeGenerator.swift in Sources */,
+				738D18D10E1C4843B85F2A6D /* ShakeDetectorWatch.swift in Sources */,
+				CC00002200CC00DD00EE00FF /* FallDetectorWatch.swift in Sources */,
+				9CB0856C6B2E40A8A373E2A9 /* SosQrInterfaceController.swift in Sources */,
+				E0C1318ED1E24B3FBE15471E /* SpO2ManagerWatch.swift in Sources */,
+				D4D6EC8131514BA6802D7116 /* VitalSignsServiceWatch.swift in Sources */,
+				4AC502AF833F44DDAAF927AB /* WatchConnectivityManager.swift in Sources */,
+				C95F9CF6AF3D4E65BD675AA2 /* WatchFirebaseService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D07907962F7ED28300DB5B1C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D079078C2F7ED28000DB5B1C /* biometricwatch Watch App */;
+			targetProxy = D07907952F7ED28300DB5B1C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		D05091412F6C5ACC00B5DB2F /* Debug */ = {
@@ -222,7 +369,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -280,7 +427,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -295,11 +442,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 74SD88NBH3;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -312,7 +460,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = VitalSense.iosApp;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.vitalsense.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -329,11 +477,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 74SD88NBH3;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -346,7 +495,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = VitalSense.iosApp;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.vitalsense.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -355,6 +504,76 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D07907992F7ED28300DB5B1C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ../BiometricWatch/BiometricWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74SD88NBH3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../BiometricWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "BioMetric AI";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = mx.ita.vitalsense.ios;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.vitalsense.ios.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+			};
+			name = Debug;
+		};
+		D079079A2F7ED28300DB5B1C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ../BiometricWatch/BiometricWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74SD88NBH3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../BiometricWatch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "BioMetric AI";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = mx.ita.vitalsense.ios;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mx.ita.vitalsense.ios.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
 			};
 			name = Release;
 		};
@@ -379,18 +598,19 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		D079079B2F7ED28300DB5B1C /* Build configuration list for PBXNativeTarget "biometricwatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D07907992F7ED28300DB5B1C /* Debug */,
+				D079079A2F7ED28300DB5B1C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 12.11.0;
-			};
-		};
-		AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "google-signin-ios" */ = {
+		AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
 			requirement = {
@@ -398,9 +618,22 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 11.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		AA00001000AA00BB00CC00DD /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
 		D050919C2F6C625C00B5DB2F /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
@@ -410,16 +643,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseDatabase;
-		};
-		D05091A02F6C626A00B5DB2F /* FirebaseCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D05091942F6C5EA300B5DB2F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseCore;
-		};
-		AA00001000AA00BB00CC00DD /* GoogleSignIn */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA00000F00AA00BB00CC00DD /* XCRemoteSwiftPackageReference "google-signin-ios" */;
-			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

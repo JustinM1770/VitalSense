@@ -369,24 +369,16 @@ fun CodeScreen(code: String) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.align(Alignment.Center)
         ) {
-            // Logo VitalSense
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Vital",
-                    color = Color(0xFF1E293B), // Slate 800
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Sense",
-                    color = Color(0xFF3B82F6), // Blue 500
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
+            // Logo Biometric
+            Text(
+                text = "Biometric",
+                color = Color(0xFF3B82F6),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+
             Spacer(Modifier.height(16.dp))
-            
+
             // Código espaciado
             val formattedCode = code.chunked(1).joinToString(" ")
             Text(
@@ -444,24 +436,16 @@ fun SuccessScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.align(Alignment.Center)
         ) {
-            // Logo VitalSense
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Vital",
-                    color = Color(0xFF1E293B), // Slate 800
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Sense",
-                    color = Color(0xFF3B82F6), // Blue 500
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
+            // Logo Biometric
+            Text(
+                text = "Biometric",
+                color = Color(0xFF3B82F6),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+
             Spacer(Modifier.height(16.dp))
-            
+
             // Green Checkmark icon
             Box(
                 modifier = Modifier

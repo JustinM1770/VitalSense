@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VitalSense — Panel Médico</title>
+  <style>
+    :root {
+      --primary: #1169FF;
+      --primary-light: #95C3F8;
+      --danger: #EA4335;
+      --warning: #F59E0B;
+      --success: #34A853;
+      --bg: #F8FAFF;
+      --card: #FFFFFF;
+      --text: #040415;
+      --muted: #8C8C8C;
+      --border: #E5E7EB;
+      --navy: #03314B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, var(--navy) 0%, #1169FF 100%);
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(17,105,255,0.3);
+    }
+    .header-logo { display: flex; align-items: center; gap: 12px; }
+    .header-logo .pulse { width: 36px; height: 36px; background: rgba(255,255,255,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .header-logo h1 { color: white; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .header-logo span { color: rgba(255,255,255,0.7); font-size: 13px; }
+    .header-right { color: rgba(255,255,255,0.8); font-size: 13px; text-align: right; }
+    .live-dot { display: inline-block; width: 8px; height: 8px; background: #4ade80; border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.3); } }
+
+    /* Layout */
+    .main { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+
+    /* Stats bar */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--card); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+    .stat-card .label { font-size: 12px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .stat-card .value { font-size: 32px; font-weight: 700; color: var(--text); }
+    .stat-card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .stat-card.danger .value { color: var(--danger); }
+    .stat-card.warning .value { color: var(--warning); }
+    .stat-card.success .value { color: var(--success); }
+    .stat-card.primary .value { color: var(--primary); }
+
+    /* Patient grid */
+    .section-title { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .section-title .badge { font-size: 12px; background: var(--primary-light); color: var(--primary); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+
+    .patients-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-bottom: 32px; }
+
+    .patient-card {
+      background: var(--card);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .patient-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(17,105,255,0.12); }
+    .patient-card.alert-card { border-color: var(--danger); box-shadow: 0 0 0 2px rgba(234,67,53,0.15); }
+
+    .patient-header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .patient-avatar { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, var(--primary-light), var(--primary)); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: 700; }
+    .patient-info { flex: 1; margin-left: 12px; }
+    .patient-name { font-size: 15px; font-weight: 600; color: var(--text); }
+    .patient-id { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: monospace; }
+    .risk-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .risk-bajo { background: #D1FAE5; color: #065F46; }
+    .risk-moderado { background: #FEF3C7; color: #92400E; }
+    .risk-alto { background: #FFEDD5; color: #9A3412; }
+    .risk-critico { background: #FEE2E2; color: #991B1B; animation: flash 1s infinite; }
+    @keyframes flash { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+    .vitals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+    .vital-item { padding: 12px 16px; text-align: center; border-right: 1px solid var(--border); }
+    .vital-item:last-child { border-right: none; }
+    .vital-icon { font-size: 18px; margin-bottom: 4px; }
+    .vital-val { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+    .vital-val.alert { color: var(--danger); }
+    .vital-unit { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .vital-label { font-size: 10px; color: var(--muted); font-weight: 500; }
+
+    .patient-footer { padding: 12px 20px; background: #F8FAFF; display: flex; align-items: center; justify-content: space-between; }
+    .last-update { font-size: 11px; color: var(--muted); }
+    .ai-summary { font-size: 11px; color: var(--primary); font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* AI Analysis section */
+    .ai-section { background: var(--card); border-radius: 20px; border: 1px solid var(--border); padding: 24px; margin-bottom: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .ai-section h2 { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .predictions-list { display: grid; gap: 12px; }
+    .prediction-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg); border-radius: 12px; border: 1px solid var(--border); }
+    .pred-icon { font-size: 24px; width: 40px; text-align: center; }
+    .pred-info { flex: 1; }
+    .pred-disease { font-size: 14px; font-weight: 600; color: var(--text); }
+    .pred-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .pred-bar-wrap { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .pred-bar-bg { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .pred-bar-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+    .pred-prob { font-size: 12px; font-weight: 700; min-width: 36px; text-align: right; }
+
+    /* SOS Alerts */
+    .sos-section { background: #FFF5F5; border: 2px solid var(--danger); border-radius: 20px; padding: 20px 24px; margin-bottom: 32px; }
+    .sos-section.empty { background: #F0FFF4; border-color: var(--success); }
+    .sos-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .sos-header h2 { font-size: 16px; font-weight: 700; }
+    .sos-header h2.active { color: var(--danger); }
+    .sos-header h2.clear { color: var(--success); }
+    .sos-list { display: grid; gap: 10px; }
+    .sos-item { background: white; border-radius: 12px; padding: 14px 16px; border: 1px solid rgba(234,67,53,0.3); display: flex; align-items: center; gap: 12px; }
+    .sos-item .sos-time { font-size: 11px; color: var(--muted); min-width: 90px; }
+    .sos-item .sos-patient { font-size: 14px; font-weight: 600; color: var(--danger); }
+    .sos-item .sos-msg { font-size: 12px; color: var(--text); margin-top: 2px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .patients-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Loading */
+    .loading { text-align: center; padding: 60px; color: var(--muted); }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .no-patients { text-align: center; padding: 40px; color: var(--muted); background: var(--card); border-radius: 16px; border: 1px dashed var(--border); }
+    .no-patients .icon { font-size: 48px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">
+    <div class="pulse">💓</div>
+    <div>
+      <h1>VitalSense</h1>
+      <span>Panel de Monitoreo Médico</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div><span class="live-dot"></span>Actualización en tiempo real</div>
+    <div id="last-sync" style="margin-top:4px;">Conectando...</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Summary stats -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card primary">
+      <div class="label">Pacientes Activos</div>
+      <div class="value" id="stat-patients">—</div>
+      <div class="sub">Monitoreados hoy</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="label">Alertas SOS</div>
+      <div class="value" id="stat-sos">—</div>
+      <div class="sub">Últimas 24 horas</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="label">Riesgo Alto</div>
+      <div class="value" id="stat-high-risk">—</div>
+      <div class="sub">Pacientes en seguimiento</div>
+    </div>
+    <div class="stat-card success">
+      <div class="label">Lecturas Hoy</div>
+      <div class="value" id="stat-readings">—</div>
+      <div class="sub">Signos vitales registrados</div>
+    </div>
+  </div>
+
+  <!-- SOS Alerts -->
+  <div id="sos-section" class="sos-section empty" style="display:none;">
+    <div class="sos-header">
+      <div style="font-size:24px;">🚨</div>
+      <h2 class="active" id="sos-title">Alertas SOS Activas</h2>
+    </div>
+    <div class="sos-list" id="sos-list"></div>
+  </div>
+
+  <!-- Patients -->
+  <div class="section-title">
+    Pacientes Monitoreados
+    <span class="badge" id="patient-count-badge">0</span>
+  </div>
+  <div id="patients-loading" class="loading">
+    <div class="spinner"></div>
+    Conectando con Firebase...
+  </div>
+  <div id="patients-grid" class="patients-grid" style="display:none;"></div>
+  <div id="no-patients" class="no-patients" style="display:none;">
+    <div class="icon">📱</div>
+    <div style="font-size:16px;font-weight:600;color:#040415;margin-bottom:8px;">Sin pacientes registrados</div>
+    <div>Los pacientes aparecerán aquí cuando inicien sesión en la app VitalSense</div>
+  </div>
+
+  <!-- AI Analysis per patient (shown on click / auto-populated) -->
+  <div id="ai-section" class="ai-section" style="display:none;">
+    <h2>🤖 Análisis IA — <span id="ai-patient-name">Selecciona un paciente</span></h2>
+    <div id="ai-summary-text" style="font-size:14px;color:#8C8C8C;margin-bottom:16px;"></div>
+    <div class="predictions-list" id="predictions-list"></div>
+  </div>
+
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, query, orderByChild, limitToLast }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey:      "AIzaSyC031HwEG-y0cCvdcASeJ7hPRPhezWmZnY",
+    authDomain:  "vitalsenseai-1cb9f.firebaseapp.com",
+    databaseURL: "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com",
+    projectId:   "vitalsenseai-1cb9f",
+    storageBucket: "vitalsenseai-1cb9f.firebasestorage.app",
+    messagingSenderId: "576196499899",
+    appId:       "1:576196499899:ios:7e4204c793ee2e0e0b4c9e"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  const patients = {};     // uid → data
+  const sosAlerts = {};   // uid → alert data
+  let totalReadings = 0;
+
+  // ── Observe all patients ──────────────────────────────────────────────────
+  onValue(ref(db, "patients"), (snap) => {
+    const data = snap.val() || {};
+    Object.entries(data).forEach(([uid, patientData]) => {
+      if (typeof patientData !== "object") return;
+      patients[uid] = { uid, ...patientData };
+    });
+    renderPatients();
+    updateStats();
+    document.getElementById("patients-loading").style.display = "none";
+    document.getElementById("last-sync").textContent = "Última sync: " + new Date().toLocaleTimeString("es-MX");
+  });
+
+  // ── Observe SOS alerts ────────────────────────────────────────────────────
+  onValue(ref(db, "sos_alerts"), (snap) => {
+    const data = snap.val() || {};
+    const now  = Date.now();
+    const cutoff = now - 24 * 3600 * 1000; // últimas 24h
+
+    Object.entries(data).forEach(([uid, alertData]) => {
+      if (!alertData || !alertData.timestamp) return;
+      if (alertData.timestamp > cutoff) sosAlerts[uid] = alertData;
+    });
+    renderSOS();
+    updateStats();
+  });
+
+  // ── Render Patients ───────────────────────────────────────────────────────
+  function renderPatients() {
+    const grid = document.getElementById("patients-grid");
+    const uids = Object.keys(patients);
+
+    document.getElementById("patient-count-badge").textContent = uids.length;
+
+    if (uids.length === 0) {
+      grid.style.display = "none";
+      document.getElementById("no-patients").style.display = "block";
+      return;
+    }
+
+    grid.style.display = "grid";
+    document.getElementById("no-patients").style.display = "none";
+
+    grid.innerHTML = uids.map(uid => {
+      const p = patients[uid];
+      const profile  = p.profile || {};
+      const aiData   = p.aiAnalysis || {};
+      const libre    = p.libre || {};
+
+      const name     = profile.nombre || profile.name || "Paciente";
+      const initial  = name.charAt(0).toUpperCase();
+      const hr       = p.heartRate || 0;
+      const spo2     = p.spo2 || 0;
+      const glucose  = libre.lastGlucose || p.glucose || 0;
+      const risk     = aiData.overallRisk || "bajo";
+      const summary  = aiData.summary || "Sin análisis disponible";
+      const ts       = p.timestamp ? new Date(p.timestamp).toLocaleTimeString("es-MX") : "—";
+
+      const isAlert  = sosAlerts[uid] || hr > 120 || (spo2 > 0 && spo2 < 90);
+      const hrAlert  = hr > 100 || hr < 50;
+      const spo2Alert = spo2 > 0 && spo2 < 92;
+
+      return `<div class="patient-card ${isAlert ? 'alert-card' : ''}" onclick="showAI('${uid}')">
+        <div class="patient-header">
+          <div class="patient-avatar">${initial}</div>
+          <div class="patient-info">
+            <div class="patient-name">${name}</div>
+            <div class="patient-id">${uid.substring(0,12)}…</div>
+          </div>
+          <span class="risk-badge risk-${risk}">${riskLabel(risk)}</span>
+        </div>
+        <div class="vitals-grid">
+          <div class="vital-item">
+            <div class="vital-icon">❤️</div>
+            <div class="vital-val ${hrAlert ? 'alert' : ''}">${hr || '—'}</div>
+            <div class="vital-unit">bpm</div>
+            <div class="vital-label">Frec. Cardíaca</div>
+          </div>
+          <div class="vital-item">
+            <div class="vital-icon">🫁</div>
+            <div class="vital-val ${spo2Alert ? 'alert' : ''}">${spo2 ? spo2 + '%' : '—'}</div>
+            <div class="vital-unit">SpO₂</div>
+            <div class="vital-label">Saturación O₂</div>
+          </div>
+          <div class="vital-item">
+            <div class="vital-icon">🩸</div>
+            <div class="vital-val ${glucose > 140 ? 'alert' : ''}">${glucose ? Math.round(glucose) : '—'}</div>
+            <div class="vital-unit">mg/dL</div>
+            <div class="vital-label">Glucosa</div>
+          </div>
+        </div>
+        <div class="patient-footer">
+          <div class="last-update">Última lectura: ${ts}</div>
+          <div class="ai-summary" title="${summary}">${summary}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Show AI Analysis ──────────────────────────────────────────────────────
+  window.showAI = function(uid) {
+    const p = patients[uid];
+    if (!p) return;
+    const profile = p.profile || {};
+    const aiData  = p.aiAnalysis || {};
+    const preds   = aiData.predictions || [];
+    const name    = profile.nombre || profile.name || "Paciente";
+
+    document.getElementById("ai-section").style.display = "block";
+    document.getElementById("ai-patient-name").textContent = name;
+    document.getElementById("ai-summary-text").textContent = aiData.summary || "Sin análisis disponible.";
+
+    const riskColors = { bajo: "#10B981", moderado: "#F59E0B", alto: "#F97316", critico: "#EF4444" };
+    const diseaseIcons = {
+      "cardiovascular": "❤️", "framingham": "❤️", "diabetes": "🩸", "findrisc": "🩸",
+      "apnea": "😴", "stop-bang": "😴", "respiratorio": "🫁", "epoc": "🫁", "hipertensión": "💊"
+    };
+
+    function getDiseaseIcon(disease) {
+      const d = disease.toLowerCase();
+      for (const [key, icon] of Object.entries(diseaseIcons)) {
+        if (d.includes(key)) return icon;
+      }
+      return "🔬";
+    }
+
+    document.getElementById("predictions-list").innerHTML = preds.map(pred => {
+      const prob     = Math.round((pred.probability || 0) * 100);
+      const risk     = pred.riskLevel || "bajo";
+      const color    = riskColors[risk] || "#8C8C8C";
+      const icon     = getDiseaseIcon(pred.disease || "");
+      const recs     = (pred.recommendations || []).slice(0,2).join(" • ");
+
+      return `<div class="prediction-row">
+        <div class="pred-icon">${icon}</div>
+        <div class="pred-info">
+          <div class="pred-disease">${pred.disease}</div>
+          <div class="pred-desc">${pred.description || ''}</div>
+          ${recs ? `<div class="pred-desc" style="color:#1169FF;margin-top:4px;">→ ${recs}</div>` : ''}
+          <div class="pred-bar-wrap">
+            <div class="pred-bar-bg">
+              <div class="pred-bar-fill" style="width:${prob}%;background:${color};"></div>
+            </div>
+            <div class="pred-prob" style="color:${color};">${prob}%</div>
+          </div>
+        </div>
+        <span class="risk-badge risk-${risk}">${riskLabel(risk)}</span>
+      </div>`;
+    }).join("") || "<div style='color:#8C8C8C;font-size:14px;'>Sin predicciones disponibles. Abre la app y ejecuta el análisis IA.</div>";
+  };
+
+  // ── Render SOS ────────────────────────────────────────────────────────────
+  function renderSOS() {
+    const section = document.getElementById("sos-section");
+    const list    = document.getElementById("sos-list");
+    const keys    = Object.keys(sosAlerts);
+
+    if (keys.length === 0) {
+      section.style.display = "none";
+      return;
+    }
+
+    section.style.display = "block";
+    section.className = "sos-section";
+    document.getElementById("sos-title").textContent = `${keys.length} Alerta${keys.length > 1 ? "s" : ""} SOS Activa${keys.length > 1 ? "s" : ""}`;
+
+    list.innerHTML = keys.map(uid => {
+      const alert  = sosAlerts[uid];
+      const p      = patients[uid] || {};
+      const profile = p.profile || {};
+      const name   = profile.nombre || profile.name || uid.substring(0,8);
+      const ts     = alert.timestamp ? new Date(alert.timestamp).toLocaleString("es-MX") : "—";
+      const msg    = alert.message || alert.type || "Alerta SOS activada";
+
+      return `<div class="sos-item">
+        <div style="font-size:24px;">🚨</div>
+        <div style="flex:1;">
+          <div class="sos-patient">${name}</div>
+          <div class="sos-msg">${msg}</div>
+        </div>
+        <div class="sos-time">${ts}</div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Update Stats ──────────────────────────────────────────────────────────
+  function updateStats() {
+    const uids = Object.keys(patients);
+    const highRisk = uids.filter(uid => {
+      const risk = (patients[uid].aiAnalysis || {}).overallRisk;
+      return risk === "alto" || risk === "critico";
+    }).length;
+
+    document.getElementById("stat-patients").textContent  = uids.length;
+    document.getElementById("stat-sos").textContent       = Object.keys(sosAlerts).length;
+    document.getElementById("stat-high-risk").textContent = highRisk;
+    document.getElementById("stat-readings").textContent  = uids.reduce((sum, uid) => {
+      const h = patients[uid].history || {};
+      return sum + Object.keys(h).length;
+    }, 0) || "—";
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function riskLabel(risk) {
+    return { bajo: "Bajo", moderado: "Moderado", alto: "Alto", critico: "Crítico" }[risk] || risk;
+  }
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+#if os(iOS)
 import SwiftUI
 
 // MARK: - Manrope Font Extension
@@ -34,3 +35,5 @@ extension UIFont {
         return UIFont(name: "Manrope-Bold", size: size) ?? .systemFont(ofSize: size, weight: .bold)
     }
 }
+
+#endif

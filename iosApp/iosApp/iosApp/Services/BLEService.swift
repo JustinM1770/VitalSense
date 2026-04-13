@@ -1,3 +1,4 @@
+#if os(iOS)
 import CoreBluetooth
 import Combine
 
@@ -219,3 +220,5 @@ extension BLEService: CBPeripheralDelegate {
         parseCharacteristic(uuid: characteristic.uuid, bytes: [UInt8](data))
     }
 }
+
+#endif

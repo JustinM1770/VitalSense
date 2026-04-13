@@ -1,3 +1,4 @@
+#if os(iOS)
 import Foundation
 import Combine
 import FirebaseAuth
@@ -28,6 +29,7 @@ class WearableViewModel: ObservableObject {
     private let db = Database.database().reference()
     private var vitalsHandle: DatabaseHandle?
     private var cancellables = Set<AnyCancellable>()
+    private var lastFirebaseSave: Date = .distantPast   // throttle a 30s
 
     // MARK: - Init (equivalente al init {} de DeviceViewModel)
 
@@ -43,7 +45,11 @@ class WearableViewModel: ObservableObject {
 
         bleService.$vitals
             .receive(on: RunLoop.main)
-            .assign(to: \.vitals, on: self)
+            .sink { [weak self] newVitals in
+                guard let self else { return }
+                self.vitals = newVitals
+                self.persistBLEVitalsIfNeeded(newVitals)
+            }
             .store(in: &cancellables)
 
         if isCodePaired {
@@ -66,7 +72,7 @@ class WearableViewModel: ObservableObject {
 
         let upperCode = code.uppercased().trimmingCharacters(in: .whitespaces)
 
-        db.child("pairing_codes").child(upperCode).getData { [weak self] error, snapshot in
+        db.child("patients/pairing_codes").child(upperCode).getData { [weak self] error, snapshot in
             guard let self else { return }
 
             Task { @MainActor in
@@ -85,7 +91,7 @@ class WearableViewModel: ObservableObject {
                 let deviceName = snapshot.childSnapshot(forPath: "deviceName").value as? String ?? "Wearable"
                 let userId = Auth.auth().currentUser?.uid ?? "global"
 
-                self.db.child("pairing_codes").child(upperCode)
+                self.db.child("patients/pairing_codes").child(upperCode)
                     .updateChildValues(["paired": true, "userId": userId])
 
                 self.pairSuccessfully(code: upperCode, deviceName: deviceName)
@@ -100,7 +106,7 @@ class WearableViewModel: ObservableObject {
 
         Task { @MainActor in
             if let pairedCode = UserDefaults.standard.string(forKey: KEY_PAIRED_CODE) {
-                db.child("pairing_codes").child(pairedCode)
+                db.child("patients/pairing_codes").child(pairedCode)
                     .updateChildValues(["paired": false])
             }
             if let userId = Auth.auth().currentUser?.uid {
@@ -157,6 +163,35 @@ class WearableViewModel: ObservableObject {
         }
     }
 
+    // MARK: - BLE → Firebase persistence
+    // Guarda cada lectura BLE en vitals/current y en history (throttled 30s)
+    // para que el ClinicalScoringEngine y la IA puedan analizarlos.
+
+    private func persistBLEVitalsIfNeeded(_ v: BLEVitals) {
+        guard let hr = v.heartRate, hr > 0,
+              let uid = Auth.auth().currentUser?.uid else { return }
+
+        let now = Date()
+        let ts  = now.timeIntervalSince1970 * 1000
+
+        let data: [String: Any] = [
+            "heartRate": hr,
+            "spo2":      v.spo2  ?? 0,
+            "glucose":   v.glucose ?? 0,
+            "timestamp": ts,
+            "source":    "ble_direct"
+        ]
+
+        // Siempre actualizar vitals/current (para que Dashboard lo muestre en vivo)
+        db.child("vitals/current/\(uid)").setValue(data)
+
+        // Escribir en history máximo cada 30 segundos (evita saturar Firebase)
+        guard now.timeIntervalSince(lastFirebaseSave) >= 30 else { return }
+        lastFirebaseSave = now
+        let key = "\(Int(ts))"
+        db.child("patients/\(uid)/history/\(key)").setValue(data)
+    }
+
     private func stopWatchDataReading() {
         guard let handle = vitalsHandle,
               let userId = Auth.auth().currentUser?.uid else { return }
@@ -170,3 +205,5 @@ class WearableViewModel: ObservableObject {
         db.child("vitals/current/\(userId)").removeObserver(withHandle: handle)
     }
 }
+
+#endif

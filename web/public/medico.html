@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Biometric — Portal Médico</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary:  #006064;
+      --primary2: #00838F;
+      --hr-color: #E53935;
+      --spo2-color: #1565C0;
+      --glu-color: #E65100;
+      --ai-color: #4A148C;
+      --bg:       #F0F4F8;
+      --card:     #FFFFFF;
+      --text:     #1A2332;
+      --sub:      #546E7A;
+      --border:   #E0E7EE;
+      --green:    #2E7D32;
+      --red:      #C62828;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Screens ── */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; }
+
+    /* ── Loading ── */
+    #s-loading {
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 20px;
+      background: var(--primary);
+    }
+    .spinner {
+      width: 52px; height: 52px;
+      border: 4px solid rgba(255,255,255,.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #s-loading p { color: rgba(255,255,255,.85); font-size: 15px; font-weight: 500; }
+
+    /* ── Error ── */
+    #s-error {
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px;
+      background: var(--primary); padding: 32px; text-align: center;
+    }
+    #s-error .icon { font-size: 64px; }
+    #s-error h2 { color: #fff; font-size: 22px; font-weight: 700; }
+    #s-error p  { color: rgba(255,255,255,.75); font-size: 14px; max-width: 320px; line-height: 1.6; }
+
+    /* ── Main Dashboard ── */
+    #s-main { flex-direction: column; }
+
+    /* Header */
+    .dash-header {
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      color: #fff; padding: 24px 20px 20px;
+    }
+    .header-top {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 8px; }
+    .logo-dot  { width: 8px; height: 8px; border-radius: 50%; background: #80DEEA; }
+    .logo-name { font-size: 11px; font-weight: 800; letter-spacing: 1.8px; color: #B2EBF2; }
+    .session-badge {
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 11px; font-weight: 600;
+    }
+    .session-badge span { font-weight: 800; }
+
+    .patient-row {
+      display: flex; align-items: center; gap: 14px;
+    }
+    .patient-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: rgba(255,255,255,.2);
+      border: 2px solid rgba(255,255,255,.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800; flex-shrink: 0;
+    }
+    .patient-info h1 { font-size: 20px; font-weight: 700; line-height: 1.2; }
+    .patient-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+    .blood-pill {
+      background: #fff; color: var(--red);
+      font-size: 13px; font-weight: 900;
+      padding: 2px 12px; border-radius: 20px;
+    }
+    .doctor-label {
+      font-size: 11px; color: rgba(255,255,255,.7);
+      background: rgba(255,255,255,.1); padding: 2px 10px; border-radius: 10px;
+    }
+
+    /* Live indicator */
+    .live-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 14px; padding: 8px 12px;
+      background: rgba(0,0,0,.15); border-radius: 10px;
+    }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #69F0AE;
+      animation: pulse-green 2s ease-in-out infinite;
+    }
+    @keyframes pulse-green {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: .5; transform: scale(1.4); }
+    }
+    .live-text { font-size: 12px; color: rgba(255,255,255,.8); }
+    #last-updated { font-size: 11px; color: rgba(255,255,255,.55); margin-left: auto; }
+
+    /* Content */
+    .dash-content { padding: 16px; max-width: 600px; margin: 0 auto; width: 100%; }
+
+    /* Vitals Row */
+    .vitals-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .vital-card {
+      background: var(--card); border-radius: 16px;
+      padding: 14px 12px; text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      transition: transform .2s;
+      position: relative; overflow: hidden;
+    }
+    .vital-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .vital-card.hr::before   { background: var(--hr-color); }
+    .vital-card.spo2::before { background: var(--spo2-color); }
+    .vital-card.glu::before  { background: var(--glu-color); }
+
+    .vital-icon { font-size: 18px; margin-bottom: 4px; }
+    .vital-val  {
+      font-size: 28px; font-weight: 800; line-height: 1;
+      transition: color .4s;
+    }
+    .vital-card.hr   .vital-val { color: var(--hr-color); }
+    .vital-card.spo2 .vital-val { color: var(--spo2-color); }
+    .vital-card.glu  .vital-val { color: var(--glu-color); }
+    .vital-unit { font-size: 10px; color: var(--sub); font-weight: 600; margin-top: 2px; }
+    .vital-status {
+      display: inline-block; font-size: 9px; font-weight: 700;
+      padding: 2px 6px; border-radius: 6px; margin-top: 4px;
+    }
+    .status-normal  { background: #E8F5E9; color: #2E7D32; }
+    .status-caution { background: #FFF8E1; color: #F57F17; }
+    .status-alert   { background: #FFEBEE; color: #C62828; }
+
+    /* Chart */
+    .card {
+      background: var(--card); border-radius: 16px;
+      padding: 16px 18px; margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .card-title  { font-size: 13px; font-weight: 700; color: var(--text); }
+    .card-sub    { font-size: 11px; color: var(--sub); }
+    .chart-wrap  { position: relative; height: 160px; }
+
+    /* Info cards */
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .info-card {
+      background: var(--card); border-radius: 14px;
+      padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    }
+    .info-card.full { grid-column: 1 / -1; }
+    .info-card.alert-card { border-left: 3px solid var(--red); background: #FFF5F5; }
+    .info-label { font-size: 10px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .info-value { font-size: 13px; color: var(--text); line-height: 1.5; font-weight: 500; }
+    .info-empty { font-size: 13px; color: #BDBDBD; font-style: italic; }
+
+    /* AI Insight */
+    .ai-card {
+      background: linear-gradient(135deg, #EDE7F6, #F3E5F5);
+      border-radius: 14px; padding: 16px;
+      margin-bottom: 14px;
+      border-left: 3px solid var(--ai-color);
+    }
+    .ai-label { font-size: 10px; font-weight: 800; color: var(--ai-color); letter-spacing: .8px; margin-bottom: 8px; }
+    .ai-text  { font-size: 13px; color: #311B92; line-height: 1.6; }
+
+    /* Buttons */
+    .call-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: var(--green); color: #fff;
+      border-radius: 14px; padding: 16px; text-decoration: none;
+      font-weight: 700; font-size: 15px; margin-bottom: 10px;
+      box-shadow: 0 4px 14px rgba(46,125,50,.35);
+      transition: background .2s, transform .1s;
+    }
+    .call-btn:hover { background: #1B5E20; transform: translateY(-1px); }
+
+    .meet-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: #1A73E8; color: #fff;
+      border-radius: 14px; padding: 14px; text-decoration: none;
+      font-weight: 600; font-size: 14px; margin-bottom: 14px;
+      box-shadow: 0 4px 14px rgba(26,115,232,.3);
+      transition: background .2s;
+    }
+    .meet-btn:hover { background: #1557B0; }
+
+    /* Footer */
+    .dash-footer {
+      text-align: center; font-size: 11px; color: #9E9E9E;
+      padding: 20px 16px 32px;
+    }
+    .dash-footer strong { color: #607D8B; }
+
+    /* Alert banner */
+    .alert-banner {
+      background: #FFEBEE; border: 1px solid #FFCDD2;
+      border-radius: 12px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .alert-banner .icon { font-size: 18px; }
+    .alert-banner p { font-size: 13px; color: var(--red); font-weight: 600; line-height: 1.4; }
+
+    @media (max-width: 360px) {
+      .vitals-row { gap: 8px; }
+      .vital-val  { font-size: 24px; }
+    }
+
+    @media print {
+      .meet-btn, .call-btn { display: none !important; }
+      .dash-header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="s-loading" class="screen active">
+  <div class="spinner"></div>
+  <p>Cargando portal médico...</p>
+</div>
+
+<!-- Error -->
+<div id="s-error" class="screen">
+  <div class="icon">🔒</div>
+  <h2 id="err-title">Sesión no disponible</h2>
+  <p  id="err-msg">Este enlace ha expirado o no es válido.</p>
+</div>
+
+<!-- Main Dashboard -->
+<div id="s-main" class="screen">
+
+  <!-- Header -->
+  <div class="dash-header">
+    <div class="header-top">
+      <div class="logo-wrap">
+        <div class="logo-dot"></div>
+        <span class="logo-name">BIOMETRIC · PORTAL MÉDICO</span>
+      </div>
+      <div class="session-badge">⏱ <span id="session-countdown">—</span></div>
+    </div>
+
+    <div class="patient-row">
+      <div id="patient-avatar" class="patient-avatar"></div>
+      <div class="patient-info">
+        <h1 id="patient-name">—</h1>
+        <div class="patient-meta">
+          <span id="blood-pill" class="blood-pill" style="display:none"></span>
+          <span class="doctor-label">Vista del médico</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="live-row">
+      <div class="live-dot"></div>
+      <span class="live-text">Signos vitales en tiempo real</span>
+      <span id="last-updated"></span>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="dash-content">
+
+    <!-- Alert banner (shown only when values are critical) -->
+    <div id="alert-banner" class="alert-banner" style="display:none">
+      <span class="icon">⚠️</span>
+      <p id="alert-text"></p>
+    </div>
+
+    <!-- Vitals -->
+    <div class="vitals-row">
+      <div class="vital-card hr">
+        <div class="vital-icon">♥</div>
+        <div class="vital-val" id="v-hr">—</div>
+        <div class="vital-unit">BPM</div>
+        <div id="s-hr" class="vital-status status-normal" style="display:none"></div>
+      </div>
+      <div class="vital-card spo2">
+        <div class="vital-icon">💨</div>
+        <div class="vital-val" id="v-spo2">—</div>
+        <div class="vital-unit">SpO₂ %</div>
+        <div id="s-spo2" class="vital-status status-normal" style="display:none"></div>
+      </div>
+      <div class="vital-card glu">
+        <div class="vital-icon">🩸</div>
+        <div class="vital-val" id="v-glu">—</div>
+        <div class="vital-unit">mg/dL</div>
+        <div id="s-glu" class="vital-status status-normal" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Chart 7 días -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📈 Historial de vitales</span>
+        <span class="card-sub" id="chart-range">últimas lecturas</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="vitals-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- AI Insight -->
+    <div id="ai-card" class="ai-card" style="display:none">
+      <div class="ai-label">🤖 ANÁLISIS IA — GEMINI</div>
+      <div class="ai-text" id="ai-text"></div>
+    </div>
+
+    <!-- Medical info grid -->
+    <div class="info-grid">
+      <div id="card-alergias" class="info-card alert-card full">
+        <div class="info-label">🚨 Alergias</div>
+        <div class="info-value" id="val-alergias"></div>
+      </div>
+      <div id="card-padecimientos" class="info-card full">
+        <div class="info-label">🏥 Padecimientos</div>
+        <div class="info-value" id="val-padecimientos"></div>
+      </div>
+      <div id="card-medicamentos" class="info-card full">
+        <div class="info-label">💊 Medicamentos actuales</div>
+        <div class="info-value" id="val-medicamentos"></div>
+      </div>
+      <div id="card-contacto" class="info-card">
+        <div class="info-label">👤 Contacto</div>
+        <div class="info-value" id="val-contacto"></div>
+      </div>
+      <div id="card-telefono" class="info-card">
+        <div class="info-label">📞 Teléfono</div>
+        <div class="info-value" id="val-telefono"></div>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div id="call-wrap"></div>
+
+    <a id="meet-btn" class="meet-btn" href="#" target="_blank" style="display:none">
+      <span>🎥</span>
+      Iniciar teleconsulta de video
+    </a>
+
+    <div class="dash-footer">
+      <strong>Biometric</strong> · Portal de seguimiento médico<br>
+      Esta sesión expira automáticamente. Los datos se actualizan cada 15 segundos.
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Config ─────────────────────────────────────────────────────────────────
+  const DB_BASE = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com";
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const params    = new URLSearchParams(window.location.search);
+  const sessionId = params.get('s');
+  let   sessionData = null;
+  let   vitalsChart = null;
+  let   pollInterval = null;
+  let   countdownInterval = null;
+
+  // ── Screen helpers ─────────────────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function showError(title, msg) {
+    document.getElementById('err-title').textContent = title;
+    document.getElementById('err-msg').textContent   = msg;
+    showScreen('s-error');
+  }
+
+  // ── Load session ───────────────────────────────────────────────────────────
+  async function loadSession() {
+    if (!sessionId) {
+      showError('Enlace inválido', 'No se encontró un ID de sesión en la URL. Pide al paciente que genere un nuevo enlace desde la app Biometric.');
+      return;
+    }
+
+    try {
+      const res  = await fetch(`${DB_BASE}/doctor_sessions/${sessionId}.json`);
+      const data = await res.json();
+
+      if (!data || data === null) {
+        showError('Sesión no encontrada', 'Este enlace ya expiró o no existe. Pide al paciente que genere un nuevo enlace desde la app.');
+        return;
+      }
+
+      if (data.expiresAt && Date.now() > data.expiresAt) {
+        showError('Sesión expirada', 'El enlace médico tiene validez de 2 horas. Pide al paciente que genere uno nuevo desde la app Biometric.');
+        return;
+      }
+
+      sessionData = data;
+      renderDashboard(data);
+      showScreen('s-main');
+      startCountdown(data.expiresAt);
+      startPolling();
+
+    } catch (err) {
+      showError('Error de conexión', 'Verifica tu conexión a internet e intenta de nuevo.');
+      console.error(err);
+    }
+  }
+
+  // ── Render dashboard ───────────────────────────────────────────────────────
+  function renderDashboard(d) {
+    // Avatar + name
+    const initials = ((d.patientName || '').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)) || 'P';
+    document.getElementById('patient-avatar').textContent = initials;
+    document.getElementById('patient-name').textContent   = d.patientName || 'Paciente';
+
+    if (d.tipoSangre) {
+      const el = document.getElementById('blood-pill');
+      el.textContent   = d.tipoSangre;
+      el.style.display = 'inline-block';
+    }
+
+    // Medical info
+    setInfo('alergias',     d.alergias,     'Sin alergias registradas');
+    setInfo('padecimientos',d.padecimientos,'Sin padecimientos registrados');
+    setInfo('medicamentos', d.medicamentos, 'Sin medicamentos registrados');
+    setInfo('contacto',     d.contactoEmergencia, '—');
+    setInfo('telefono',     d.telefonoEmergencia, '—');
+
+    // Call button
+    if (d.telefonoEmergencia) {
+      document.getElementById('call-wrap').innerHTML = `
+        <a class="call-btn" href="tel:${d.telefonoEmergencia}">
+          <span>📞</span> Llamar contacto — ${d.telefonoEmergencia}
+        </a>`;
+    }
+
+    // Teleconsulta button (genera enlace de Google Meet único)
+    const meetBtn = document.getElementById('meet-btn');
+    meetBtn.style.display = 'flex';
+    meetBtn.href = `https://meet.google.com/new`;
+
+    // AI Insight
+    if (d.aiInsight) {
+      document.getElementById('ai-text').textContent = d.aiInsight;
+      document.getElementById('ai-card').style.display = 'block';
+    }
+
+    // Vitals + chart
+    updateVitals(d.vitals || {});
+    renderChart(d.history || []);
+  }
+
+  function setInfo(key, value, fallback) {
+    const el = document.getElementById(`val-${key}`);
+    if (!el) return;
+    if (value) {
+      el.textContent = value;
+      el.className = 'info-value';
+    } else {
+      el.textContent = fallback;
+      el.className = 'info-empty';
+    }
+  }
+
+  // ── Vitals update ──────────────────────────────────────────────────────────
+  function updateVitals(v) {
+    const hr  = v.heartRate || null;
+    const sp  = v.spo2      || null;
+    const gl  = v.glucose   || null;
+    const ts  = v.timestamp || null;
+
+    animateValue('v-hr',  hr  ? Math.round(hr)  : '—');
+    animateValue('v-spo2',sp  ? Math.round(sp)  : '—');
+    animateValue('v-glu', gl  ? Math.round(gl)  : '—');
+
+    // Status badges
+    setVitalStatus('s-hr',  hr,  hr < 50 || hr > 100 ? (hr < 40 || hr > 130 ? 'alert' : 'caution') : 'normal',
+                            hr < 50 || hr > 100 ? (hr < 40 || hr > 130 ? '⚡ Crítico' : '⚠ Atención') : '✓ Normal');
+    setVitalStatus('s-spo2',sp, sp < 92 ? (sp < 85 ? 'alert' : 'caution') : 'normal',
+                            sp < 92 ? (sp < 85 ? '⚡ Crítico' : '⚠ Bajo') : '✓ Normal');
+    setVitalStatus('s-glu', gl, gl > 180 || gl < 70 ? (gl > 300 || gl < 54 ? 'alert' : 'caution') : 'normal',
+                            gl > 180 ? (gl > 300 ? '⚡ Crítico' : '⚠ Elevada') : gl < 70 ? '⚠ Baja' : '✓ Normal');
+
+    // Alert banner
+    const alerts = [];
+    if (hr && (hr > 130 || hr < 40))  alerts.push(`FC ${hr} lpm — fuera de rango seguro`);
+    if (sp && sp < 85)                alerts.push(`SpO₂ ${sp}% — nivel crítico de oxigenación`);
+    if (gl && gl > 300)               alerts.push(`Glucosa ${Math.round(gl)} mg/dL — hiperglucemia severa`);
+    const banner = document.getElementById('alert-banner');
+    if (alerts.length > 0) {
+      document.getElementById('alert-text').textContent = alerts.join(' · ');
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+
+    // Last updated
+    if (ts) {
+      const d = new Date(ts);
+      document.getElementById('last-updated').textContent =
+        `Act. ${d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+  }
+
+  function setVitalStatus(id, value, type, label) {
+    const el = document.getElementById(id);
+    if (!el || value === null) return;
+    el.className   = `vital-status status-${type}`;
+    el.textContent = label;
+    el.style.display = 'inline-block';
+  }
+
+  function animateValue(id, newVal) {
+    const el = document.getElementById(id);
+    if (!el || el.textContent === String(newVal)) return;
+    el.style.opacity = '0.3';
+    el.style.transform = 'scale(0.85)';
+    setTimeout(() => {
+      el.textContent = newVal;
+      el.style.transition = 'opacity .3s, transform .3s';
+      el.style.opacity = '1';
+      el.style.transform = 'scale(1)';
+    }, 150);
+  }
+
+  // ── Chart ──────────────────────────────────────────────────────────────────
+  function renderChart(history) {
+    if (!history || history.length === 0) return;
+
+    const sorted = [...history].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const last   = sorted.slice(-14);
+
+    const labels = last.map(h => {
+      if (!h.timestamp) return '';
+      const d = new Date(h.timestamp);
+      return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+    });
+
+    const hrData  = last.map(h => h.heartRate || null);
+    const spoData = last.map(h => h.spo2      || null);
+    const gluData = last.map(h => h.glucose   ? Math.round(h.glucose) : null);
+
+    document.getElementById('chart-range').textContent = `${last.length} lecturas`;
+
+    const ctx = document.getElementById('vitals-chart').getContext('2d');
+    if (vitalsChart) vitalsChart.destroy();
+
+    vitalsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'FC (bpm)',
+            data: hrData,
+            borderColor: '#E53935', backgroundColor: 'rgba(229,57,53,.08)',
+            borderWidth: 2, pointRadius: 3, tension: 0.4, fill: false,
+            yAxisID: 'y',
+          },
+          {
+            label: 'SpO₂ (%)',
+            data: spoData,
+            borderColor: '#1565C0', backgroundColor: 'rgba(21,101,192,.08)',
+            borderWidth: 2, pointRadius: 3, tension: 0.4, fill: false,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Glucosa',
+            data: gluData,
+            borderColor: '#E65100', backgroundColor: 'rgba(230,81,0,.08)',
+            borderWidth: 2, pointRadius: 3, tension: 0.4, fill: false,
+            yAxisID: 'y1',
+          },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { font: { size: 11 }, boxWidth: 14, padding: 10 } },
+          tooltip: { bodyFont: { size: 12 }, titleFont: { size: 11 } },
+        },
+        scales: {
+          x: { ticks: { font: { size: 10 }, maxTicksLimit: 7 }, grid: { display: false } },
+          y: {
+            type: 'linear', position: 'left',
+            ticks: { font: { size: 10 } },
+            title: { display: true, text: 'FC / SpO₂', font: { size: 10 } },
+          },
+          y1: {
+            type: 'linear', position: 'right',
+            ticks: { font: { size: 10 } },
+            title: { display: true, text: 'mg/dL', font: { size: 10 } },
+            grid: { drawOnChartArea: false },
+          },
+        },
+      },
+    });
+  }
+
+  // ── Countdown ──────────────────────────────────────────────────────────────
+  function startCountdown(expiresAt) {
+    const el = document.getElementById('session-countdown');
+    function tick() {
+      const diff = Math.max(0, expiresAt - Date.now());
+      if (diff === 0) {
+        el.textContent = 'Expirada';
+        clearInterval(countdownInterval);
+        clearInterval(pollInterval);
+        return;
+      }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      el.textContent = h > 0 ? `${h}h ${m}m` : `${m}:${s.toString().padStart(2,'0')}`;
+    }
+    tick();
+    countdownInterval = setInterval(tick, 1000);
+  }
+
+  // ── Live polling (every 15 seconds) ────────────────────────────────────────
+  function startPolling() {
+    pollInterval = setInterval(async () => {
+      if (!sessionId) return;
+      try {
+        const res  = await fetch(`${DB_BASE}/doctor_sessions/${sessionId}/vitals.json`);
+        const vitals = await res.json();
+        if (vitals && typeof vitals === 'object') {
+          updateVitals(vitals);
+        }
+      } catch (_) { /* ignore network errors during polling */ }
+    }, 15000);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  loadSession();
+</script>
+
+</body>
+</html>

@@ -134,7 +134,7 @@ class TwilioEmergencyService {
          * Cambia a `false` cuando tengas Twilio configurado y hayas hecho deploy
          * de la Cloud Function en `functions/index.js`.
          */
-        const val TEST_MODE = true
+        const val TEST_MODE = false
 
         /**
          * URL de la Firebase Cloud Function que llama a Twilio.

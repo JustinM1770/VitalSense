@@ -1,3 +1,4 @@
+#if os(iOS)
 import SwiftUI
 
 // MARK: - WearableView
@@ -36,7 +37,7 @@ struct WearableView: View {
                         )
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.xl)
             }
         }
         .navigationBarHidden(true)
@@ -65,7 +66,7 @@ private struct CodePanel: View {
                     .foregroundColor(.onboardingBlue)
             }
 
-            Spacer().frame(height: 16)
+            Spacer().frame(height: Spacing.lg)
 
             Text("Para ver datos en tiempo real, abre VitalSense en tu reloj e ingresa el código de 8 caracteres que aparecerá allí.")
                 .font(.custom("Manrope-Medium", size: 14))
@@ -73,16 +74,16 @@ private struct CodePanel: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 16)
 
-            Spacer().frame(height: 8)
+            Spacer().frame(height: Spacing.sm)
 
             Text("Si ya vinculaste por Bluetooth, recuerda que aún debes ingresar el código para sincronizar con esta app.")
                 .font(.custom("Manrope-Medium", size: 12))
                 .foregroundColor(.onboardingBlue.opacity(0.7))
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, Spacing.xxl)
 
             if let error = errorMessage {
-                Spacer().frame(height: 12)
+                Spacer().frame(height: Spacing.md)
                 Text(error)
                     .font(.custom("Manrope-Medium", size: 13))
                     .foregroundColor(Color(hex: "#EF4444"))
@@ -90,7 +91,7 @@ private struct CodePanel: View {
                     .padding(.horizontal, 16)
             }
 
-            Spacer().frame(height: 24)
+            Spacer().frame(height: Spacing.xxl)
 
             // Campo de código
             TextField("Código de vinculación", text: $code)
@@ -102,7 +103,7 @@ private struct CodePanel: View {
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(errorMessage != nil ? Color(hex: "#EF4444") : Color(hex: "#E5E7EB"), lineWidth: 1)
+                        .stroke(errorMessage != nil ? Color(hex: "#EF4444") : Color.borderGray, lineWidth: 1)
                 )
                 .frame(maxWidth: UIScreen.main.bounds.width * 0.8)
                 .onChange(of: code) { newValue in
@@ -168,7 +169,7 @@ private struct PairedWatchPanel: View {
             .background(Color.spO2Green.opacity(0.12))
             .cornerRadius(32)
 
-            Spacer().frame(height: 12)
+            Spacer().frame(height: Spacing.md)
 
             Text("Datos en tiempo real")
                 .font(.custom("Manrope-Medium", size: 12))
@@ -194,7 +195,7 @@ private struct PairedWatchPanel: View {
                 )
             }
 
-            Spacer().frame(height: 12)
+            Spacer().frame(height: Spacing.md)
 
             // Fila 2: SpO₂ + Sueño
             HStack(spacing: 12) {
@@ -214,7 +215,7 @@ private struct PairedWatchPanel: View {
                 )
             }
 
-            Spacer().frame(height: 16)
+            Spacer().frame(height: Spacing.lg)
 
             Text("Los datos se actualizan automáticamente cada 5 segundos.")
                 .font(.custom("Manrope-Medium", size: 12))
@@ -256,7 +257,7 @@ private struct BLEVitalCard: View {
                 .font(.system(size: 20))
                 .foregroundColor(iconColor)
 
-            Spacer().frame(height: 8)
+            Spacer().frame(height: Spacing.sm)
 
             Text(label)
                 .font(.custom("Manrope-Medium", size: 11))
@@ -281,7 +282,9 @@ private struct BLEVitalCard: View {
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hex: "#E5E7EB"), lineWidth: 1)
+                .stroke(Color.borderGray, lineWidth: 1)
         )
     }
 }
+
+#endif

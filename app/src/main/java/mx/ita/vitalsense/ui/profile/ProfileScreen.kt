@@ -46,13 +46,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.graphics.Bitmap
 import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.graphics.asImageBitmap
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mx.ita.vitalsense.data.emergency.DoctorSessionRepository
+import mx.ita.vitalsense.data.emergency.QrCodeGenerator
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -131,6 +140,12 @@ fun ProfileScreen(
     val avatarUriString = profilePrefs.getString("avatar_uri_$uid", null)
     var imageUri by remember { mutableStateOf<Uri?>(if (avatarUriString != null) Uri.parse(avatarUriString) else null) }
     val scope = rememberCoroutineScope()
+
+    // Doctor portal sharing state
+    var showDoctorDialog    by remember { mutableStateOf(false) }
+    var doctorShareUrl      by remember { mutableStateOf("") }
+    var doctorQrBitmap      by remember { mutableStateOf<Bitmap?>(null) }
+    var isDoctorLoading     by remember { mutableStateOf(false) }
 
     val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
         if (result.isSuccessful) {
@@ -558,6 +573,38 @@ fun ProfileScreen(
                         }
                     }
 
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── Compartir con médico ──────────────────────────────
+                    Button(
+                        onClick = {
+                            isDoctorLoading = true
+                            scope.launch {
+                                DoctorSessionRepository().createSession()
+                                    .onSuccess { session ->
+                                        doctorShareUrl  = session.webUrl
+                                        doctorQrBitmap  = QrCodeGenerator.generate(session.webUrl)
+                                        showDoctorDialog = true
+                                        isDoctorLoading  = false
+                                    }
+                                    .onFailure {
+                                        isDoctorLoading = false
+                                        Toast.makeText(context, "Error al generar enlace médico", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(26.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00838F)),
+                        enabled = !isDoctorLoading,
+                    ) {
+                        if (isDoctorLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Text("🩺  Compartir con médico", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.White)
+                        }
+                    }
+
                     Spacer(Modifier.height(24.dp))
                     Text(
                         text = "Cerrar sesión",
@@ -570,6 +617,43 @@ fun ProfileScreen(
                             onSignOut()
                         }.padding(vertical = 8.dp),
                     )
+
+                    // ── Diálogo QR portal médico ──────────────────────────
+                    if (showDoctorDialog && doctorQrBitmap != null) {
+                        AlertDialog(
+                            onDismissRequest = { showDoctorDialog = false },
+                            title = {
+                                Text("Portal para el médico", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            },
+                            text = {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                    Image(
+                                        bitmap = doctorQrBitmap!!.asImageBitmap(),
+                                        contentDescription = "QR Portal Médico",
+                                        modifier = Modifier.size(220.dp),
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        "El médico escanea este QR para ver tu historial clínico en tiempo real. Válido 2 horas.",
+                                        fontFamily = Manrope, fontSize = 12.sp,
+                                        textAlign = TextAlign.Center, color = Color(0xFF546E7A)
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Portal médico", doctorShareUrl))
+                                    Toast.makeText(context, "Enlace copiado", Toast.LENGTH_SHORT).show()
+                                }) { Text("Copiar enlace", color = DashBlue, fontFamily = Manrope, fontWeight = FontWeight.SemiBold) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDoctorDialog = false }) {
+                                    Text("Cerrar", fontFamily = Manrope, color = Color(0xFF546E7A))
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }

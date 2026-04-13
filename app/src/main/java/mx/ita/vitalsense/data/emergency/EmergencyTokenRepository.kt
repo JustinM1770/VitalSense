@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.tasks.await
 import mx.ita.vitalsense.data.model.MedicalProfile
+import java.security.MessageDigest
 import java.util.UUID
 
 /**
@@ -99,8 +100,10 @@ class EmergencyTokenRepository {
         val tokenId = UUID.randomUUID().toString()
         val pin     = (1000..9999).random().toString()
         val now     = System.currentTimeMillis()
+        // SHA-256(pin + tokenId) — el tokenId actúa como sal única por token
+        val pinHash = sha256(pin + tokenId)
 
-        // 3. Escribir token en Firebase
+        // 3. Escribir token en Firebase — pinHash en lugar de pin en texto plano
         db.getReference("emergency_tokens/$tokenId").setValue(
             mapOf(
                 "tokenId"            to tokenId,
@@ -119,15 +122,14 @@ class EmergencyTokenRepository {
                 "expiresAt"          to (now + ttlMs),
                 "active"             to true,
                 "documentos"         to storageDocsList,
-                "pin"                to pin,
+                "pinHash"            to pinHash,   // ← nunca el PIN en claro
             )
         ).await()
 
-        // 4. Escribir nodo activeEmergency para el reloj
+        // 4. Escribir nodo activeEmergency para el reloj (sin PIN)
         db.getReference("patients/$userId/activeEmergency").setValue(
             mapOf(
                 "tokenId"     to tokenId,
-                "pin"         to pin,
                 "expiresAt"   to (now + ttlMs),
                 "anomalyType" to anomalyType,
                 "heartRate"   to heartRate,
@@ -180,10 +182,11 @@ class EmergencyTokenRepository {
         )
     }
 
-    /** Verifica el PIN ingresado por el paramédico contra Firebase. */
+    /** Verifica el PIN contra el hash almacenado en Firebase (sin leer el PIN en claro). */
     suspend fun verifyPin(tokenId: String, enteredPin: String): Result<Boolean> = runCatching {
-        val snap = db.getReference("emergency_tokens/$tokenId/pin").get().await()
-        snap.getValue(String::class.java) == enteredPin
+        val snap = db.getReference("emergency_tokens/$tokenId/pinHash").get().await()
+        val storedHash = snap.getValue(String::class.java) ?: return@runCatching false
+        sha256(enteredPin + tokenId) == storedHash
     }
 
     /** Revoca el token y limpia el nodo del reloj. */
@@ -201,6 +204,11 @@ class EmergencyTokenRepository {
 
     fun remainingSeconds(expiresAt: Long): Int =
         ((expiresAt - System.currentTimeMillis()) / 1000L).toInt().coerceAtLeast(0)
+
+    private fun sha256(input: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(input.toByteArray())
+            .joinToString("") { "%02x".format(it) }
 
     companion object {
         /** URL base de Firebase Hosting. Actualizar después de `firebase deploy --only hosting`. */

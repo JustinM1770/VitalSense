@@ -14,6 +14,7 @@ struct iosAppApp: App {
 
     init() {
         FirebaseApp.configure()
+        WatchConnectivitySender.shared.setup()
     }
 
     var body: some Scene {
@@ -21,6 +22,9 @@ struct iosAppApp: App {
             AppNavigation()
                 .onOpenURL { url in
                     GIDSignIn.sharedInstance.handle(url)
+                }
+                .task {
+                    await NotificationService.shared.requestAuthorization()
                 }
         }
     }

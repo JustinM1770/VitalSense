@@ -1,3 +1,4 @@
+#if os(iOS)
 import SwiftUI
 import FirebaseDatabase
 
@@ -37,7 +38,7 @@ struct PatientDetailView: View {
                                 .background(Color.white)
                                 .cornerRadius(16)
                                 .padding(.horizontal)
-                                .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
+                                .vsShadow(.medium)
                         }
                     }
                 }
@@ -88,7 +89,7 @@ struct DetailCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
+        .vsShadow(.medium)
     }
 }
 
@@ -139,3 +140,5 @@ struct HeartRateChartView: View {
         .padding(12)
     }
 }
+
+#endif

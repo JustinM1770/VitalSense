@@ -2,329 +2,602 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VitalSense — Acceso de Emergencia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>BioMetric AI — Ficha de Emergencia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --navy:       #0A2540;
+      --blue:       #1169FF;
+      --blue-dark:  #225FFF;
+      --blue-light: #E5EBFF;
+      --teal:       #52A2C4;
+      --cyan:       #93EDFC;
+      --green:      #34A853;
+      --red:        #EB4B62;
+      --red-soft:   #FDE8E8;
+      --amber:      #FFB300;
+      --amber-soft: #FFF8E1;
+      --text:       #040415;
+      --text-nav:   #03314B;
+      --text-sub:   #8C8C8C;
+      --border:     #EFEFEF;
+      --bg:         #F4F7FF;
+      --white:      #FFFFFF;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f5f5f5; min-height: 100vh;
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      color: var(--text);
     }
 
-    /* ── PIN Screen ── */
-    #pin-screen {
-      background: #B71C1C;
-      display: flex; align-items: center; justify-content: center;
-      min-height: 100vh; padding: 24px;
-    }
-    .pin-card {
-      background: #fff; border-radius: 20px; padding: 32px 24px;
-      max-width: 380px; width: 100%; text-align: center;
-      box-shadow: 0 8px 32px rgba(0,0,0,.3);
-    }
-    .logo { font-size: 12px; font-weight: 700; color: #B71C1C; letter-spacing: 1px; margin-bottom: 20px; }
-    .pin-title { font-size: 22px; font-weight: 700; color: #B71C1C; margin-bottom: 8px; }
-    .pin-subtitle { font-size: 13px; color: #757575; margin-bottom: 28px; line-height: 1.5; }
-    .pin-input {
-      width: 100%; font-size: 36px; font-weight: 700; letter-spacing: 16px;
-      text-align: center; border: 2px solid #E0E0E0; border-radius: 14px;
-      padding: 14px 8px; outline: none; color: #212121;
-    }
-    .pin-input:focus { border-color: #B71C1C; }
-    .pin-btn {
-      width: 100%; background: #B71C1C; color: #fff; border: none;
-      border-radius: 14px; padding: 16px; font-size: 16px; font-weight: 700;
-      margin-top: 16px; cursor: pointer; transition: background .2s;
-    }
-    .pin-btn:hover { background: #D32F2F; }
-    .pin-btn:disabled { background: #BDBDBD; cursor: default; }
-    .pin-error {
-      color: #D32F2F; font-size: 13px; margin-top: 10px;
-      display: none; font-weight: 600;
-    }
-    .pin-attempts { font-size: 11px; color: #9E9E9E; margin-top: 8px; }
+    /* ── Screens ──────────────────────────────────────── */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; }
 
-    /* ── Profile Screen ── */
-    #profile-screen { display: none; }
-    .header {
-      background: linear-gradient(135deg, #B71C1C, #D32F2F);
-      color: #fff; padding: 32px 20px 28px; text-align: center;
-    }
-    .avatar {
-      width: 72px; height: 72px; border-radius: 50%;
-      background: rgba(255,255,255,.2); display: inline-flex;
-      align-items: center; justify-content: center;
-      font-size: 28px; font-weight: 700; margin-bottom: 12px;
-    }
-    .patient-name { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-    .blood-badge {
-      display: inline-block; background: #fff; color: #B71C1C;
-      font-size: 20px; font-weight: 900; padding: 4px 20px;
-      border-radius: 30px; margin-bottom: 6px;
-    }
-    .anomaly-tag {
-      font-size: 12px; background: rgba(255,255,255,.15);
-      border-radius: 20px; padding: 4px 12px; display: inline-block;
-    }
-    .content { padding: 16px; max-width: 520px; margin: 0 auto; }
-    .section {
-      background: #fff; border-radius: 14px; padding: 16px;
-      margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
-    }
-    .section.alert { border-left: 4px solid #B71C1C; background: #FFF8F8; }
-    .section-label {
-      font-size: 11px; color: #9E9E9E; font-weight: 600;
-      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
-    }
-    .section-value { font-size: 15px; color: #212121; font-weight: 500; line-height: 1.5; }
-    .call-btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: #2E7D32; color: #fff; border-radius: 12px; padding: 14px;
-      text-decoration: none; font-weight: 700; font-size: 15px; margin-bottom: 12px;
-    }
-    .docs-list { display: flex; flex-direction: column; gap: 8px; }
-    .doc-item {
-      display: flex; align-items: center; gap: 10px;
-      border: 1px solid #E0E0E0; border-radius: 10px; padding: 10px 14px;
-      text-decoration: none; color: #1565C0; font-weight: 600; font-size: 14px;
-    }
-    .doc-item:hover { background: #E3F2FD; }
-    .doc-badge {
-      padding: 3px 8px; border-radius: 6px; font-size: 10px;
-      font-weight: 700; flex-shrink: 0;
-    }
-    .doc-badge.pdf { background: #FFEBEE; color: #C62828; }
-    .doc-badge.img { background: #E3F2FD; color: #1565C0; }
-    .img-preview {
-      width: 100%; border-radius: 10px; margin-bottom: 6px; max-height: 220px; object-fit: cover;
-    }
-    .footer {
-      text-align: center; font-size: 11px; color: #BDBDBD;
-      padding: 20px; margin-top: 8px;
-    }
-
-    /* ── Loading / Error ── */
-    #loading-screen, #expired-screen {
-      display: none; align-items: center; justify-content: center;
-      min-height: 100vh; flex-direction: column; gap: 16px;
-      background: #B71C1C; color: #fff; text-align: center; padding: 32px;
+    /* ── Loading ──────────────────────────────────────── */
+    #s-loading {
+      flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+      background: linear-gradient(160deg, var(--navy), var(--blue-dark));
     }
     .spinner {
-      width: 48px; height: 48px; border: 4px solid rgba(255,255,255,.3);
-      border-top-color: #fff; border-radius: 50%;
+      width: 44px; height: 44px;
+      border: 3px solid rgba(255,255,255,.18);
+      border-top-color: #fff;
+      border-radius: 50%;
       animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    #s-loading p     { color: #fff; font-size: 14px; font-weight: 600; letter-spacing: .2px; }
+    #s-loading small { color: rgba(255,255,255,.45); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+
+    /* ── Error ────────────────────────────────────────── */
+    #s-error {
+      flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      background: var(--bg); padding: 32px; text-align: center;
+    }
+    .err-icon {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--red-soft);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 4px;
+    }
+    .err-icon svg { width: 26px; height: 26px; stroke: var(--red); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    #s-error h2 { font-size: 18px; font-weight: 700; color: var(--text-nav); }
+    #s-error p  { font-size: 13px; color: var(--text-sub); max-width: 300px; line-height: 1.65; }
+
+    /* ── Main ─────────────────────────────────────────── */
+    #s-main { flex-direction: column; animation: fadeIn .3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ─ Header ───────────────────────────────────────── */
+    .header {
+      background: linear-gradient(160deg, var(--navy) 0%, var(--blue-dark) 55%, var(--blue) 100%);
+      padding: 44px 24px 28px;
+      text-align: center;
+      color: #fff;
+    }
+
+    .brand {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-bottom: 22px;
+    }
+    .brand-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan);
+    }
+    .brand-name {
+      font-size: 10px; font-weight: 800;
+      letter-spacing: 2.5px; color: rgba(255,255,255,.65);
+      text-transform: uppercase;
+    }
+
+    .avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(255,255,255,.12);
+      border: 2px solid rgba(255,255,255,.28);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 800;
+      margin: 0 auto 14px; letter-spacing: -1px;
+      color: #fff;
+    }
+
+    .patient-name {
+      font-size: 20px; font-weight: 700; margin-bottom: 14px; letter-spacing: -.3px;
+    }
+
+    .pills {
+      display: flex; gap: 8px;
+      justify-content: center; flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .pill {
+      border-radius: 30px; padding: 5px 14px;
+      font-size: 12px; font-weight: 600;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+    }
+    .pill.blood {
+      background: var(--white); color: var(--red);
+      font-size: 14px; font-weight: 800; padding: 4px 16px;
+    }
+    .pill.alert-type {
+      background: rgba(235,75,98,.22);
+      border: 1px solid rgba(235,75,98,.4);
+      font-size: 11px;
+    }
+
+    /* Vitals strip */
+    .vitals {
+      display: flex;
+      background: rgba(255,255,255,.08);
+      border-radius: 12px; overflow: hidden;
+    }
+    .v { flex: 1; padding: 10px 6px; text-align: center;
+         border-right: 1px solid rgba(255,255,255,.08); }
+    .v:last-child { border-right: none; }
+    .v-val { font-size: 18px; font-weight: 800; }
+    .v-lbl { font-size: 9px; opacity: .5; font-weight: 600; margin-top: 3px; letter-spacing: .4px; text-transform: uppercase; }
+
+    /* ─ Body ──────────────────────────────────────────── */
+    .body { padding: 16px; max-width: 520px; margin: 0 auto; width: 100%; }
+
+    /* ─ Card base ─────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 8px rgba(4,4,21,.05);
+    }
+    .card-label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 10px; font-weight: 700;
+      color: var(--text-sub); text-transform: uppercase;
+      letter-spacing: .8px; margin-bottom: 8px;
+    }
+    .card-label svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .card-value {
+      font-size: 14px; color: var(--text); font-weight: 500; line-height: 1.7;
+    }
+
+    /* ─ Public data card ──────────────────────────────── */
+    .public-card {
+      background: var(--amber-soft);
+      border: 1px solid rgba(255,179,0,.3);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+    }
+    .public-card .section-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px;
+    }
+    .public-card .section-header svg { width: 15px; height: 15px; stroke: #8D6E00; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .public-card .section-title { font-size: 11px; font-weight: 700; color: #8D6E00; text-transform: uppercase; letter-spacing: .8px; }
+
+    .public-row {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,179,0,.18);
+    }
+    .public-row:last-of-type { border-bottom: none; }
+
+    .pub-icon-wrap {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: rgba(255,179,0,.2);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .pub-icon-wrap svg { width: 15px; height: 15px; stroke: #8D6E00; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .pub-inner .pub-lbl {
+      font-size: 10px; font-weight: 700; color: #8D6E00;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .pub-inner .pub-val {
+      font-size: 14px; color: var(--text-nav); font-weight: 500; margin-top: 2px; line-height: 1.55;
+    }
+    .public-note {
+      font-size: 10px; color: #8D6E00; margin-top: 12px;
+      padding-top: 10px; border-top: 1px solid rgba(255,179,0,.18);
+      line-height: 1.6; font-weight: 500;
+    }
+
+    /* ─ PIN card ──────────────────────────────────────── */
+    .pin-card {
+      background: var(--white);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 8px rgba(4,4,21,.05);
+      border-top: 3px solid var(--blue);
+    }
+
+    .pin-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .pin-header svg { width: 16px; height: 16px; stroke: var(--blue); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .pin-title { font-size: 14px; font-weight: 700; color: var(--text-nav); }
+    .pin-sub {
+      font-size: 12px; color: var(--text-sub);
+      margin-bottom: 20px; line-height: 1.6; margin-top: 4px;
+    }
+    .pin-sub strong { color: var(--blue); font-weight: 600; }
+
+    .digit-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; }
+    .digit-box {
+      width: 56px; height: 64px;
+      border: 2px solid var(--border); border-radius: 12px;
+      font-size: 26px; font-weight: 700; text-align: center;
+      color: var(--text); background: var(--bg);
+      outline: none; transition: border-color .15s, background .15s;
+      -moz-appearance: textfield;
+      font-family: 'Manrope', sans-serif;
+    }
+    .digit-box::-webkit-inner-spin-button,
+    .digit-box::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .digit-box:focus  { border-color: var(--blue); background: var(--white); }
+    .digit-box.filled { border-color: var(--blue); background: var(--blue-light); }
+    .digit-box.shake  { animation: shake .32s ease; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-5px); }
+      40%     { transform: translateX(5px); }
+      60%     { transform: translateX(-3px); }
+      80%     { transform: translateX(3px); }
+    }
+
+    .pin-error {
+      color: var(--red); font-size: 12px; font-weight: 600;
+      min-height: 16px; opacity: 0; transition: opacity .2s;
+      text-align: center; margin-bottom: 6px;
+    }
+    .pin-error.visible { opacity: 1; }
+    .pin-attempts { font-size: 11px; color: var(--text-sub); text-align: center; margin-bottom: 12px; }
+
+    .pin-btn {
+      width: 100%; background: var(--blue); color: #fff;
+      border: none; border-radius: 12px; padding: 15px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background .15s, transform .08s;
+      font-family: 'Manrope', sans-serif;
+      letter-spacing: .2px;
+    }
+    .pin-btn:hover:not(:disabled)  { background: var(--blue-dark); transform: translateY(-1px); }
+    .pin-btn:active:not(:disabled) { transform: translateY(0); }
+    .pin-btn:disabled { background: #C8D0E0; cursor: default; }
+
+    /* ─ Full record ───────────────────────────────────── */
+    #full-record { display: none; }
+    .card.alert-card {
+      border-left: 3px solid var(--red);
+      background: var(--red-soft);
+    }
+
+    /* Action buttons */
+    .action-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      border-radius: 12px; padding: 15px; text-decoration: none;
+      font-weight: 700; font-size: 14px; margin-bottom: 10px;
+      transition: filter .12s; letter-spacing: .1px;
+      font-family: 'Manrope', sans-serif;
+    }
+    .action-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .action-btn:hover { filter: brightness(1.08); }
+    .action-btn.green { background: var(--green); color: #fff; box-shadow: 0 4px 14px rgba(52,168,83,.25); }
+    .action-btn.blue  { background: var(--blue);  color: #fff; box-shadow: 0 4px 14px rgba(17,105,255,.25); }
+
+    /* ─ Footer ────────────────────────────────────────── */
+    .footer {
+      text-align: center; font-size: 10px; color: #B0BAC5;
+      padding: 20px 20px 44px; line-height: 1.8;
+      letter-spacing: .2px;
+    }
+    .footer strong { color: var(--text-sub); font-weight: 700; }
+
+    /* ─ Print ─────────────────────────────────────────── */
+    @media print {
+      .pin-card { display: none; }
+      .card { box-shadow: none; border: 1px solid var(--border); }
+      .header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
 
 <!-- Loading -->
-<div id="loading-screen" style="display:flex">
+<div id="s-loading" class="screen active">
   <div class="spinner"></div>
-  <p style="font-size:16px">Cargando perfil de emergencia...</p>
+  <p>Cargando ficha de emergencia</p>
+  <small>BioMetric AI</small>
 </div>
 
-<!-- Expirado / Error -->
-<div id="expired-screen">
-  <div style="font-size:64px">⚠️</div>
-  <h2 id="expired-title" style="font-size:22px;font-weight:700">Acceso no disponible</h2>
-  <p id="expired-msg" style="font-size:14px;opacity:.8;max-width:300px;line-height:1.5"></p>
-</div>
-
-<!-- PIN Entry -->
-<div id="pin-screen" style="display:none">
-  <div class="pin-card">
-    <div class="logo">● VITALSENSE BIOMETRIC</div>
-    <h1 class="pin-title">Acceso de Emergencia</h1>
-    <p class="pin-subtitle">
-      Ingresa el PIN de 4 dígitos anunciado en la llamada de emergencia
-    </p>
-    <input id="pin-input" class="pin-input" type="number"
-           placeholder="0000" maxlength="4" autocomplete="off">
-    <div id="pin-error" class="pin-error">PIN incorrecto. Verifica la llamada.</div>
-    <p id="pin-attempts" class="pin-attempts"></p>
-    <button id="pin-btn" class="pin-btn" onclick="verifyPin()">Verificar PIN</button>
+<!-- Error -->
+<div id="s-error" class="screen">
+  <div class="err-icon">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
   </div>
+  <h2 id="err-title">No disponible</h2>
+  <p  id="err-msg"></p>
 </div>
 
-<!-- Profile -->
-<div id="profile-screen">
+<!-- Main -->
+<div id="s-main" class="screen">
+
+  <!-- Header -->
   <div class="header">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <span class="brand-name">BioMetric AI</span>
+    </div>
     <div id="avatar" class="avatar"></div>
     <div id="patient-name" class="patient-name"></div>
-    <div id="blood-badge" class="blood-badge" style="display:none"></div>
-    <br>
-    <span id="anomaly-tag" class="anomaly-tag"></span>
-  </div>
-  <div class="content">
-    <div id="sections"></div>
-    <div id="docs-section" style="display:none" class="section">
-      <div class="section-label">📎 Documentos médicos</div>
-      <div id="docs-list" class="docs-list"></div>
+    <div id="pills" class="pills"></div>
+    <div class="vitals">
+      <div class="v"><div id="v-hr"   class="v-val">—</div><div class="v-lbl">Frec. cardiaca</div></div>
+      <div class="v"><div id="v-spo2" class="v-val">—</div><div class="v-lbl">SpO₂</div></div>
+      <div class="v"><div id="v-glu"  class="v-val">—</div><div class="v-lbl">Glucosa</div></div>
     </div>
-    <div id="call-btn-wrap"></div>
-    <div class="footer">VitalSense BioMetric · Acceso temporal de emergencia</div>
+  </div>
+
+  <div class="body">
+
+    <!-- Datos públicos -->
+    <div class="public-card" id="pub-card">
+      <div class="section-header">
+        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span class="section-title">Datos de emergencia — acceso inmediato</span>
+      </div>
+      <div id="pub-rows"></div>
+      <p class="public-note">
+        Esta información no requiere contraseña. Para el expediente médico completo,
+        ingresa el PIN recibido por WhatsApp.
+      </p>
+    </div>
+
+    <!-- PIN -->
+    <div class="pin-card" id="pin-card">
+      <div class="pin-header">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div class="pin-title">Expediente médico completo</div>
+      </div>
+      <p class="pin-sub">
+        Ingresa el PIN de 4 dígitos enviado por <strong>WhatsApp cifrado</strong>
+        al contacto de emergencia del paciente.
+      </p>
+      <div class="digit-row">
+        <input class="digit-box" id="d0" type="tel" inputmode="numeric" maxlength="1">
+        <input class="digit-box" id="d1" type="tel" inputmode="numeric" maxlength="1">
+        <input class="digit-box" id="d2" type="tel" inputmode="numeric" maxlength="1">
+        <input class="digit-box" id="d3" type="tel" inputmode="numeric" maxlength="1">
+      </div>
+      <div id="pin-error"    class="pin-error"></div>
+      <div id="pin-attempts" class="pin-attempts"></div>
+      <button id="pin-btn" class="pin-btn" onclick="verifyPin()">
+        Desbloquear expediente
+      </button>
+    </div>
+
+    <!-- Expediente completo (tras PIN correcto) -->
+    <div id="full-record">
+      <div id="full-sections"></div>
+      <div id="call-wrap"></div>
+    </div>
+
+    <div class="footer">
+      <strong>BioMetric AI</strong> &nbsp;&middot;&nbsp; Ficha Clínica de Emergencia<br>
+      Sesión activa 30 min &nbsp;&middot;&nbsp; Canal cifrado E2E &nbsp;&middot;&nbsp; NOM-024-SSA3
+    </div>
+
   </div>
 </div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+<script>
+  const DB         = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com";
+  const VERIFY_URL = "https://us-central1-vitalsenseai-1cb9f.cloudfunctions.net/verifyEmergencyPin";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyCwNw4trKyn6sE2_6jis48qTP8sJ-M0bcg",
-    authDomain: "vitalsenseai-1cb9f.firebaseapp.com",
-    databaseURL: "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com",
-    projectId: "vitalsenseai-1cb9f",
-    storageBucket: "vitalsenseai-1cb9f.firebasestorage.app",
-    messagingSenderId: "576196499899",
-    appId: "1:576196499899:web:vitalsenseweb"  // ← obtener de Firebase Console → Project Settings → Web app
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db  = getDatabase(app);
-
-  // Obtener tokenId de la URL (?t=...)
   const params  = new URLSearchParams(window.location.search);
   const tokenId = params.get('t');
+  let   attempts = 0;
 
-  let tokenData  = null;
-  let attempts   = 0;
-  const MAX_ATTEMPTS = 5;
+  /* ── helpers ──────────────────────────────────────── */
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+  function err(title, msg) {
+    document.getElementById('err-title').textContent = title;
+    document.getElementById('err-msg').textContent   = msg;
+    show('s-error');
+  }
 
-  // ── Cargar token desde Firebase ──────────────────────────────────────────────
-  async function loadToken() {
-    if (!tokenId) return showExpired("URL inválida", "No se proporcionó un token de emergencia.");
+  /* ── SVG icon strings ─────────────────────────────── */
+  const ICONS = {
+    blood:    '<svg viewBox="0 0 24 24"><path d="M12 2C6 9 3 13.5 3 17a9 9 0 0 0 18 0c0-3.5-3-8-9-15z"/></svg>',
+    allergy:  '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    condition:'<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+    contact:  '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    medicine: '<svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+    location: '<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+    phone:    '<svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.06-1.06a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  };
 
+  /* ── load public data ─────────────────────────────── */
+  async function init() {
+    if (!tokenId) { err("Enlace inválido", "No se encontró un token de emergencia en esta URL."); return; }
     try {
-      const snap = await get(ref(db, `emergency_tokens/${tokenId}`));
-      if (!snap.exists()) return showExpired("Token no encontrado", "Este QR ya expiró o fue revocado.");
-
-      const data = snap.val();
-      if (!data.active) return showExpired("Token revocado", "La emergencia ya fue atendida.");
-
-      if (Date.now() > data.expiresAt)
-        return showExpired("QR expirado", "El tiempo de acceso de emergencia (30 min) ha expirado.");
-
-      tokenData = data;
-      show('pin-screen');
-      hide('loading-screen');
-
-      // Enter en el input verifica
-      document.getElementById('pin-input').addEventListener('keydown', e => {
-        if (e.key === 'Enter') verifyPin();
-      });
-    } catch (e) {
-      showExpired("Error de conexión", "Verifica tu conexión a internet e intenta de nuevo.");
+      const res  = await fetch(`${DB}/emergency_public/${tokenId}.json`);
+      const data = await res.json();
+      if (!data)                          { err("Sesión no encontrada", "Este enlace ya no es válido."); return; }
+      if (data.expiresAt < Date.now())    { err("Sesión expirada", "El enlace de emergencia expiró. Genera uno nuevo desde la app."); return; }
+      render(data);
+      show('s-main');
+      boxes[0].focus();
+    } catch {
+      err("Sin conexión", "Verifica tu acceso a internet e intenta de nuevo.");
     }
   }
 
-  // ── Verificar PIN ─────────────────────────────────────────────────────────────
-  window.verifyPin = function() {
-    const entered = document.getElementById('pin-input').value.trim();
-    if (entered.length !== 4) return;
+  /* ── render public header & data ─────────────────── */
+  function render(d) {
+    const initials = (d.nombre || 'P').trim().split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+    document.getElementById('avatar').textContent       = initials;
+    document.getElementById('patient-name').textContent = d.nombre || 'Paciente';
 
-    attempts++;
-    document.getElementById('pin-attempts').textContent =
-      `Intento ${attempts} de ${MAX_ATTEMPTS}`;
+    const pillsEl = document.getElementById('pills');
+    if (d.tipoSangre)  pillsEl.innerHTML += `<span class="pill blood">${d.tipoSangre}</span>`;
+    if (d.anomalyType) pillsEl.innerHTML += `<span class="pill alert-type">${d.anomalyType}</span>`;
 
-    if (entered === String(tokenData.pin)) {
-      hide('pin-screen');
-      renderProfile(tokenData);
-      show('profile-screen');
-    } else {
-      document.getElementById('pin-error').style.display = 'block';
-      document.getElementById('pin-input').value = '';
-      if (attempts >= MAX_ATTEMPTS) {
-        document.getElementById('pin-btn').disabled = true;
-        document.getElementById('pin-btn').textContent = 'Demasiados intentos';
+    if (d.heartRate) document.getElementById('v-hr').textContent = d.heartRate + ' bpm';
+
+    const rows = document.getElementById('pub-rows');
+    const row  = (iconKey, label, val) => {
+      if (!val) return;
+      rows.innerHTML += `
+        <div class="public-row">
+          <div class="pub-icon-wrap">${ICONS[iconKey]}</div>
+          <div class="pub-inner">
+            <div class="pub-lbl">${label}</div>
+            <div class="pub-val">${val}</div>
+          </div>
+        </div>`;
+    };
+    row('blood',     'Tipo de sangre',      d.tipoSangre);
+    row('allergy',   'Alergias conocidas',  d.alergias);
+    row('condition', 'Condiciones médicas', d.padecimientos);
+  }
+
+  /* ── PIN boxes ────────────────────────────────────── */
+  const boxes = [0,1,2,3].map(i => document.getElementById(`d${i}`));
+  boxes.forEach((b, i) => {
+    b.addEventListener('input', e => {
+      b.value = e.target.value.replace(/\D/g,'').slice(-1);
+      b.classList.toggle('filled', !!b.value);
+      if (b.value && i < 3) boxes[i+1].focus();
+      if (pin().length === 4) verifyPin();
+    });
+    b.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !b.value && i > 0) {
+        boxes[i-1].value = '';
+        boxes[i-1].classList.remove('filled');
+        boxes[i-1].focus();
       }
+    });
+    b.addEventListener('paste', e => {
+      e.preventDefault();
+      const t = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'');
+      if (t.length === 4) {
+        boxes.forEach((bx,j) => { bx.value = t[j]||''; bx.classList.toggle('filled', !!bx.value); });
+        setTimeout(verifyPin, 50);
+      }
+    });
+  });
+  const pin   = () => boxes.map(b => b.value).join('');
+  const shake = () => boxes.forEach(b => { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); });
+  const clear = () => { boxes.forEach(b => { b.value=''; b.classList.remove('filled','shake'); }); boxes[0].focus(); };
+
+  /* ── verify PIN ───────────────────────────────────── */
+  window.verifyPin = async () => {
+    if (pin().length < 4) return;
+    const errEl = document.getElementById('pin-error');
+    const attEl = document.getElementById('pin-attempts');
+    const btn   = document.getElementById('pin-btn');
+
+    btn.disabled    = true;
+    btn.textContent = 'Verificando...';
+
+    try {
+      const res  = await fetch(VERIFY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tokenId, pin: pin() }),
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        btn.textContent      = 'Acceso concedido';
+        btn.style.background = '#34A853';
+        setTimeout(() => {
+          renderFull(data.profile);
+          document.getElementById('full-record').style.display = 'block';
+          document.getElementById('pin-card').style.display    = 'none';
+          document.getElementById('full-record').scrollIntoView({ behavior: 'smooth' });
+        }, 350);
+        return;
+      }
+
+      btn.disabled    = false;
+      btn.textContent = 'Desbloquear expediente';
+      shake(); clear();
+
+      const msgs = {
+        wrong_pin: 'PIN incorrecto. Revisa el mensaje de WhatsApp.',
+        expired:   'Sesión expirada. Genera un nuevo enlace desde la app.',
+        revoked:   'Esta emergencia ya fue resuelta.',
+        not_found: 'Token inválido.',
+      };
+      errEl.textContent = msgs[data.reason] || 'Error. Intenta de nuevo.';
+      errEl.classList.add('visible');
+      setTimeout(() => errEl.classList.remove('visible'), 3500);
+
+      if (data.reason === 'wrong_pin') {
+        const left = 5 - ++attempts;
+        if (left <= 0) {
+          btn.disabled    = true;
+          btn.textContent = 'Bloqueado';
+          attEl.textContent = 'Demasiados intentos incorrectos.';
+        } else {
+          attEl.textContent = `${left} intento${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''}`;
+        }
+      }
+    } catch {
+      btn.disabled    = false;
+      btn.textContent = 'Desbloquear expediente';
+      errEl.textContent = 'Sin conexión.';
+      errEl.classList.add('visible');
+      setTimeout(() => errEl.classList.remove('visible'), 3500);
     }
   };
 
-  // ── Renderizar perfil ─────────────────────────────────────────────────────────
-  function renderProfile(d) {
-    // Avatar
-    const initials = (d.nombre?.[0] || '') + (d.apellidos?.[0] || '');
-    document.getElementById('avatar').textContent = initials.toUpperCase() || 'VS';
-    document.getElementById('patient-name').textContent =
-      `${d.nombre || ''} ${d.apellidos || ''}`.trim() || 'Paciente';
-
-    // Tipo de sangre
-    if (d.tipoSangre) {
-      const b = document.getElementById('blood-badge');
-      b.textContent = d.tipoSangre;
-      b.style.display = 'inline-block';
-    }
-
-    // Anomalía
-    if (d.anomalyType)
-      document.getElementById('anomaly-tag').textContent =
-        `⚡ ${d.anomalyType} · ${d.heartRateAtAlert} BPM`;
-
-    // Secciones
-    const sections = document.getElementById('sections');
-    const add = (label, value, alert = false) => {
-      if (!value) return;
-      sections.innerHTML += `
-        <div class="section${alert ? ' alert' : ''}">
-          <div class="section-label">${label}</div>
-          <div class="section-value">${value}</div>
+  /* ── render full record ───────────────────────────── */
+  function renderFull(d) {
+    const sec = document.getElementById('full-sections');
+    const add = (iconKey, label, val, isAlert) => {
+      if (!val) return;
+      sec.innerHTML += `
+        <div class="card${isAlert ? ' alert-card' : ''}">
+          <div class="card-label">${ICONS[iconKey]} ${label}</div>
+          <div class="card-value">${val}</div>
         </div>`;
     };
-    add('⚠ Alergias', d.alergias, true);
-    add('Padecimientos', d.padecimientos);
-    add('Medicamentos actuales', d.medicamentos);
-    add('Contacto de emergencia', d.contactoEmergencia);
+    add('allergy',   'Alergias',               d.alergias,           true);
+    add('condition', 'Padecimientos',           d.padecimientos,      false);
+    add('medicine',  'Medicamentos actuales',   d.medicamentos,       false);
+    add('contact',   'Contacto de emergencia',  d.contactoEmergencia, false);
 
-    // Botón llamar
+    if (d.lat && d.lng) {
+      sec.innerHTML += `
+        <a href="https://maps.google.com/?q=${d.lat},${d.lng}" target="_blank" class="action-btn blue">
+          ${ICONS.location} Ver ubicación del paciente
+        </a>`;
+    }
     if (d.telefonoEmergencia) {
-      document.getElementById('call-btn-wrap').innerHTML =
-        `<a class="call-btn" href="tel:${d.telefonoEmergencia}">
-           📞 Llamar a contacto: ${d.telefonoEmergencia}
-         </a>`;
-    }
-
-    // Documentos (PDFs + imágenes de Firebase Storage)
-    if (d.documentos && d.documentos.length > 0) {
-      const docsSection = document.getElementById('docs-section');
-      const docsList    = document.getElementById('docs-list');
-      docsSection.style.display = 'block';
-
-      d.documentos.forEach(doc => {
-        if (doc.tipo === 'imagen') {
-          docsList.innerHTML += `
-            <div>
-              <img src="${doc.url}" alt="${doc.nombre}" class="img-preview"
-                   onerror="this.style.display='none'">
-              <a href="${doc.url}" target="_blank" class="doc-item">
-                <span class="doc-badge img">IMG</span>${doc.nombre}
-              </a>
-            </div>`;
-        } else {
-          docsList.innerHTML += `
-            <a href="${doc.url}" target="_blank" class="doc-item">
-              <span class="doc-badge pdf">PDF</span>${doc.nombre}
-            </a>`;
-        }
-      });
+      document.getElementById('call-wrap').innerHTML = `
+        <a href="tel:${d.telefonoEmergencia}" class="action-btn green">
+          ${ICONS.phone} Llamar contacto de emergencia
+        </a>`;
     }
   }
 
-  // ── Utilidades ────────────────────────────────────────────────────────────────
-  function show(id) { document.getElementById(id).style.display = id === 'profile-screen' ? 'block' : 'flex'; }
-  function hide(id) { document.getElementById(id).style.display = 'none'; }
-
-  function showExpired(title, msg) {
-    hide('loading-screen');
-    hide('pin-screen');
-    document.getElementById('expired-title').textContent = title;
-    document.getElementById('expired-msg').textContent   = msg;
-    document.getElementById('expired-screen').style.display = 'flex';
-  }
-
-  loadToken();
+  init();
 </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VitalSense</string>
+    <string name="app_name">Biometric</string>
     <!--
         CONFIGURACIÓN REQUERIDA:
         1. Firebase Console → Authentication → Sign-in method → Habilitar Google

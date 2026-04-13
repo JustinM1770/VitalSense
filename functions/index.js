@@ -18,8 +18,69 @@
 
 const functions = require("firebase-functions");
 const twilio    = require("twilio");
+const admin     = require("firebase-admin");
+const crypto    = require("crypto");
+
+admin.initializeApp();
 
 // ─── Handler principal ────────────────────────────────────────────────────────
+
+// ─── verifyEmergencyPin ───────────────────────────────────────────────────────
+// Verifica el PIN del paramédico server-side y devuelve el perfil médico.
+// Los datos médicos NUNCA salen de Firebase sin pasar por aquí.
+//
+// POST body: { tokenId: string, pin: string }
+// Response:  { ok: true, profile: {...} }  |  { ok: false, reason: string }
+
+exports.verifyEmergencyPin = functions.https.onRequest(async (req, res) => {
+  // CORS — permite acceso desde la web de emergencia
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST")   return res.status(405).json({ ok: false, reason: "method_not_allowed" });
+
+  const { tokenId, pin } = req.body;
+  if (!tokenId || !pin) return res.status(400).json({ ok: false, reason: "missing_params" });
+  if (!/^\d{4}$/.test(pin)) return res.status(400).json({ ok: false, reason: "invalid_pin_format" });
+
+  const db  = admin.database();
+  const ref = db.ref(`emergency_tokens/${tokenId}`);
+
+  try {
+    const snap = await ref.once("value");
+    if (!snap.exists()) return res.status(404).json({ ok: false, reason: "not_found" });
+
+    const data = snap.val();
+
+    // Validar estado del token
+    if (!data.active)               return res.json({ ok: false, reason: "revoked" });
+    if (Date.now() > data.expiresAt) return res.json({ ok: false, reason: "expired" });
+
+    // Verificar PIN con hash SHA-256(pin + tokenId) como sal
+    const expectedHash = crypto
+      .createHash("sha256")
+      .update(pin + tokenId)
+      .digest("hex");
+
+    if (data.pinHash !== expectedHash) {
+      // Registrar intento fallido (sin exponer info sensible)
+      console.warn(`[PIN] intento fallido tokenId=${tokenId}`);
+      return res.json({ ok: false, reason: "wrong_pin" });
+    }
+
+    // PIN correcto — devolver perfil médico (sin pinHash)
+    const { pinHash: _removed, ...profile } = data;
+    console.log(`[PIN] acceso concedido tokenId=${tokenId}`);
+    return res.json({ ok: true, profile });
+
+  } catch (err) {
+    console.error("[verifyEmergencyPin]", err.message);
+    return res.status(500).json({ ok: false, reason: "server_error" });
+  }
+});
+
+// ─── triggerEmergencyCall ─────────────────────────────────────────────────────
 
 exports.triggerEmergencyCall = functions.https.onRequest(async (req, res) => {
   // Solo POST

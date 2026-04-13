@@ -1,0 +1,95 @@
+{
+  "rules": {
+    "emergency_tokens": {
+      "$tokenId": {
+        // Solo metadatos públicos — SIN datos médicos ni pinHash
+        ".read": "data.child('active').val() === true",
+        ".write": "auth != null && (auth.uid === newData.child('userId').val() || auth.uid === data.child('userId').val())",
+
+        // Los datos médicos y el hash del PIN NUNCA son accesibles directamente
+        // Solo la Cloud Function verifyEmergencyPin puede leerlos con admin SDK
+        "pinHash":            { ".read": false },
+        "nombre":             { ".read": false },
+        "apellidos":          { ".read": false },
+        "alergias":           { ".read": false },
+        "padecimientos":      { ".read": false },
+        "medicamentos":       { ".read": false },
+        "telefonoEmergencia": { ".read": false },
+        "documentos":         { ".read": false },
+
+        // Metadatos de estado — sí accesibles para mostrar "activo/expirado"
+        "active":      { ".read": true },
+        "expiresAt":   { ".read": true },
+        "anomalyType": { ".read": true },
+        "createdAt":   { ".read": true },
+        "tokenId":     { ".read": true }
+      }
+    },
+
+    "users": {
+      "$userId": {
+        ".read":  "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+
+    "patients": {
+      "$patientId": {
+        ".read":  "auth != null && auth.uid === $patientId",
+        ".write": "auth != null && auth.uid === $patientId"
+      }
+    },
+
+    "vitals": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    "sleep": {
+      "$userId": {
+        ".read":  "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+
+    "medications": {
+      "$userId": {
+        ".read":  "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+
+    "alerts": {
+      "$userId": {
+        ".read":  "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId"
+      }
+    },
+
+    "emergency_call_logs": {
+      ".read":  false,
+      ".write": false
+    },
+
+    // Portal médico — el UUID largo del sessionId actúa como token de acceso.
+    // Solo la app (usuario autenticado) puede crear sesiones; cualquiera con el ID puede leer.
+    "doctor_sessions": {
+      "$sessionId": {
+        ".read":  true,
+        ".write": "auth != null"
+      }
+    },
+
+    // Datos públicos de emergencia — IDENTIMEX Protocol (NOM-024-SSA3)
+    // Solo contiene: nombre, tipoSangre, alergias, padecimientos, anomalyType, heartRate, expiresAt
+    // NO contiene: historial médico, medicamentos, PIN, documentos, geolocalización.
+    // Legible por cualquiera que tenga el tokenId (se obtiene escaneando el QR).
+    // Solo la app autenticada puede escribir (via admin SDK / usuario autenticado).
+    "emergency_public": {
+      "$tokenId": {
+        ".read":  true,
+        ".write": "auth != null"
+      }
+    }
+  }
+}

@@ -1,44 +1,225 @@
+#if os(iOS)
 import Foundation
 import Combine
+import FirebaseAuth
 import FirebaseDatabase
+import UserNotifications
 
+// MARK: - DashboardViewModel (datos reales de HealthKit + Firebase)
 @MainActor
 class DashboardViewModel: ObservableObject {
-    @Published var patients: [VitalsDataiOS] = []
+    // HealthKit (datos reales del Apple Watch)
+    @Published var healthKit = HealthKitService.shared
+
+    // Firebase (medicamentos + libre)
+    @Published var medications: [MedicationiOS] = []
+    @Published var userName: String = "Usuario"
+    @Published var userInitial: String = "U"
+    @Published var libreLastGlucose: Double = 0
+    @Published var libreLastTime: TimeInterval = 0
     @Published var isLoading = true
-    @Published var alertMessage: String?
+    @Published var aiRiskLevel: RiskLevel? = nil
+    @Published var aiSummary: String? = nil
 
     private let dbRef = Database.database().reference()
-    private var handle: DatabaseHandle?
+    private var cancellables = Set<AnyCancellable>()
+    private var aiAnalysisDone = false
 
     func startObserving() {
         isLoading = true
-        handle = dbRef.child("patients").observe(.value) { [weak self] snapshot in
-            guard let self else { return }
-            var result: [VitalsDataiOS] = []
-            var alert: String?
-            for child in snapshot.children {
-                guard let snap = child as? DataSnapshot,
-                      let dict = snap.value as? [String: Any] else { continue }
-                let glucose = dict["glucose"] as? Double ?? Double(dict["glucose"] as? Int ?? 0)
-                let p = VitalsDataiOS(
-                    patientId: snap.key,
-                    patientName: dict["patientName"] as? String ?? "Paciente",
-                    heartRate: dict["heartRate"] as? Int ?? 0,
-                    glucose: glucose,
-                    spo2: dict["spo2"] as? Int ?? 0,
-                    timestamp: dict["timestamp"] as? TimeInterval ?? 0
-                )
-                result.append(p)
-                if p.glucose > 150 { alert = "⚠️ Glucosa alta: \(Int(p.glucose)) mg/dL — \(p.patientName)" }
+        loadUserInfo()
+
+        // Pedir permisos de HealthKit y empezar a observar
+        Task {
+            await healthKit.requestAuthorization()
+            isLoading = false
+        }
+
+        // Cargar datos de Firebase (solo medicamentos y libre)
+        loadMedications()
+        loadLibreData()
+
+        // Observar cambios del HealthKitService → actualizar UI + Firebase
+        healthKit.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+                self?.updateAlertMessage()
+                self?.syncVitalsToFirebase()
             }
-            self.patients = result
-            self.alertMessage = alert
-            self.isLoading = false
+            .store(in: &cancellables)
+
+        // Cargar análisis IA en caché y lanzar si tiene más de 6 horas
+        loadAIInsights()
+    }
+
+    private func loadAIInsights() {
+        guard let uid = Auth.auth().currentUser?.uid, !aiAnalysisDone else { return }
+        aiAnalysisDone = true
+        Task {
+            let service = AIHealthService.shared
+            await service.loadCachedAnalysis(userId: uid)
+            if let a = service.analysis {
+                await MainActor.run {
+                    self.aiRiskLevel = a.overallRisk
+                    self.aiSummary = a.summary
+                }
+                // Si el análisis tiene más de 6 horas, actualizar en background
+                let age = Date().timeIntervalSince(a.timestamp)
+                if age > 6 * 3600 {
+                    await service.runAnalysis(userId: uid)
+                    if let updated = service.analysis {
+                        await MainActor.run {
+                            self.aiRiskLevel = updated.overallRisk
+                            self.aiSummary = updated.summary
+                        }
+                    }
+                }
+            } else {
+                // Primera vez: lanzar análisis automático
+                await service.runAnalysis(userId: uid)
+                if let a = service.analysis {
+                    await MainActor.run {
+                        self.aiRiskLevel = a.overallRisk
+                        self.aiSummary = a.summary
+                    }
+                }
+            }
         }
     }
 
     func stopObserving() {
-        if let handle { dbRef.child("patients").removeObserver(withHandle: handle) }
+        healthKit.stopObserving()
+        cancellables.removeAll()
+    }
+
+    // MARK: - User Info
+    private func loadUserInfo() {
+        let user = Auth.auth().currentUser
+        userName = user?.displayName ?? "Usuario"
+        let parts = userName.split(separator: " ")
+        userInitial = parts.first.map { String($0.prefix(1)).uppercased() } ?? "U"
+    }
+
+    // MARK: - Medications (Firebase)
+    private func loadMedications() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        dbRef.child("medications/\(uid)").observeSingleEvent(of: .value) { [weak self] snap in
+            guard let self else { return }
+            var meds: [MedicationiOS] = []
+            for child in snap.children {
+                guard let s = child as? DataSnapshot,
+                      let d = s.value as? [String: Any] else { continue }
+                let activo = d["activo"] as? Bool ?? true
+                guard activo else { continue }
+                meds.append(MedicationiOS(
+                    id: s.key,
+                    nombre: d["nombre"] as? String ?? "",
+                    dosis: d["dosis"] as? String ?? "",
+                    horario: d["cadaCuanto"] as? String ?? "",
+                    activo: activo
+                ))
+            }
+            Task { @MainActor in
+                self.medications = meds
+            }
+        }
+    }
+
+    // MARK: - Libre Data (UserDefaults)
+    private func loadLibreData() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        libreLastGlucose = UserDefaults.standard.double(forKey: "libre_last_glucose_\(uid)")
+        libreLastTime = UserDefaults.standard.double(forKey: "libre_last_time_\(uid)")
+    }
+
+    // MARK: - Alert
+    @Published var alertMessage: String?
+
+    // MARK: - Patients (vitales del usuario actual como VitalsDataiOS)
+    var patients: [VitalsDataiOS] {
+        let hr = Int(healthKit.latestHeartRate)
+        let spo2 = Int(healthKit.latestSpO2)
+        guard hr > 0 || spo2 > 0 else { return [] }
+        return [VitalsDataiOS(
+            patientId: Auth.auth().currentUser?.uid ?? "",
+            patientName: userName,
+            heartRate: hr,
+            glucose: libreLastGlucose,
+            spo2: spo2,
+            timestamp: Date().timeIntervalSince1970
+        )]
+    }
+
+    // MARK: - Vitals history (historial de HR del día)
+    var vitalsHistory: [VitalsDataiOS] {
+        let history = healthKit.heartRateHistory
+        return history.enumerated().map { i, hr in
+            VitalsDataiOS(
+                patientId: Auth.auth().currentUser?.uid ?? "",
+                patientName: userName,
+                heartRate: Int(hr),
+                glucose: libreLastGlucose,
+                spo2: Int(healthKit.latestSpO2),
+                timestamp: Date().timeIntervalSince1970 - Double((history.count - i) * 60)
+            )
+        }
+    }
+
+    // MARK: - Sleep data (derivado de HealthKit)
+    var sleepData: SleepDataiOS? {
+        guard healthKit.latestSleepScore > 0 || healthKit.latestSleepHours > 0 else { return nil }
+        return SleepDataiOS(
+            score: healthKit.latestSleepScore,
+            hours: healthKit.latestSleepHours,
+            estado: healthKit.sleepEstado
+        )
+    }
+
+    // MARK: - Alert logic
+    private func updateAlertMessage() {
+        let hr = Int(healthKit.latestHeartRate)
+        let spo2 = Int(healthKit.latestSpO2)
+        if hr > 120 {
+            alertMessage = "Frecuencia cardíaca elevada: \(hr) bpm"
+        } else if spo2 > 0 && spo2 < 90 {
+            alertMessage = "SpO₂ crítico: \(spo2)%"
+        } else {
+            alertMessage = nil
+        }
+    }
+
+    // MARK: - Sync Apple Watch / HealthKit vitals to Firebase
+    // Se llama cada vez que HealthKit reporta nuevos datos.
+    // Escribe en vitals/current y en patients/{uid}/history (throttled 60s).
+
+    private var lastHKFirebaseSave: Date = .distantPast
+
+    func syncVitalsToFirebase() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let hr = Int(healthKit.latestHeartRate)
+        let spo2 = Int(healthKit.latestSpO2)
+        guard hr > 0 else { return }   // necesitamos al menos FC
+
+        let now = Date()
+        let ts  = now.timeIntervalSince1970 * 1000
+
+        let data: [String: Any] = [
+            "heartRate": hr,
+            "spo2":      spo2,
+            "glucose":   libreLastGlucose,
+            "timestamp": ts,
+            "source":    "apple_watch_healthkit"
+        ]
+
+        // Actualizar vitales en vivo
+        dbRef.child("vitals/current/\(uid)").setValue(data)
+
+        // Guardar en history máximo cada 60 segundos
+        guard now.timeIntervalSince(lastHKFirebaseSave) >= 60 else { return }
+        lastHKFirebaseSave = now
+        dbRef.child("patients/\(uid)/history/\(Int(ts))").setValue(data)
     }
 }
+
+#endif

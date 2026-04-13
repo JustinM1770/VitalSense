@@ -18,6 +18,15 @@ local.properties
 
 # Firebase - NO subir a GitHub público
 app/google-services.json
+iosApp/iosApp/iosApp/GoogleService-Info.plist
+
+# Xcode - archivos de usuario y temporales
+iosApp/**/*.xcuserstate
+iosApp/**/xcuserdata/
+iosApp/**/*.xcodeproj.backup_*/
+iosApp/**/*.xcodeproj/project.pbxproj.backup
+iosApp/iosApp/build/
+iosApp/iosApp/DerivedData/
 
 # API Keys - NO subir a repositorios públicos
 # Mover a ~/.gradle/gradle.properties para mayor seguridad

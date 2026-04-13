@@ -57,6 +57,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             VitalSenseTheme {
                 AppNavigation()
+
             }
         }
         pendingNotificationOpen = parseNotificationOpenRequest(intent)

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Términos y Condiciones — VitalSense</title>
+  <style>
+    :root {
+      --primary: #1169FF;
+      --primary-dark: #0A2540;
+      --accent: #52A2C4;
+      --bg: #F0F4FA;
+      --surface: #FFFFFF;
+      --text: #1A1A2E;
+      --muted: #6B7280;
+      --border: #E5E9F2;
+      --danger: #EF4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, #163A6B 60%, #1169FF 100%);
+      color: #fff;
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+
+    header .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    header .logo-dot {
+      width: 36px; height: 36px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header .subtitle {
+      color: #B6D8FF;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+
+    /* ── Meta bar ── */
+    .meta-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .meta-bar span strong { color: var(--text); }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Alert banner ── */
+    .alert {
+      background: #FFF7ED;
+      border: 1px solid #FED7AA;
+      border-left: 4px solid #F97316;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+      font-size: 0.88rem;
+      color: #92400E;
+    }
+
+    .alert strong { display: block; margin-bottom: 4px; color: #78350F; }
+
+    /* ── TOC ── */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-bottom: 40px;
+    }
+
+    .toc h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      padding-left: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 24px;
+    }
+
+    .toc ol li a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 0.88rem;
+    }
+
+    .toc ol li a:hover { text-decoration: underline; }
+
+    @media (max-width: 560px) { .toc ol { grid-template-columns: 1fr; } }
+
+    /* ── Sections ── */
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px 36px;
+      margin-bottom: 24px;
+      scroll-margin-top: 24px;
+    }
+
+    section h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    section h2 .num {
+      background: var(--primary);
+      color: #fff;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      width: 24px; height: 24px;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    section h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--primary-dark);
+      margin: 20px 0 8px;
+    }
+
+    section p { font-size: 0.9rem; color: #374151; margin-bottom: 10px; }
+
+    section ul, section ol {
+      padding-left: 22px;
+      margin-bottom: 10px;
+    }
+
+    section ul li, section ol li {
+      font-size: 0.9rem;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    /* ── Tag badges ── */
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 8px;
+    }
+
+    .tag-law  { background: #DBEAFE; color: #1E40AF; }
+    .tag-data { background: #D1FAE5; color: #065F46; }
+    .tag-med  { background: #FEE2E2; color: #991B1B; }
+
+    /* ── Highlight box ── */
+    .highlight {
+      background: #EFF6FF;
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 0.88rem;
+      color: #1E40AF;
+    }
+
+    /* ── Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      margin: 16px 0;
+    }
+
+    th {
+      background: #F1F5F9;
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      color: var(--primary-dark);
+      border-bottom: 2px solid var(--border);
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: #374151;
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--primary-dark);
+      color: #94A3B8;
+      text-align: center;
+      padding: 32px 24px;
+      font-size: 0.82rem;
+    }
+
+    footer strong { color: #fff; }
+
+    @media (max-width: 600px) {
+      section { padding: 24px 20px; }
+      header h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <div class="logo-dot">❤</div>
+    <span style="font-size:1.4rem;font-weight:700;">VitalSense</span>
+  </div>
+  <h1>Términos y Condiciones de Uso</h1>
+  <p class="subtitle">Plataforma de monitoreo de salud y telemedicina</p>
+</header>
+
+<!-- ── Meta ── -->
+<div class="meta-bar">
+  <span><strong>Versión:</strong> 1.0</span>
+  <span><strong>Fecha de entrada en vigor:</strong> 01 de abril de 2026</span>
+  <span><strong>Última actualización:</strong> 30 de marzo de 2026</span>
+  <span><strong>Idioma:</strong> Español (México)</span>
+</div>
+
+<!-- ── Content ── -->
+<div class="container">
+
+  <div class="alert">
+    <strong>Aviso importante antes de continuar</strong>
+    VitalSense es una herramienta de apoyo al monitoreo de salud. <strong>No sustituye el diagnóstico médico profesional.</strong>
+    Ante cualquier emergencia médica llame de inmediato al <strong>911</strong>.
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>Contenido</h2>
+    <ol>
+      <li><a href="#s1">Definiciones y partes</a></li>
+      <li><a href="#s2">Aceptación de términos</a></li>
+      <li><a href="#s3">Descripción del servicio</a></li>
+      <li><a href="#s4">Protección de datos personales</a></li>
+      <li><a href="#s5">Datos de salud sensibles</a></li>
+      <li><a href="#s6">Uso del dispositivo BLE</a></li>
+      <li><a href="#s7">QR de emergencia</a></li>
+      <li><a href="#s8">Limitaciones y responsabilidades</a></li>
+      <li><a href="#s9">Obligaciones del usuario</a></li>
+      <li><a href="#s10">Propiedad intelectual</a></li>
+      <li><a href="#s11">Modificaciones</a></li>
+      <li><a href="#s12">Jurisdicción y legislación</a></li>
+    </ol>
+  </div>
+
+  <!-- ── 1 ── -->
+  <section id="s1">
+    <h2><span class="num">1</span> Definiciones y partes</h2>
+    <p>Para efectos de los presentes Términos y Condiciones ("T&C") se entenderá por:</p>
+    <ul>
+      <li><strong>VitalSense / Plataforma:</strong> La aplicación móvil, servicios en la nube y página de emergencia operados bajo el paquete <code>mx.ita.vitalsense</code>.</li>
+      <li><strong>Responsable:</strong> El equipo de desarrollo de VitalSense del Instituto Tecnológico de Aguascalientes (ITA), participante en <em>InnovaTecNM 2026</em>.</li>
+      <li><strong>Usuario / Paciente:</strong> Toda persona física que instala y usa VitalSense.</li>
+      <li><strong>Socorrista / Paramédico:</strong> Profesional de salud que accede a datos de emergencia mediante código QR autorizado.</li>
+      <li><strong>Datos de Salud:</strong> Información de frecuencia cardíaca, saturación de oxígeno (SpO₂), glucosa en sangre, medicamentos y signos vitales procesados por la plataforma.</li>
+      <li><strong>Firebase:</strong> Infraestructura cloud de Google (Google LLC) utilizada para autenticación, base de datos en tiempo real y almacenamiento de archivos.</li>
+    </ul>
+  </section>
+
+  <!-- ── 2 ── -->
+  <section id="s2">
+    <h2><span class="num">2</span> Aceptación de términos</h2>
+    <p>
+      Al registrarse, iniciar sesión o utilizar cualquier funcionalidad de VitalSense, el Usuario manifiesta haber leído, entendido y aceptado íntegramente los presentes T&C, así como el <strong>Aviso de Privacidad</strong> y la <strong>Política de Cookies</strong>.
+    </p>
+    <div class="highlight">
+      Si el Usuario no está de acuerdo con alguna disposición, deberá abstenerse de usar la aplicación y podrá solicitar la eliminación de su cuenta y datos en cualquier momento.
+    </div>
+    <p>
+      Para usuarios menores de 18 años, el registro y uso de la plataforma requiere el <strong>consentimiento expreso de un tutor legal</strong>.
+    </p>
+  </section>
+
+  <!-- ── 3 ── -->
+  <section id="s3">
+    <h2><span class="num">3</span> Descripción del servicio <span class="tag tag-med">Salud</span></h2>
+
+    <h3>3.1 Funciones principales</h3>
+    <ul>
+      <li>Monitoreo de signos vitales en tiempo real mediante dispositivos BLE (Bluetooth Low Energy).</li>
+      <li>Almacenamiento y consulta de historial de mediciones.</li>
+      <li>Generación de alertas y notificaciones ante lecturas fuera de umbrales clínicos.</li>
+      <li>Análisis de tendencias asistido por inteligencia artificial (Google Gemini).</li>
+      <li>Generación de código QR de emergencia con acceso temporal a perfil médico.</li>
+      <li>Exportación de reportes en formato PDF.</li>
+      <li>Gestión de medicamentos y recordatorios.</li>
+    </ul>
+
+    <h3>3.2 Naturaleza del servicio</h3>
+    <p>
+      VitalSense es una herramienta de <strong>apoyo y monitoreo</strong>. Las lecturas provienen de dispositivos de consumo o prototipo y pueden presentar imprecisiones. <strong>Ninguna funcionalidad de la app constituye diagnóstico, prescripción ni tratamiento médico.</strong>
+    </p>
+
+    <h3>3.3 Disponibilidad</h3>
+    <p>
+      El servicio se presta "tal como está" (<em>as-is</em>). El Responsable no garantiza disponibilidad ininterrumpida y podrá realizar mantenimientos programados o de emergencia sin previo aviso.
+    </p>
+  </section>
+
+  <!-- ── 4 ── -->
+  <section id="s4">
+    <h2><span class="num">4</span> Protección de datos personales <span class="tag tag-law">LFPDPPP</span></h2>
+
+    <h3>4.1 Marco normativo aplicable</h3>
+    <ul>
+      <li><strong>Ley Federal de Protección de Datos Personales en Posesión de los Particulares</strong> (LFPDPPP, DOF 05-07-2010).</li>
+      <li><strong>Reglamento de la LFPDPPP</strong> (DOF 21-12-2011).</li>
+      <li><strong>NOM-024-SSA3-2010</strong> — Sistemas de información de registro electrónico para la salud.</li>
+      <li><strong>NOM-004-SSA3-2012</strong> — Expediente clínico.</li>
+    </ul>
+
+    <h3>4.2 Datos recabados</h3>
+    <table>
+      <tr>
+        <th>Categoría</th>
+        <th>Datos específicos</th>
+        <th>Finalidad</th>
+      </tr>
+      <tr>
+        <td>Identidad</td>
+        <td>Nombre, correo electrónico, foto de perfil (opcional)</td>
+        <td>Autenticación e identificación</td>
+      </tr>
+      <tr>
+        <td>Salud (sensibles)</td>
+        <td>FC, SpO₂, glucosa, medicamentos, cuestionario médico</td>
+        <td>Monitoreo, alertas, reportes</td>
+      </tr>
+      <tr>
+        <td>Dispositivo</td>
+        <td>Token FCM, modelo del teléfono</td>
+        <td>Notificaciones push</td>
+      </tr>
+      <tr>
+        <td>Técnicos</td>
+        <td>Timestamps, logs de uso anónimos</td>
+        <td>Mejora del servicio y seguridad</td>
+      </tr>
+    </table>
+
+    <h3>4.3 Transferencias a terceros</h3>
+    <p>Los datos se alojan en infraestructura de <strong>Google Firebase</strong> (servidores en EE.UU.) con cifrado en tránsito (TLS) y en reposo. No se comparten con terceros con fines publicitarios o comerciales.</p>
+
+    <h3>4.4 Derechos ARCO</h3>
+    <p>El Usuario puede ejercer en todo momento sus derechos de <strong>Acceso, Rectificación, Cancelación y Oposición</strong> (ARCO) mediante solicitud escrita a:</p>
+    <div class="highlight">
+      Instituto Tecnológico de Aguascalientes — Equipo VitalSense<br>
+      Av. Adolfo López Mateos #1801 Ote., Aguascalientes, Ags., México<br>
+      Correo: <strong>vitalsense.ita@gmail.com</strong>
+    </div>
+    <p>El Responsable responderá en un plazo máximo de <strong>20 días hábiles</strong>.</p>
+  </section>
+
+  <!-- ── 5 ── -->
+  <section id="s5">
+    <h2><span class="num">5</span> Datos de salud sensibles <span class="tag tag-data">Sensibles</span></h2>
+    <p>
+      Con base en el <strong>Art. 9 de la LFPDPPP</strong>, los datos relativos a la salud son considerados datos personales sensibles y requieren consentimiento expreso y por escrito del titular.
+    </p>
+    <p>
+      Al aceptar estos T&C y proporcionar información de salud, el Usuario <strong>otorga expresamente su consentimiento</strong> para que VitalSense recabe, use, almacene y, en caso de emergencia, comparta sus datos de salud conforme a lo descrito en la Sección 7 (QR de Emergencia).
+    </p>
+    <ul>
+      <li>Los datos de salud nunca se venden ni ceden con fines comerciales.</li>
+      <li>Los reportes PDF generados se comparten únicamente cuando el usuario ejecuta explícitamente la acción de compartir.</li>
+      <li>El historial se conserva mientras la cuenta esté activa; al eliminar la cuenta se destruye dentro de los <strong>30 días naturales</strong> posteriores.</li>
+    </ul>
+  </section>
+
+  <!-- ── 6 ── -->
+  <section id="s6">
+    <h2><span class="num">6</span> Uso del dispositivo BLE y precisión de mediciones</h2>
+    <p>
+      VitalSense se conecta a dispositivos Bluetooth Low Energy (BLE), incluyendo prototipos ESP32 y wearables comerciales compatibles con el perfil <em>Heart Rate Service (0x180D)</em>.
+    </p>
+    <div class="highlight">
+      Las lecturas de dispositivos BLE de consumo o prototipo pueden tener márgenes de error. El Usuario acepta que la precisión no está certificada por ninguna autoridad sanitaria (COFEPRIS / FDA) y que los valores deben ser verificados con equipos médicos certificados ante cualquier duda.
+    </div>
+    <ul>
+      <li>La app requiere permiso de ubicación en Android para el escaneo BLE (requerimiento del sistema operativo, no se geolocaliza al usuario).</li>
+      <li>La conexión es local y los datos se transmiten cifrados a Firebase una vez procesados.</li>
+    </ul>
+  </section>
+
+  <!-- ── 7 ── -->
+  <section id="s7">
+    <h2><span class="num">7</span> Código QR de emergencia</h2>
+
+    <h3>7.1 Funcionamiento</h3>
+    <p>
+      Cuando la IA detecta signos vitales en rangos críticos (FC &gt;130 o &lt;40 lpm, SpO₂ &lt;85%, glucosa &gt;300 mg/dL), la aplicación puede generar automáticamente un <strong>código QR de acceso temporal</strong> al perfil médico del usuario.
+    </p>
+
+    <h3>7.2 Token de acceso</h3>
+    <ul>
+      <li>El token tiene una vigencia de <strong>30 minutos</strong> (TTL configurado en Firebase).</li>
+      <li>Pasado ese tiempo, el enlace expira y no puede ser reutilizado.</li>
+      <li>El token solo permite <strong>lectura</strong> del perfil médico de emergencia; no permite modificar datos.</li>
+    </ul>
+
+    <h3>7.3 Consentimiento informado</h3>
+    <p>
+      Al activar la funcionalidad de QR de emergencia (o al no desactivarla en configuración), el Usuario consiente expresamente que, en caso de emergencia médica detectada por la app, <strong>cualquier persona con acceso físico al dispositivo</strong> (ej. paramédico) pueda escanear el QR y acceder a los datos básicos de salud.
+    </p>
+    <p>El Usuario puede deshabilitar esta función en cualquier momento desde los ajustes de la aplicación.</p>
+  </section>
+
+  <!-- ── 8 ── -->
+  <section id="s8">
+    <h2><span class="num">8</span> Limitaciones de responsabilidad</h2>
+    <p>En la máxima medida permitida por la legislación mexicana aplicable:</p>
+    <ul>
+      <li>El Responsable <strong>no garantiza</strong> la exactitud clínica de las mediciones.</li>
+      <li>El Responsable <strong>no será responsable</strong> de daños derivados de decisiones médicas basadas exclusivamente en los datos de la app.</li>
+      <li>El Responsable <strong>no se hace responsable</strong> por interrupciones del servicio causadas por terceros (Firebase, Google, operadoras de telefonía).</li>
+      <li>La función de IA preventiva con Gemini es orientativa; sus recomendaciones no reemplazan la opinión de un médico.</li>
+    </ul>
+    <div class="highlight">
+      <strong>Limitación de responsabilidad económica:</strong> En ningún caso la responsabilidad total del Responsable excederá el monto pagado por el Usuario en los últimos 12 meses. En su versión gratuita, la responsabilidad se limita a lo estrictamente establecido por la LFPDPPP.
+    </div>
+  </section>
+
+  <!-- ── 9 ── -->
+  <section id="s9">
+    <h2><span class="num">9</span> Obligaciones del usuario</h2>
+    <p>El Usuario se compromete a:</p>
+    <ul>
+      <li>Proporcionar información <strong>veraz y actualizada</strong> en su perfil médico.</li>
+      <li>Mantener su contraseña confidencial y no compartirla con terceros.</li>
+      <li>No usar la plataforma para <strong>fines ilícitos</strong>, acceder a datos de otros pacientes sin autorización, o intentar vulnerar la seguridad del sistema.</li>
+      <li>No reproducir, modificar, distribuir ni realizar ingeniería inversa sobre la aplicación sin autorización escrita del Responsable.</li>
+      <li>Notificar de inmediato cualquier uso no autorizado de su cuenta a <strong>vitalsense.ita@gmail.com</strong>.</li>
+    </ul>
+    <p>El incumplimiento puede derivar en la suspensión o cancelación inmediata de la cuenta.</p>
+  </section>
+
+  <!-- ── 10 ── -->
+  <section id="s10">
+    <h2><span class="num">10</span> Propiedad intelectual</h2>
+    <p>
+      El código fuente, diseño, logotipo, nombre "VitalSense", algoritmos de análisis y demás elementos de la plataforma son propiedad exclusiva del equipo de desarrollo del ITA y están protegidos por la <strong>Ley Federal del Derecho de Autor</strong> (LFDA) y demás legislación aplicable.
+    </p>
+    <p>
+      Se otorga al Usuario una licencia <strong>personal, no exclusiva, no transferible y revocable</strong> para usar la aplicación exclusivamente en los términos aquí establecidos.
+    </p>
+  </section>
+
+  <!-- ── 11 ── -->
+  <section id="s11">
+    <h2><span class="num">11</span> Modificaciones a los T&C</h2>
+    <p>
+      El Responsable se reserva el derecho de modificar los presentes T&C en cualquier momento. Los cambios sustanciales serán notificados al Usuario mediante:
+    </p>
+    <ul>
+      <li>Notificación push en la aplicación, o</li>
+      <li>Correo electrónico a la dirección registrada.</li>
+    </ul>
+    <p>
+      Si el Usuario continúa usando VitalSense después de la notificación, se entenderá que acepta los nuevos términos. En caso contrario, puede cancelar su cuenta.
+    </p>
+  </section>
+
+  <!-- ── 12 ── -->
+  <section id="s12">
+    <h2><span class="num">12</span> Jurisdicción y legislación aplicable</h2>
+    <p>
+      Los presentes T&C se rigen por las leyes de los <strong>Estados Unidos Mexicanos</strong>. Para cualquier controversia derivada de su interpretación o cumplimiento, las partes se someten a la jurisdicción de los <strong>Tribunales Federales con sede en la Ciudad de Aguascalientes, Ags.</strong>, renunciando a cualquier otro fuero que pudiera corresponderles.
+    </p>
+
+    <h3>Marco legal de referencia</h3>
+    <ul>
+      <li>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</li>
+      <li>NOM-024-SSA3-2010 — Sistemas de información de registro electrónico para la salud</li>
+      <li>NOM-004-SSA3-2012 — Expediente clínico</li>
+      <li>Ley Federal del Derecho de Autor (LFDA)</li>
+      <li>Ley de la Propiedad Industrial</li>
+      <li>Código de Comercio — en lo relativo a comercio electrónico</li>
+    </ul>
+  </section>
+
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+  <p><strong>VitalSense</strong> &mdash; Instituto Tecnológico de Aguascalientes · InnovaTecNM 2026</p>
+  <p style="margin-top:8px;">Versión 1.0 &nbsp;·&nbsp; Vigente desde el 01 de abril de 2026 &nbsp;·&nbsp; vitalsense.ita@gmail.com</p>
+  <p style="margin-top:12px; font-size:0.75rem; color:#64748B;">
+    Este documento fue elaborado con fines académicos y de demostración. Consulte a un abogado especializado antes de publicar en producción.
+  </p>
+</footer>
+
+</body>
+</html>
