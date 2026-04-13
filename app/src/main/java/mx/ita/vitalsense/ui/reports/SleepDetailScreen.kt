@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,19 +30,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mx.ita.vitalsense.R
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun SleepDetailScreen(
     score: Int,
-    horas: Float,
+    minutos: Int,
+    sleepStartMillis: Long,
+    sleepEndMillis: Long,
     estado: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val safeScore = score.coerceIn(0, 100)
-    val safeHours = horas.coerceAtLeast(0f)
+    val safeMinutes = minutos.coerceAtLeast(0)
+    val totalHours = safeMinutes / 60f
     val qualityColor = when {
         safeScore >= 85 -> Color(0xFF10B981)
         safeScore >= 70 -> Color(0xFF22C55E)
@@ -51,12 +61,23 @@ fun SleepDetailScreen(
         else -> Color(0xFFEF4444)
     }
 
-    val deepHours = (safeHours * 0.25f).coerceAtMost(safeHours)
-    val remHours = (safeHours * 0.20f).coerceAtMost((safeHours - deepHours).coerceAtLeast(0f))
-    val lightHours = (safeHours - deepHours - remHours).coerceAtLeast(0f)
+    val deepHours = (totalHours * 0.25f).coerceAtMost(totalHours)
+    val remHours = (totalHours * 0.20f).coerceAtMost((totalHours - deepHours).coerceAtLeast(0f))
+    val lightHours = (totalHours - deepHours - remHours).coerceAtLeast(0f)
+    val durationLabel = when {
+        safeMinutes <= 0 -> stringResource(R.string.sleep_duration_zero)
+        safeMinutes >= 60 && safeMinutes % 60 > 0 -> stringResource(
+            R.string.sleep_duration_hours_minutes,
+            safeMinutes / 60,
+            safeMinutes % 60,
+        )
+        safeMinutes >= 60 -> stringResource(R.string.sleep_duration_hours_only, safeMinutes / 60)
+        else -> stringResource(R.string.sleep_duration_minutes_only, safeMinutes)
+    }
+    val windowLabel = formatSleepWindowLabel(sleepStartMillis, sleepEndMillis)
 
     Scaffold(
-        containerColor = Color(0xFFF8FAFC),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Row(
                 modifier = Modifier
@@ -66,10 +87,10 @@ fun SleepDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Regresar")
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
                 Spacer(Modifier.width(8.dp))
-                Text("Sueño detallado", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.sleep_detail_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
         },
     ) { innerPadding ->
@@ -83,7 +104,7 @@ fun SleepDetailScreen(
         ) {
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
             ) {
                 Row(
@@ -102,31 +123,43 @@ fun SleepDetailScreen(
                     }
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        Text("Calidad del sueño", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text(estado.ifBlank { "Sin datos" }, color = qualityColor, fontWeight = FontWeight.SemiBold)
-                        Text("Duración: ${"%.1f".format(safeHours)} h", color = Color(0xFF64748B), fontSize = 12.sp)
+                        Text(stringResource(R.string.sleep_quality_title), color = colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        Text(estado.ifBlank { stringResource(R.string.sleep_no_data) }, color = qualityColor, fontWeight = FontWeight.SemiBold)
+                        Text(durationLabel, color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                 }
             }
 
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.sleep_real_schedule_title), color = colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(windowLabel, color = colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text(stringResource(R.string.sleep_recorded_duration, durationLabel), color = colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                }
+            }
+
             StageCard(
-                title = "Etapas estimadas",
+                title = stringResource(R.string.sleep_estimated_stages_title),
                 deepHours = deepHours,
                 remHours = remHours,
                 lightHours = lightHours,
-                totalHours = safeHours,
+                totalHours = totalHours,
             )
 
             Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                shape = RoundedCornerShape(20.dp),
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Resumen clínico", color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("• Tu puntaje indica ${sleepInterpretation(safeScore)}.", color = Color(0xFF334155), fontSize = 13.sp)
-                    Text("• La duración ideal recomendada para adultos es 7-9 horas.", color = Color(0xFF334155), fontSize = 13.sp)
-                    Text("• Prioriza horario constante y evita pantallas 60 min antes de dormir.", color = Color(0xFF334155), fontSize = 13.sp)
+                    Text(stringResource(R.string.sleep_clinical_summary_title), color = colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(stringResource(R.string.sleep_score_interpretation_bullet, stringResource(sleepInterpretationRes(safeScore))), color = colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text(stringResource(R.string.sleep_duration_recommendation_bullet), color = colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text(stringResource(R.string.sleep_real_schedule_bullet, windowLabel), color = colorScheme.onSurfaceVariant, fontSize = 13.sp)
                 }
             }
         }
@@ -141,6 +174,7 @@ private fun StageCard(
     lightHours: Float,
     totalHours: Float,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val safeTotal = totalHours.coerceAtLeast(0.1f)
     val deepPct = (deepHours / safeTotal).coerceIn(0f, 1f)
     val remPct = (remHours / safeTotal).coerceIn(0f, 1f)
@@ -148,31 +182,43 @@ private fun StageCard(
 
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(title, color = colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
 
-            SleepStageRow("Profundo", deepHours, deepPct, Color(0xFF1D4ED8))
-            SleepStageRow("REM", remHours, remPct, Color(0xFF7C3AED))
-            SleepStageRow("Ligero", lightHours, lightPct, Color(0xFF0EA5E9))
+            SleepStageRow(stringResource(R.string.sleep_stage_deep), deepHours, deepPct, Color(0xFF1D4ED8))
+            SleepStageRow(stringResource(R.string.sleep_stage_rem), remHours, remPct, Color(0xFF7C3AED))
+            SleepStageRow(stringResource(R.string.sleep_stage_light), lightHours, lightPct, Color(0xFF0EA5E9))
         }
     }
 }
 
 @Composable
 private fun SleepStageRow(label: String, hours: Float, percent: Float, color: Color) {
+    val colorScheme = MaterialTheme.colorScheme
+    val minutes = (hours * 60f).roundToInt().coerceAtLeast(0)
+    val durationLabel = when {
+        minutes <= 0 -> stringResource(R.string.sleep_duration_zero)
+        minutes >= 60 && minutes % 60 > 0 -> stringResource(
+            R.string.sleep_duration_hours_minutes,
+            minutes / 60,
+            minutes % 60,
+        )
+        minutes >= 60 -> stringResource(R.string.sleep_duration_hours_only, minutes / 60)
+        else -> stringResource(R.string.sleep_duration_minutes_only, minutes)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, color = Color(0xFF334155), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text("${"%.1f".format(hours)} h", color = Color(0xFF334155), fontSize = 12.sp)
+            Text(label, color = colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(durationLabel, color = colorScheme.onSurfaceVariant, fontSize = 12.sp)
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .background(Color(0xFFE2E8F0), RoundedCornerShape(999.dp))
+                .background(colorScheme.surfaceVariant, RoundedCornerShape(999.dp))
         ) {
             Box(
                 modifier = Modifier
@@ -184,11 +230,20 @@ private fun SleepStageRow(label: String, hours: Float, percent: Float, color: Co
     }
 }
 
-private fun sleepInterpretation(score: Int): String {
+private fun formatSleepWindowLabel(startMillis: Long, endMillis: Long): String {
+    if (startMillis <= 0L || endMillis <= 0L || endMillis < startMillis) return "--"
+    val formatter = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
+    val zone = ZoneId.systemDefault()
+    val start = Instant.ofEpochMilli(startMillis).atZone(zone).toLocalTime().format(formatter)
+    val end = Instant.ofEpochMilli(endMillis).atZone(zone).toLocalTime().format(formatter)
+    return "$start - $end"
+}
+
+private fun sleepInterpretationRes(score: Int): Int {
     return when {
-        score >= 85 -> "descanso excelente"
-        score >= 70 -> "descanso adecuado"
-        score >= 50 -> "descanso regular"
-        else -> "descanso insuficiente"
+        score >= 85 -> R.string.sleep_interpretation_excellent
+        score >= 70 -> R.string.sleep_interpretation_good
+        score >= 50 -> R.string.sleep_interpretation_regular
+        else -> R.string.sleep_interpretation_low
     }
 }

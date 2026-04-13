@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.LocalHospital
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -35,12 +36,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
-import mx.ita.vitalsense.ui.theme.DashBg
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
 
@@ -53,6 +55,7 @@ fun DocumentosScreen(
     emergencyPhone: String = "+52 449 1004533",
     onBack: () -> Unit = {},
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
     val prefs = remember { context.getSharedPreferences("vitalsense_profile", Context.MODE_PRIVATE) }
@@ -65,7 +68,7 @@ fun DocumentosScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DashBg)
+            .background(colorScheme.background)
             .verticalScroll(rememberScrollState()),
     ) {
         Spacer(Modifier.height(52.dp))
@@ -82,7 +85,7 @@ fun DocumentosScreen(
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Regresar",
+                contentDescription = stringResource(R.string.back),
                 tint = Color.White,
                 modifier = Modifier.size(20.dp),
             )
@@ -96,7 +99,7 @@ fun DocumentosScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color.White)
+                .background(colorScheme.surface)
                 .padding(24.dp),
         ) {
             Column {
@@ -112,7 +115,7 @@ fun DocumentosScreen(
                         if (!avatarUri.isNullOrBlank()) {
                             AsyncImage(
                                 model = Uri.parse(avatarUri),
-                                contentDescription = "Avatar",
+                                contentDescription = stringResource(R.string.dashboard_avatar),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -133,13 +136,13 @@ fun DocumentosScreen(
                             fontFamily = Manrope,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
-                            color = Color(0xFF1A1A2E),
+                            color = colorScheme.onSurface,
                         )
                         Text(
-                            text = "$patientAge años",
+                            text = stringResource(R.string.documents_age_years, patientAge),
                             fontFamily = Manrope,
                             fontSize = 14.sp,
-                            color = Color(0xFF8A8A8A),
+                            color = colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -150,7 +153,7 @@ fun DocumentosScreen(
                 InfoRow(
                     icon = Icons.Outlined.LocalHospital,
                     iconColor = ChartRedLocal,
-                    title = "Tipo de sangre",
+                    title = stringResource(R.string.profile_blood_type),
                     value = bloodType,
                 )
 
@@ -161,30 +164,30 @@ fun DocumentosScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFFFFEBEE))
+                        .background(colorScheme.errorContainer)
                         .padding(14.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Outlined.Warning,
                             contentDescription = null,
-                            tint = Color(0xFFE53935),
+                            tint = colorScheme.error,
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Alergias",
+                                text = stringResource(R.string.documents_allergies),
                                 fontFamily = Manrope,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
-                                color = Color(0xFFE53935),
+                                color = colorScheme.error,
                             )
                             Text(
                                 text = allergies,
                                 fontFamily = Manrope,
                                 fontSize = 14.sp,
-                                color = Color(0xFF1A1A2E),
+                                color = colorScheme.onErrorContainer,
                             )
                         }
                     }
@@ -196,28 +199,28 @@ fun DocumentosScreen(
                 InfoRow(
                     icon = Icons.Outlined.Phone,
                     iconColor = DashBlue,
-                    title = "Telefono de contacto",
+                    title = stringResource(R.string.documents_contact_phone),
                     value = emergencyPhone,
                 )
 
                 Spacer(Modifier.height(20.dp))
 
                 Text(
-                    text = "Documentos personales:",
+                    text = stringResource(R.string.documents_personal_documents),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    color = Color(0xFF1A1A2E),
+                    color = colorScheme.onSurface,
                 )
 
                 Spacer(Modifier.height(12.dp))
 
                 if (uploadedDocs.isEmpty()) {
                     Text(
-                        text = "Sin documentos subidos",
+                        text = stringResource(R.string.documents_none_uploaded),
                         fontFamily = Manrope,
                         fontSize = 13.sp,
-                        color = Color(0xFF8A8A8A),
+                        color = colorScheme.onSurfaceVariant,
                     )
                 } else {
                     uploadedDocs.forEachIndexed { idx, filename ->
@@ -235,17 +238,17 @@ fun DocumentosScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFFFFF9C4))
+                        .background(colorScheme.secondaryContainer)
                         .padding(14.dp),
                 ) {
                     Row(verticalAlignment = Alignment.Top) {
                         Text("⚠️", fontSize = 14.sp)
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Esta información es confidencial y solo debe usarse en emergencias médicas",
+                            text = stringResource(R.string.documents_confidential_notice),
                             fontFamily = Manrope,
                             fontSize = 12.sp,
-                            color = Color(0xFF795548),
+                            color = colorScheme.onSecondaryContainer,
                         )
                     }
                 }
@@ -263,6 +266,7 @@ private fun InfoRow(
     title: String,
     value: String,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -270,18 +274,19 @@ private fun InfoRow(
         Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Column {
-            Text(title, fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF8A8A8A))
-            Text(value, fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF1A1A2E))
+            Text(title, fontFamily = Manrope, fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
+            Text(value, fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = colorScheme.onSurface)
         }
     }
 }
 
 @Composable
 private fun DocFileRow(filename: String) {
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(10.dp))
+            .border(1.dp, colorScheme.outlineVariant, RoundedCornerShape(10.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -290,17 +295,17 @@ private fun DocFileRow(filename: String) {
             fontFamily = Manrope,
             fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp,
-            color = Color(0xFF1A1A2E),
+            color = colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
         Box(
             modifier = Modifier
                 .size(32.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFFFFEBEE)),
+                .background(colorScheme.errorContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text("PDF", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = Color(0xFFE53935))
+            Text(stringResource(R.string.documents_pdf_badge), fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 8.sp, color = colorScheme.error)
         }
     }
 }

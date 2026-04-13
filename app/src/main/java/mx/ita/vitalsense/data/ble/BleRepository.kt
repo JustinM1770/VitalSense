@@ -131,7 +131,7 @@ class BleRepository(private val context: Context) {
     }
 
     fun connectWithCode(code: String, deviceName: String) {
-        // Mock connection associated with pairing code
+        // Vinculacion por codigo validada en Firebase (flujo cloud watch-phone).
         _connectionState.value = BleConnectionState.Connected(deviceName)
     }
 

@@ -37,6 +37,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -59,7 +60,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.ble.BleConnectionState
 import mx.ita.vitalsense.data.ble.BleDevice
 import mx.ita.vitalsense.data.ble.BleVitals
@@ -96,6 +99,7 @@ fun DeviceScanScreen(
     onBack: () -> Unit,
     vm: DeviceViewModel = viewModel(),
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val vitals        by vm.vitals.collectAsStateWithLifecycle()
     val isCodePaired  by vm.isCodePaired.collectAsStateWithLifecycle()
     val codeError     by vm.codeError.collectAsStateWithLifecycle()
@@ -105,7 +109,7 @@ fun DeviceScanScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(NeomorphicBackground)
+            .background(colorScheme.background)
             .statusBarsPadding()
             .padding(top = 32.dp),
     ) {
@@ -125,14 +129,14 @@ fun DeviceScanScreen(
                     .align(Alignment.CenterStart),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = TextDark)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colorScheme.onSurface)
             }
             Text(
-                text = "Conectar Wearable",
+                text = stringResource(R.string.device_scan_title),
                 fontFamily = Manrope,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = TextDark,
+                color = colorScheme.onSurface,
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -148,7 +152,12 @@ fun DeviceScanScreen(
         } else {
             CodeEntryPanel(
                 code = pairingCode,
-                onCodeChange = { pairingCode = it.uppercase().take(8) },
+                onCodeChange = {
+                    pairingCode = it
+                        .filter { ch -> ch.isLetterOrDigit() }
+                        .uppercase()
+                        .take(8)
+                },
                 isLoading = connState is BleConnectionState.Connecting,
                 errorMessage = codeError,
                 onPair = { vm.connectWithCode(pairingCode) },
@@ -167,6 +176,7 @@ private fun CodeEntryPanel(
     errorMessage: String?,
     onPair: () -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -177,13 +187,13 @@ private fun CodeEntryPanel(
             modifier = Modifier
                 .size(80.dp)
                 .clip(CircleShape)
-                .background(OnboardingBlue.copy(alpha = 0.1f)),
+                .background(colorScheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Rounded.Watch,
                 contentDescription = null,
-                tint = OnboardingBlue,
+                tint = colorScheme.primary,
                 modifier = Modifier.size(40.dp),
             )
         }
@@ -191,9 +201,8 @@ private fun CodeEntryPanel(
         Spacer(Modifier.height(16.dp))
 
         Text(
-            text = "Ingresa el código que aparece en tu reloj",
+            text = stringResource(R.string.device_scan_instruction),
             fontFamily = Manrope,
-            fontSize = 14.sp,
             color = TextGray,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
@@ -204,8 +213,8 @@ private fun CodeEntryPanel(
             value = code,
             onValueChange = onCodeChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Código de 8 caracteres", fontFamily = Manrope) },
-            placeholder = { Text("Ej. A1B2C3D4", fontFamily = Manrope, color = TextGray) },
+            label = { Text(stringResource(R.string.device_scan_code_label), fontFamily = Manrope) },
+            placeholder = { Text(stringResource(R.string.device_scan_code_placeholder), fontFamily = Manrope, color = TextGray) },
             singleLine = true,
             enabled = !isLoading,
             shape = RoundedCornerShape(14.dp),
@@ -233,9 +242,9 @@ private fun CodeEntryPanel(
             if (isLoading) {
                 CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Vinculando…", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(stringResource(R.string.device_scan_pairing_in_progress), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
             } else {
-                Text("Vincular Reloj", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(stringResource(R.string.device_scan_pair_action), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, color = Color.White)
             }
         }
     }
@@ -252,6 +261,7 @@ private fun ScanPanel(
     onStopScan: () -> Unit,
     onConnect: (BleDevice) -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -282,7 +292,7 @@ private fun ScanPanel(
                    else "Busca tu sensor VitalSense o wearable compatible",
             fontFamily = Manrope,
             fontSize = 14.sp,
-            color = TextGray,
+            color = colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
 
@@ -296,21 +306,21 @@ private fun ScanPanel(
                 .height(50.dp),
             shape = RoundedCornerShape(32.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (isScanning) Color(0xFFEF4444) else OnboardingBlue,
+                containerColor = if (isScanning) Color(0xFFEF4444) else colorScheme.primary,
             ),
         ) {
             if (isScanning) {
                 CircularProgressIndicator(
-                    color = Color.White,
+                    color = colorScheme.onPrimary,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text("Detener", fontFamily = Manrope, fontWeight = FontWeight.SemiBold,
-                    color = Color.White)
+                    color = colorScheme.onPrimary)
             } else {
                 Text("Buscar dispositivos", fontFamily = Manrope,
-                    fontWeight = FontWeight.SemiBold, color = Color.White)
+                    fontWeight = FontWeight.SemiBold, color = colorScheme.onPrimary)
             }
         }
 
@@ -318,12 +328,12 @@ private fun ScanPanel(
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    color = OnboardingBlue,
+                    color = colorScheme.primary,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Conectando…", fontFamily = Manrope, fontSize = 13.sp, color = TextGray)
+                Text("Conectando…", fontFamily = Manrope, fontSize = 13.sp, color = colorScheme.onSurfaceVariant)
             }
         }
 
@@ -336,7 +346,7 @@ private fun ScanPanel(
                 fontFamily = Manrope,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
-                color = TextGray,
+                color = colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
@@ -351,12 +361,13 @@ private fun ScanPanel(
 
 @Composable
 private fun DeviceRow(device: BleDevice, onConnect: () -> Unit) {
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(CardBg)
-            .border(1.dp, BorderCol, RoundedCornerShape(12.dp))
+            .background(colorScheme.surface)
+            .border(1.dp, colorScheme.outline, RoundedCornerShape(12.dp))
             .clickable(onClick = onConnect)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -365,17 +376,17 @@ private fun DeviceRow(device: BleDevice, onConnect: () -> Unit) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(OnboardingBlue.copy(alpha = 0.1f)),
+                .background(colorScheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Outlined.BluetoothConnected, null,
-                tint = OnboardingBlue, modifier = Modifier.size(20.dp))
+                tint = colorScheme.primary, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(device.name, fontFamily = Manrope, fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp, color = TextDark)
-            Text(device.address, fontFamily = Manrope, fontSize = 11.sp, color = TextGray)
+                fontSize = 14.sp, color = colorScheme.onSurface)
+            Text(device.address, fontFamily = Manrope, fontSize = 11.sp, color = colorScheme.onSurfaceVariant)
         }
         // RSSI como barras de señal (texto)
         val signal = when {
@@ -383,7 +394,7 @@ private fun DeviceRow(device: BleDevice, onConnect: () -> Unit) {
             device.rssi > -75 -> "●●○"
             else              -> "●○○"
         }
-        Text(signal, fontSize = 12.sp, color = OnboardingBlue.copy(alpha = 0.7f))
+        Text(signal, fontSize = 12.sp, color = colorScheme.primary.copy(alpha = 0.7f))
     }
 }
 
@@ -395,6 +406,7 @@ private fun ConnectedPanel(
     vitals: BleVitals,
     onDisconnect: () -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -405,7 +417,7 @@ private fun ConnectedPanel(
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(32.dp))
-                .background(SpO2Green.copy(alpha = 0.12f))
+                .background(colorScheme.secondary.copy(alpha = 0.14f))
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -413,7 +425,7 @@ private fun ConnectedPanel(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(SpO2Green),
+                    .background(colorScheme.secondary),
             )
             Spacer(Modifier.width(8.dp))
             Text(
@@ -421,7 +433,7 @@ private fun ConnectedPanel(
                 fontFamily = Manrope,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
-                color = SpO2Green,
+                    color = colorScheme.secondary,
             )
         }
 
@@ -435,20 +447,20 @@ private fun ConnectedPanel(
             BleVitalCard(
                 modifier = Modifier.weight(1f),
                 icon = { Icon(Icons.Outlined.FavoriteBorder, null,
-                    tint = HeartRateRed, modifier = Modifier.size(22.dp)) },
+                    tint = colorScheme.primary, modifier = Modifier.size(22.dp)) },
                 label = "Ritmo cardíaco",
                 value = vitals.heartRate?.toString() ?: "—",
                 unit = "BPM",
-                color = HeartRateRed,
+                color = colorScheme.primary,
             )
             BleVitalCard(
                 modifier = Modifier.weight(1f),
                 icon = { Icon(Icons.Outlined.WaterDrop, null,
-                    tint = Color(0xFFFF9800), modifier = Modifier.size(22.dp)) },
+                    tint = colorScheme.tertiary, modifier = Modifier.size(22.dp)) },
                 label = "Glucosa",
                 value = vitals.glucose?.let { "%.0f".format(it) } ?: "—",
                 unit = "mg/dL",
-                color = Color(0xFFFF9800),
+                color = colorScheme.tertiary,
             )
         }
 
@@ -457,11 +469,11 @@ private fun ConnectedPanel(
         BleVitalCard(
             modifier = Modifier.fillMaxWidth(),
             icon = { Icon(Icons.Outlined.FavoriteBorder, null,
-                tint = SpO2Green, modifier = Modifier.size(22.dp)) },
+                tint = colorScheme.secondary, modifier = Modifier.size(22.dp)) },
             label = "SpO₂",
             value = vitals.spo2?.toString() ?: "—",
             unit = "%",
-            color = SpO2Green,
+            color = colorScheme.secondary,
         )
 
         Spacer(Modifier.height(28.dp))
@@ -475,11 +487,11 @@ private fun ConnectedPanel(
             shape = RoundedCornerShape(32.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
         ) {
-            Icon(Icons.Outlined.Close, null, tint = Color.White,
+            Icon(Icons.Outlined.Close, null, tint = colorScheme.onError,
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text("Desconectar", fontFamily = Manrope, fontWeight = FontWeight.SemiBold,
-                color = Color.White)
+                color = colorScheme.onError)
         }
     }
 }
@@ -493,22 +505,23 @@ private fun BleVitalCard(
     unit: String,
     color: Color,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(CardBg)
-            .border(1.dp, BorderCol, RoundedCornerShape(16.dp))
+            .background(colorScheme.surface)
+            .border(1.dp, colorScheme.outline, RoundedCornerShape(16.dp))
             .padding(16.dp),
     ) {
         icon()
         Spacer(Modifier.height(8.dp))
-        Text(label, fontFamily = Manrope, fontSize = 11.sp, color = TextGray)
+        Text(label, fontFamily = Manrope, fontSize = 11.sp, color = colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(value, fontFamily = Manrope, fontWeight = FontWeight.Bold,
-                fontSize = 28.sp, color = TextDark, lineHeight = 28.sp)
+                fontSize = 28.sp, color = colorScheme.onSurface, lineHeight = 28.sp)
             Spacer(Modifier.width(4.dp))
-            Text(unit, fontSize = 12.sp, color = TextGray,
+            Text(unit, fontSize = 12.sp, color = colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 3.dp))
         }
     }

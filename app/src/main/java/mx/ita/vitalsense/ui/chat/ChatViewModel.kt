@@ -25,6 +25,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 enum class ChatMessageType {
@@ -45,7 +46,7 @@ data class ChatMessage(
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseDatabase.getInstance()
-    private val userName = auth.currentUser?.displayName?.split(" ")?.firstOrNull() ?: "Usuario"
+    private val userName = auth.currentUser?.displayName?.split(" ")?.firstOrNull() ?: if (currentLanguage() == "en") "User" else "Usuario"
     private val uid = auth.currentUser?.uid ?: "guest"
     private val prefs = application.getSharedPreferences("chatbot_history", Context.MODE_PRIVATE)
     private val historyKey = "messages_$uid"
@@ -65,6 +66,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadHistory()
+    }
+
+    private fun currentLanguage(): String {
+        val lang = Locale.getDefault().language.lowercase(Locale.ROOT)
+        return when (lang) {
+            "pt" -> "pt"
+            "en" -> "en"
+            else -> "es"
+        }
+    }
+
+    private fun welcomeText(): String {
+        return when (currentLanguage()) {
+            "en" -> "Hi $userName, do you have any questions?"
+            "pt" -> "Olá $userName, você tem alguma dúvida?"
+            else -> "Hola $userName, tienes alguna duda?"
+        }
     }
 
     fun sendMessage(text: String) {
@@ -113,7 +131,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         appendMessage(
             ChatMessage(
                 id = System.currentTimeMillis().toString(),
-                text = "Imagen enviada",
+                text = when (currentLanguage()) {
+                    "en" -> "Image sent"
+                    "pt" -> "Imagem enviada"
+                    else -> "Imagen enviada"
+                },
                 isUser = true,
                 type = ChatMessageType.IMAGE,
                 mediaUri = imageUri,
@@ -121,7 +143,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         respondWithText(
-            "Recibi tu imagen. Si quieres, describe lo que observas y te ayudo a interpretarlo dentro del contexto de tus signos vitales.",
+            when (currentLanguage()) {
+                "en" -> "I received your image. If you want, describe what you see and I can help interpret it using your vital signs context."
+                "pt" -> "Recebi sua imagem. Se quiser, descreva o que você observa e eu te ajudo a interpretar no contexto dos seus sinais vitais."
+                else -> "Recibi tu imagen. Si quieres, describe lo que observas y te ayudo a interpretarlo dentro del contexto de tus signos vitales."
+            },
         )
     }
 
@@ -131,7 +157,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         appendMessage(
             ChatMessage(
                 id = System.currentTimeMillis().toString(),
-                text = "Audio grabado",
+                text = when (currentLanguage()) {
+                    "en" -> "Audio recorded"
+                    "pt" -> "Audio gravado"
+                    else -> "Audio grabado"
+                },
                 isUser = true,
                 type = ChatMessageType.AUDIO,
                 mediaUri = audioUri,
@@ -139,7 +169,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         respondWithText(
-            "Recibi tu audio. Si quieres una respuesta mas precisa, agrega un mensaje corto con tu duda principal.",
+            when (currentLanguage()) {
+                "en" -> "I received your audio. For a more precise response, add a short message with your main question."
+                "pt" -> "Recebi seu áudio. Para uma resposta mais precisa, adicione uma mensagem curta com sua dúvida principal."
+                else -> "Recibi tu audio. Si quieres una respuesta mas precisa, agrega un mensaje corto con tu duda principal."
+            },
         )
     }
 
@@ -170,7 +204,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _messages.value = listOf(
                 ChatMessage(
                     id = "welcome",
-                    text = "Hola $userName, tienes alguna duda?",
+                    text = welcomeText(),
                     isUser = false,
                     type = ChatMessageType.TEXT,
                 ),
@@ -204,7 +238,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 listOf(
                     ChatMessage(
                         id = "welcome",
-                        text = "Hola $userName, tienes alguna duda?",
+                        text = welcomeText(),
                         isUser = false,
                         type = ChatMessageType.TEXT,
                     ),
@@ -216,7 +250,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _messages.value = listOf(
                 ChatMessage(
                     id = "welcome",
-                    text = "Hola $userName, tienes alguna duda?",
+                    text = welcomeText(),
                     isUser = false,
                     type = ChatMessageType.TEXT,
                 ),
@@ -249,7 +283,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun fetchPatientContext(): PatientContext = withContext(Dispatchers.IO) {
         if (uid.isBlank() || uid == "guest") {
             return@withContext PatientContext(
-                profileSummary = "Sin sesion iniciada.",
+                profileSummary = when (currentLanguage()) {
+                    "en" -> "No active session."
+                    "pt" -> "Sem sessão iniciada."
+                    else -> "Sin sesion iniciada."
+                },
                 latestVitals = null,
                 sleepData = null,
                 history = emptyList(),
@@ -262,17 +300,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val edad = profileSnapshot?.child("edad")?.getValue(Int::class.java)
             val genero = profileSnapshot?.child("genero")?.getValue(String::class.java).orEmpty()
             val sangre = profileSnapshot?.child("tipoSangre")?.getValue(String::class.java).orEmpty()
-            append("Nombre: ")
+            append(
+                when (currentLanguage()) {
+                    "en" -> "Name: "
+                    "pt" -> "Nome: "
+                    else -> "Nombre: "
+                }
+            )
             append(if (nombre.isBlank()) userName else nombre)
             append(". ")
-            append("Edad: ")
-            append(edad?.toString() ?: "No disponible")
+            append(if (currentLanguage() == "en") "Age: " else if (currentLanguage() == "pt") "Idade: " else "Edad: ")
+            append(edad?.toString() ?: if (currentLanguage() == "en") "Not available" else if (currentLanguage() == "pt") "Não disponível" else "No disponible")
             append(". ")
-            append("Genero: ")
-            append(if (genero.isBlank()) "No disponible" else genero)
+            append(if (currentLanguage() == "en") "Gender: " else if (currentLanguage() == "pt") "Gênero: " else "Genero: ")
+            append(if (genero.isBlank()) (if (currentLanguage() == "en") "Not available" else if (currentLanguage() == "pt") "Não disponível" else "No disponible") else genero)
             append(". ")
-            append("Tipo de sangre: ")
-            append(if (sangre.isBlank()) "No disponible" else sangre)
+            append(if (currentLanguage() == "en") "Blood type: " else if (currentLanguage() == "pt") "Tipo sanguíneo: " else "Tipo de sangre: ")
+            append(if (sangre.isBlank()) (if (currentLanguage() == "en") "Not available" else if (currentLanguage() == "pt") "Não disponível" else "No disponible") else sangre)
             append('.')
         }
 
@@ -346,8 +390,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     private suspend fun callGeminiMedicalAssistant(userText: String, context: PatientContext): String = withContext(Dispatchers.IO) {
         val systemPrompt = """
-            Eres un médico virtual de apoyo integrado en VitalSense, una app de telemonitoreo para adultos mayores.
-            Responde en español claro, empático y directo.
+            ${if (currentLanguage() == "en") "You are a virtual medical assistant integrated in VitalSense, a telemonitoring app for older adults." else if (currentLanguage() == "pt") "Você é um assistente médico virtual integrado ao VitalSense, um app de telemonitoramento para idosos." else "Eres un médico virtual de apoyo integrado en VitalSense, una app de telemonitoreo para adultos mayores."}
+            ${if (currentLanguage() == "en") "Reply in clear, empathetic and direct English." else if (currentLanguage() == "pt") "Responda em português claro, empático e direto." else "Responde en español claro, empático y directo."}
             Usa los datos del perfil y del dispositivo del paciente para personalizar tu orientación.
             Reglas:
             - No inventes datos; si faltan, dilo explícitamente.
@@ -359,7 +403,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
               1) Estado actual (1 línea)
               2) Qué hacer ahora (2–3 bullets)
               3) Cuándo ir a urgencias (1 línea)
-            - Cierra siempre con: "Esta orientación no sustituye una consulta médica presencial."
+            - ${if (currentLanguage() == "en") "Always close with: \"This guidance does not replace an in-person medical consultation.\"" else if (currentLanguage() == "pt") "Sempre termine com: \"Esta orientação não substitui uma consulta médica presencial.\"" else "Cierra siempre con: \"Esta orientación no sustituye una consulta médica presencial.\""}
         """.trimIndent()
 
         val contextJson = JSONObject().apply {
@@ -372,6 +416,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             })
             put("sueno", JSONObject().apply {
                 put("score",  context.sleepData?.score  ?: JSONObject.NULL)
+                put("minutos", context.sleepData?.totalMinutes ?: JSONObject.NULL)
+                put("horas_completas", context.sleepData?.completeHours ?: JSONObject.NULL)
                 put("horas",  context.sleepData?.horas  ?: JSONObject.NULL)
                 put("estado", context.sleepData?.estado ?: JSONObject.NULL)
             })
@@ -390,20 +436,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val conversationTail = _messages.value.takeLast(6)
             .filter { it.type == ChatMessageType.TEXT }
             .joinToString("\n") { msg ->
-                val role = if (msg.isUser) "Paciente" else "Asistente"
+                val role = if (msg.isUser) {
+                    if (currentLanguage() == "en") "Patient" else if (currentLanguage() == "pt") "Paciente" else "Paciente"
+                } else {
+                    if (currentLanguage() == "en") "Assistant" else if (currentLanguage() == "pt") "Assistente" else "Asistente"
+                }
                 "$role: ${sanitizeText(msg.text)}"
             }
 
         val fullUserMessage = buildString {
-            appendLine("Contexto clínico del paciente:")
+            appendLine(if (currentLanguage() == "en") "Patient clinical context:" else if (currentLanguage() == "pt") "Contexto clínico do paciente:" else "Contexto clínico del paciente:")
             appendLine(contextJson.toString())
             appendLine()
             if (conversationTail.isNotBlank()) {
-                appendLine("Conversación reciente:")
+                appendLine(if (currentLanguage() == "en") "Recent conversation:" else if (currentLanguage() == "pt") "Conversa recente:" else "Conversación reciente:")
                 appendLine(conversationTail)
                 appendLine()
             }
-            appendLine("Nueva pregunta del paciente:")
+            appendLine(if (currentLanguage() == "en") "New patient question:" else if (currentLanguage() == "pt") "Nova pergunta do paciente:" else "Nueva pregunta del paciente:")
             appendLine(sanitizeText(userText))
         }
 
@@ -456,18 +506,48 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val input = userText.lowercase()
         val latest = context.latestVitals
         val sleep = context.sleepData
+        val lang = currentLanguage()
 
         val dataSummary = buildString {
-            append("Datos actuales: ")
-            append("FC ")
-            append(latest?.heartRate?.takeIf { it > 0 }?.toString() ?: "ND")
-            append(" bpm, SpO2 ")
-            append(latest?.spo2?.takeIf { it > 0 }?.toString() ?: "ND")
-            append("%, glucosa ")
-            append(latest?.glucose?.takeIf { it > 0.0 }?.let { "%.0f".format(it) } ?: "ND")
-            append(" mg/dL, sueno ")
-            append(sleep?.horas?.takeIf { it > 0f }?.let { "%.1f".format(it) } ?: "ND")
-            append(" h.")
+            if (lang == "en") {
+                append("Current data: HR ")
+                append(latest?.heartRate?.takeIf { it > 0 }?.toString() ?: "NA")
+                append(" bpm, SpO2 ")
+                append(latest?.spo2?.takeIf { it > 0 }?.toString() ?: "NA")
+                append("%, glucose ")
+                append(latest?.glucose?.takeIf { it > 0.0 }?.let { "%.0f".format(it) } ?: "NA")
+                append(" mg/dL, sleep ")
+                append(sleep?.durationLabel()?.takeIf { it.isNotBlank() } ?: "NA")
+                append(".")
+            } else if (lang == "pt") {
+                append("Dados atuais: FC ")
+                append(latest?.heartRate?.takeIf { it > 0 }?.toString() ?: "ND")
+                append(" bpm, SpO2 ")
+                append(latest?.spo2?.takeIf { it > 0 }?.toString() ?: "ND")
+                append("%, glicose ")
+                append(latest?.glucose?.takeIf { it > 0.0 }?.let { "%.0f".format(it) } ?: "ND")
+                append(" mg/dL, sono ")
+                append(sleep?.durationLabel()?.takeIf { it.isNotBlank() } ?: "ND")
+                append(".")
+            } else {
+                append("Datos actuales: ")
+                append("FC ")
+                append(latest?.heartRate?.takeIf { it > 0 }?.toString() ?: "ND")
+                append(" bpm, SpO2 ")
+                append(latest?.spo2?.takeIf { it > 0 }?.toString() ?: "ND")
+                append("%, glucosa ")
+                append(latest?.glucose?.takeIf { it > 0.0 }?.let { "%.0f".format(it) } ?: "ND")
+                append(" mg/dL, sueno ")
+                append(sleep?.durationLabel()?.takeIf { it != "Sin datos" } ?: "ND")
+                append(".")
+            }
+        }
+
+        if (lang == "en") {
+            return "Current status: $dataSummary\n• I can help you review your vital signs and symptoms.\n• Tell me your main concern and when it started.\n• If symptoms are severe or worsening quickly, seek emergency care now.\nThis guidance does not replace an in-person medical consultation."
+        }
+        if (lang == "pt") {
+            return "Estado atual: $dataSummary\n• Posso te ajudar a revisar sinais vitais e sintomas.\n• Diga sua principal dúvida e quando começou.\n• Se os sintomas forem graves ou piorarem rápido, procure urgência agora.\nEsta orientação não substitui uma consulta médica presencial."
         }
 
         return when {

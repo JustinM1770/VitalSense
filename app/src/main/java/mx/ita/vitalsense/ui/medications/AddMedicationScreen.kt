@@ -25,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
@@ -47,28 +48,17 @@ import com.google.firebase.database.FirebaseDatabase
 import mx.ita.vitalsense.data.model.Medication
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
-
-private val frequencyOptions = listOf(
-    "Cada 4 horas",
-    "Cada 6 horas",
-    "Cada 8 horas",
-    "Cada 12 horas",
-    "Cada 24 horas",
-    "Personalizado",
-)
-
-private val durationOptions = listOf(
-    "2 dias",
-    "7 dias",
-    "2 semanas",
-    "1 mes",
-    "Indeterminado",
-)
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import androidx.compose.ui.res.stringResource
+import mx.ita.vitalsense.R
 
 @Composable
 fun AddMedicationScreen(
     onBack: () -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
 
@@ -76,18 +66,38 @@ fun AddMedicationScreen(
     var frecuencia by remember { mutableStateOf("") }
     var frecuenciaCustom by remember { mutableStateOf("") }
     var duracion by remember { mutableStateOf("") }
+    var recordatorioHora by remember { mutableStateOf("") }
 
     var freqExpanded by remember { mutableStateOf(false) }
     var durExpanded by remember { mutableStateOf(false) }
 
-    val frecuenciaFinal = if (frecuencia == "Personalizado") frecuenciaCustom.trim() else frecuencia
+    val customFrequencyLabel = stringResource(R.string.medication_frequency_custom_option)
+    val frequencyOptions = listOf(
+        stringResource(R.string.medication_frequency_4h),
+        stringResource(R.string.medication_frequency_6h),
+        stringResource(R.string.medication_frequency_8h),
+        stringResource(R.string.medication_frequency_12h),
+        stringResource(R.string.medication_frequency_24h),
+        customFrequencyLabel,
+    )
+    val durationOptions = listOf(
+        stringResource(R.string.medication_duration_2_days),
+        stringResource(R.string.medication_duration_7_days),
+        stringResource(R.string.medication_duration_2_weeks),
+        stringResource(R.string.medication_duration_1_month),
+        stringResource(R.string.medication_duration_indefinite),
+    )
+
+    val frecuenciaFinal = if (frecuencia == customFrequencyLabel) frecuenciaCustom.trim() else frecuencia
+    val horaFinal = recordatorioHora.trim()
+    val horaError = !horaFinal.matches(Regex("^([01]\\d|2[0-3]):([0-5]\\d)$"))
 
     val nombreError = nombre.trim().isBlank()
     val frecuenciaError = frecuenciaFinal.isBlank()
     val duracionError = duracion.isBlank()
-    val formValid = !nombreError && !frecuenciaError && !duracionError && uid.isNotBlank()
+    val formValid = !nombreError && !frecuenciaError && !duracionError && !horaError && uid.isNotBlank()
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Box(modifier = Modifier.fillMaxSize().background(colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -107,23 +117,23 @@ fun AddMedicationScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Regresar",
+                        contentDescription = stringResource(R.string.back),
                         tint = DashBlue,
                     )
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "Agregar medicamento",
+                    text = stringResource(R.string.medication_add),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = DashBlue,
+                    color = colorScheme.onBackground,
                 )
             }
 
             Spacer(Modifier.height(24.dp))
 
-            Text("Nombre del medicamento", fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.medication_name_label), fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = nombre,
@@ -132,22 +142,22 @@ fun AddMedicationScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                 isError = nombreError,
-                placeholder = { Text("Ej. Metformina", color = Color(0xFF9CA3AF)) },
+                placeholder = { Text(stringResource(R.string.medication_name_placeholder), color = colorScheme.onSurfaceVariant) },
                 shape = RoundedCornerShape(12.dp),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = colorScheme.surface,
+                    unfocusedContainerColor = colorScheme.surface,
                     focusedIndicatorColor = DashBlue,
-                    unfocusedIndicatorColor = Color(0xFFE5E7EB),
+                    unfocusedIndicatorColor = colorScheme.outlineVariant,
                 ),
             )
             if (nombreError) {
-                Text("El nombre es obligatorio", color = Color(0xFFD32F2F), fontSize = 12.sp)
+                Text(stringResource(R.string.medication_name_required_error), color = Color(0xFFD32F2F), fontSize = 12.sp)
             }
 
             Spacer(Modifier.height(18.dp))
 
-            Text("Cada cuanto tomar", fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.medication_frequency_label), fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Box {
                 OutlinedTextField(
@@ -157,13 +167,13 @@ fun AddMedicationScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = frecuenciaError,
-                    placeholder = { Text("Selecciona una frecuencia", color = Color(0xFF9CA3AF)) },
+                    placeholder = { Text(stringResource(R.string.medication_frequency_placeholder), color = colorScheme.onSurfaceVariant) },
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = colorScheme.surface,
+                        unfocusedContainerColor = colorScheme.surface,
                         focusedIndicatorColor = DashBlue,
-                        unfocusedIndicatorColor = Color(0xFFE5E7EB),
+                        unfocusedIndicatorColor = colorScheme.outlineVariant,
                     ),
                 )
                 // Overlay transparente que captura el toque sin que el TextField lo bloquee
@@ -181,7 +191,7 @@ fun AddMedicationScreen(
                 }
             }
 
-            if (frecuencia == "Personalizado") {
+            if (frecuencia == customFrequencyLabel) {
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = frecuenciaCustom,
@@ -189,24 +199,24 @@ fun AddMedicationScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = frecuenciaError,
-                    placeholder = { Text("Ej. Cada 10 horas", color = Color(0xFF9CA3AF)) },
+                    placeholder = { Text(stringResource(R.string.medication_frequency_custom_placeholder), color = colorScheme.onSurfaceVariant) },
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = colorScheme.surface,
+                        unfocusedContainerColor = colorScheme.surface,
                         focusedIndicatorColor = DashBlue,
-                        unfocusedIndicatorColor = Color(0xFFE5E7EB),
+                        unfocusedIndicatorColor = colorScheme.outlineVariant,
                     ),
                 )
             }
 
             if (frecuenciaError) {
-                Text("La frecuencia es obligatoria", color = Color(0xFFD32F2F), fontSize = 12.sp)
+                Text(stringResource(R.string.medication_frequency_required_error), color = Color(0xFFD32F2F), fontSize = 12.sp)
             }
 
             Spacer(Modifier.height(18.dp))
 
-            Text("Duracion del tratamiento", fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.medication_duration_label), fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Box {
                 OutlinedTextField(
@@ -216,13 +226,13 @@ fun AddMedicationScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = duracionError,
-                    placeholder = { Text("Selecciona duracion", color = Color(0xFF9CA3AF)) },
+                    placeholder = { Text(stringResource(R.string.medication_duration_placeholder), color = colorScheme.onSurfaceVariant) },
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = colorScheme.surface,
+                        unfocusedContainerColor = colorScheme.surface,
                         focusedIndicatorColor = DashBlue,
-                        unfocusedIndicatorColor = Color(0xFFE5E7EB),
+                        unfocusedIndicatorColor = colorScheme.outlineVariant,
                     ),
                 )
                 // Overlay transparente que captura el toque sin que el TextField lo bloquee
@@ -240,14 +250,37 @@ fun AddMedicationScreen(
                 }
             }
             if (duracionError) {
-                Text("La duracion es obligatoria", color = Color(0xFFD32F2F), fontSize = 12.sp)
+                Text(stringResource(R.string.medication_duration_required_error), color = Color(0xFFD32F2F), fontSize = 12.sp)
+            }
+
+            Spacer(Modifier.height(18.dp))
+
+            Text(stringResource(R.string.medication_first_reminder_label), fontFamily = Manrope, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = recordatorioHora,
+                onValueChange = { recordatorioHora = it.filter { ch -> ch.isDigit() || ch == ':' }.take(5) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = horaError,
+                placeholder = { Text(stringResource(R.string.medication_time_placeholder), color = colorScheme.onSurfaceVariant) },
+                shape = RoundedCornerShape(12.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = colorScheme.surface,
+                    unfocusedContainerColor = colorScheme.surface,
+                    focusedIndicatorColor = DashBlue,
+                    unfocusedIndicatorColor = colorScheme.outlineVariant,
+                ),
+            )
+            if (horaError) {
+                Text(stringResource(R.string.medication_time_format_error), color = Color(0xFFD32F2F), fontSize = 12.sp)
             }
 
             Spacer(Modifier.height(18.dp))
 
             Text(
-                text = "Extra: este medicamento se mostrara en dashboard y perfil de emergencia.",
-                color = Color(0xFF6B7280),
+                text = stringResource(R.string.medication_extra_note),
+                color = colorScheme.onSurfaceVariant,
                 fontFamily = Manrope,
                 fontSize = 12.sp,
             )
@@ -267,6 +300,9 @@ fun AddMedicationScreen(
                         duracion = duracion,
                         dosis = frecuenciaFinal,
                         horario = duracion,
+                        recordatorioHora = horaFinal,
+                        reminderEnabled = true,
+                        nextReminderAt = resolveFirstReminderAt(horaFinal),
                         activo = true,
                         createdAt = System.currentTimeMillis(),
                     )
@@ -275,11 +311,11 @@ fun AddMedicationScreen(
                         .getReference("medications/$uid/$id")
                         .setValue(med)
                         .addOnSuccessListener {
-                            Toast.makeText(context, "Medicamento guardado", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.medication_saved), Toast.LENGTH_SHORT).show()
                             onBack()
                         }
                         .addOnFailureListener {
-                            Toast.makeText(context, "No se pudo guardar el medicamento", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.medication_save_error), Toast.LENGTH_LONG).show()
                         }
                 },
                 enabled = formValid,
@@ -290,10 +326,21 @@ fun AddMedicationScreen(
                     disabledContainerColor = DashBlue.copy(alpha = 0.35f),
                 ),
             ) {
-                Text("Guardar medicamento", color = Color.White, fontFamily = Manrope, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.medication_save_button), color = Color.White, fontFamily = Manrope, fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+private fun resolveFirstReminderAt(hhmm: String): Long {
+    val parts = hhmm.split(":")
+    if (parts.size != 2) return 0L
+    val hour = parts[0].toIntOrNull() ?: return 0L
+    val minute = parts[1].toIntOrNull() ?: return 0L
+    val localDateTime = LocalDate.now(ZoneId.systemDefault()).atTime(LocalTime.of(hour, minute))
+    val candidate = localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val current = System.currentTimeMillis()
+    return if (candidate >= current) candidate else candidate + 24L * 60L * 60L * 1000L
 }

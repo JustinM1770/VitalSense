@@ -69,6 +69,7 @@ fun SincronizarWearableScreen(
     val scope    = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val focusRequester = remember { FocusRequester() }
+    val colorScheme = MaterialTheme.colorScheme
 
     // Launcher para solicitar permisos de Health Connect
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -100,7 +101,7 @@ fun SincronizarWearableScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White),
+            .background(colorScheme.background),
     ) {
         Column(
             modifier = Modifier
@@ -119,7 +120,7 @@ fun SincronizarWearableScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Regresar",
-                        tint = Color.Black,
+                        tint = colorScheme.onBackground,
                     )
                 }
             }
@@ -132,7 +133,7 @@ fun SincronizarWearableScreen(
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                color = Color.Black,
+                color = colorScheme.onBackground,
                 lineHeight = 32.sp,
             )
 
@@ -144,7 +145,7 @@ fun SincronizarWearableScreen(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Normal,
                 textAlign = TextAlign.Center,
-                color = Color(0xFF6B7A8D),
+                color = colorScheme.onSurfaceVariant,
                 lineHeight = 22.sp,
             )
 
@@ -167,13 +168,13 @@ fun SincronizarWearableScreen(
                     decorationBox = { it() },
                 )
 
-                // Overlay visual — 3 celdas + guión + 3 celdas
+                // Overlay visual — 4 celdas + guion + 4 celdas
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Primeras 3 celdas
-                    repeat(3) { index ->
+                    // Primeras 4 celdas
+                    repeat(4) { index ->
                         CodeCell(
                             char = uiState.code.getOrNull(index),
                             isActive = uiState.code.length == index,
@@ -188,9 +189,9 @@ fun SincronizarWearableScreen(
                         color = Color(0xFF3D3D3D),
                     )
 
-                    // Últimas 3 celdas
-                    repeat(3) { index ->
-                        val charIndex = index + 3
+                    // Ultimas 4 celdas
+                    repeat(4) { index ->
+                        val charIndex = index + 4
                         CodeCell(
                             char = uiState.code.getOrNull(charIndex),
                             isActive = uiState.code.length == charIndex,
@@ -208,7 +209,7 @@ fun SincronizarWearableScreen(
                         permissionLauncher.launch(permissions)
                     }
                 },
-                enabled = uiState.code.length == 6 && uiState.syncState !is SyncState.Loading,
+                enabled = uiState.code.length == 8 && uiState.syncState !is SyncState.Loading,
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = WearableBlue,

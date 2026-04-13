@@ -30,6 +30,8 @@ import mx.ita.vitalsense.data.repository.VitalsRepository
 class DeviceViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val TAG = "DeviceViewModel"
+        private const val DB_URL = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com"
+        private const val WATCH_DATA_STALE_MS = 90_000L
         const val PREFS_NAME = "vitalsense_watch_prefs"
         const val KEY_CODE_PAIRED = "code_paired"
         const val KEY_PAIRED_CODE = "paired_code"
@@ -39,7 +41,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
 
     val repo = BleRepository(app.applicationContext)
     private val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val db = FirebaseDatabase.getInstance()
+    private val db = FirebaseDatabase.getInstance(DB_URL)
     private val vitalsRepo = VitalsRepository()
 
     private val _devices = MutableStateFlow<List<BleDevice>>(emptyList())
@@ -117,24 +119,84 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             try {
-                val upperCode = code.uppercase().trim()
-                val ref = db.getReference("patients/pairing_codes").child(upperCode)
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
-                val snapshot = ref.get().await()
+                val upperCode = code.uppercase().filter { it.isLetterOrDigit() }.trim()
+                if (upperCode.length != 8) {
+                    _codeError.value = "Codigo invalido. Debe tener 8 caracteres."
+                    repo.setDisconnected()
+                    return@launch
+                }
 
-                if (snapshot.exists()) {
+                val pairingCodesRef = db.getReference("patients/pairing_codes")
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId.isNullOrBlank()) {
+                    _codeError.value = "Debes iniciar sesion para vincular el reloj."
+                    repo.setDisconnected()
+                    return@launch
+                }
+
+                // 1) Lookup exact key with short retries (handles race while watch publishes code)
+                var snapshot: com.google.firebase.database.DataSnapshot? = null
+                for (attempt in 0..4) {
+                    val exact = pairingCodesRef.child(upperCode).get().await()
+                    if (exact.exists()) {
+                        snapshot = exact
+                        break
+                    }
+                    if (attempt < 4) delay(700L)
+                }
+
+                // 2) Fallback: some old entries may store code in field instead of node key
+                if (snapshot == null) {
+                    val byField = pairingCodesRef
+                        .orderByChild("code")
+                        .equalTo(upperCode)
+                        .limitToFirst(1)
+                        .get()
+                        .await()
+                    snapshot = byField.children.firstOrNull()
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    val active = snapshot.child("active").getValue(Boolean::class.java) ?: true
+                    val alreadyPaired = snapshot.child("paired").getValue(Boolean::class.java) ?: false
+                    val ownerUid = snapshot.child("userId").getValue(String::class.java).orEmpty()
+
+                    if (!active) {
+                        _codeError.value = "Este codigo ya expiro. Genera uno nuevo en el reloj."
+                        repo.setDisconnected()
+                        return@launch
+                    }
+
+                    if (alreadyPaired && ownerUid.isNotBlank() && ownerUid != userId) {
+                        _codeError.value = "Este reloj ya esta vinculado con otra cuenta."
+                        repo.setDisconnected()
+                        return@launch
+                    }
+
                     val deviceName = snapshot.child("deviceName").getValue(String::class.java) ?: "Wearable"
-                    val finalUid = userId ?: "global"
-                    ref.updateChildren(mapOf("paired" to true, "userId" to finalUid)).await()
+                    val resolvedRef = pairingCodesRef.child(snapshot.key ?: upperCode)
+                    resolvedRef.updateChildren(
+                        mapOf(
+                            "paired" to true,
+                            "active" to true,
+                            "userId" to userId,
+                            "pairedAt" to System.currentTimeMillis(),
+                        ),
+                    ).await()
                     pairSuccessfully(upperCode, deviceName)
                 } else {
-                    _codeError.value = "Código inválido. Verifica el código en tu reloj e inténtalo de nuevo."
+                    _codeError.value = "Codigo no encontrado. Espera 2-3 segundos y vuelve a intentar con el codigo exacto del reloj."
                     repo.setDisconnected()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Firebase error, pairing anyway", e)
-                val upperCode = code.uppercase().trim()
-                pairSuccessfully(upperCode, "Wearable")
+                Log.e(TAG, "Error al vincular reloj con Firebase", e)
+                val raw = e.message.orEmpty()
+                _codeError.value = if (raw.contains("permission denied", ignoreCase = true)) {
+                    "Firebase rechazo el acceso a pairing_codes. Revisa las reglas de base de datos para el reloj y el telefono."
+                } else {
+                    "No se pudo validar el codigo con el servidor. Error: ${e.message}"
+                }
+                repo.setDisconnected()
             }
         }
     }
@@ -195,10 +257,12 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
             launch {
                 vitalsRepo.observeVitals().collect { result: Result<VitalsData> ->
                     result.onSuccess { vitals: VitalsData ->
+                        val now = System.currentTimeMillis()
+                        val isFresh = vitals.timestamp > 0L && (now - vitals.timestamp) <= WATCH_DATA_STALE_MS
                         val ble = BleVitals(
-                            heartRate = vitals.heartRate,
-                            glucose = vitals.glucose,
-                            spo2 = vitals.spo2,
+                            heartRate = vitals.heartRate.takeIf { isFresh && it > 0 },
+                            glucose = vitals.glucose.takeIf { isFresh && it > 0.0 },
+                            spo2 = vitals.spo2.takeIf { isFresh && it > 0 },
                             timestamp = vitals.timestamp
                         )
                         repo.updateVitals(ble)
@@ -213,6 +277,15 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                     try {
                         if (hcRepo.hasPermissions()) {
                             val hcVitals = hcRepo.readLatestVitals()
+                            val now = System.currentTimeMillis()
+                            val hrSampleTs = hcVitals.heartRateSampleTimestamp
+                            val isHeartRateFresh = hrSampleTs != null && (now - hrSampleTs) <= 2 * 60_000L
+
+                            if (!isHeartRateFresh) {
+                                delay(60_000L)
+                                continue
+                            }
+
                             val ble = BleVitals(
                                 heartRate = hcVitals.heartRate ?: 0,
                                 glucose   = hcVitals.glucose   ?: 0.0,
@@ -221,7 +294,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
                             )
                             if ((ble.heartRate ?: 0) > 0) {
                                 repo.updateVitals(ble)
-                                writeVitalsToFirebase(ble)
+                                writeVitalsToFirebase(ble, hrSampleTs)
                             }
                         }
                     } catch (e: Exception) {
@@ -289,6 +362,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun writeSleepToFirebase(sleep: SleepData) {
         try {
+            if (sleep.totalMinutes <= 0) return
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
             val dateKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
             val ref = db.getReference("sleep/$userId/$dateKey")
@@ -298,16 +372,19 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun writeVitalsToFirebase(vitals: BleVitals) {
+    private fun writeVitalsToFirebase(vitals: BleVitals, heartRateSampleTimestamp: Long? = null) {
         try {
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "global"
             val ref = db.getReference("vitals/current/$userId")
-            val data = mapOf(
+            val data = mutableMapOf<String, Any>(
                 "heartRate" to (vitals.heartRate ?: 0),
                 "spo2" to (vitals.spo2 ?: 0),
                 "glucose" to (vitals.glucose ?: 0.0),
                 "timestamp" to System.currentTimeMillis()
             )
+            if (heartRateSampleTimestamp != null) {
+                data["heartRateSampleTimestamp"] = heartRateSampleTimestamp
+            }
             ref.setValue(data)
         } catch (e: Exception) {
             Log.e(TAG, "Error writing vitals to Firebase", e)

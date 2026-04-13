@@ -33,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -141,7 +142,7 @@ fun CuestionarioScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState()),
     ) {
         Spacer(Modifier.height(52.dp))
@@ -233,7 +234,7 @@ fun CuestionarioScreen(
             fontFamily = Manrope,
             fontWeight = FontWeight.Bold,
             fontSize = 22.sp,
-            color = Color(0xFF1A1A2E),
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
 
@@ -318,8 +319,8 @@ fun CuestionarioScreen(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = DashBlue,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedTextColor = Color(0xFF1A1A2E),
-                            unfocusedTextColor = Color(0xFF1A1A2E),
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                         ),
                     )
 
@@ -379,8 +380,8 @@ fun CuestionarioScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = DashBlue,
                                 unfocusedBorderColor = Color(0xFFE0E0E0),
-                                focusedTextColor = Color(0xFF1A1A2E),
-                                unfocusedTextColor = Color(0xFF1A1A2E),
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                             ),
                         )
 
@@ -433,7 +434,7 @@ fun CuestionarioScreen(
                 text = "Verificación de datos biométricos",
                 fontFamily = Manrope,
                 fontSize = 14.sp,
-                color = Color(0xFF1A1A2E),
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
 
@@ -603,8 +604,8 @@ private fun CuestionarioField(
                 unfocusedBorderColor = Color(0xFFE0E0E0),
                 disabledBorderColor = Color(0xFFE0E0E0),
                 disabledContainerColor = Color(0xFFF5F5F5),
-                focusedTextColor = Color(0xFF1A1A2E),
-                unfocusedTextColor = Color(0xFF1A1A2E),
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                 disabledTextColor = Color(0xFF8A8A8A),
             ),
         )

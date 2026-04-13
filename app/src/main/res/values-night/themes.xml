@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- App theme (used after splash) - Dark mode variant -->
+    <style name="Theme.VitalSense" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorBackground">@color/background</item>
+        <item name="colorOnBackground">@color/on_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!--
+        System SplashScreen theme (Android 12+) - Dark mode variant
+    -->
+    <style name="Theme.VitalSense.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/icono</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/background</item>
+        <item name="postSplashScreenTheme">@style/Theme.VitalSense</item>
+    </style>
+
+</resources>

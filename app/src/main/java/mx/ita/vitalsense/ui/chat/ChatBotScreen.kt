@@ -35,11 +35,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import mx.ita.vitalsense.R
 import java.io.File
 import kotlinx.coroutines.launch
 
@@ -66,7 +68,7 @@ fun ChatBotScreen(
         if (localUri != null) {
             vm.sendImageMessage(localUri.toString())
         } else {
-            Toast.makeText(context, "No se pudo adjuntar la imagen", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.chat_attach_image_error), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -79,12 +81,12 @@ fun ChatBotScreen(
                 recorder = started.first
                 recordingPath = started.second
                 isRecording = true
-                Toast.makeText(context, "Grabando audio...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.chat_recording_audio), Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "No se pudo iniciar la grabacion", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.chat_recording_start_error), Toast.LENGTH_LONG).show()
             }
         } else {
-            Toast.makeText(context, "Permiso de microfono denegado", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.chat_mic_permission_denied), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -95,7 +97,7 @@ fun ChatBotScreen(
     }
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             ChatTopBar(onBack = onBack)
         }
@@ -152,9 +154,9 @@ fun ChatBotScreen(
                                 recorder = started.first
                                 recordingPath = started.second
                                 isRecording = true
-                                Toast.makeText(context, "Grabando audio...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.chat_recording_audio), Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "No se pudo iniciar la grabacion", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, context.getString(R.string.chat_recording_start_error), Toast.LENGTH_LONG).show()
                             }
                         } else {
                             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -168,9 +170,9 @@ fun ChatBotScreen(
 
                         if (!path.isNullOrBlank()) {
                             vm.sendAudioMessage(Uri.fromFile(File(path)).toString())
-                            Toast.makeText(context, "Audio enviado", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.chat_audio_sent), Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(context, "No se encontro el audio grabado", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.chat_audio_not_found), Toast.LENGTH_LONG).show()
                         }
                     }
                 },
@@ -192,6 +194,7 @@ fun ChatBotScreen(
 
 @Composable
 private fun ChatTopBar(onBack: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -207,20 +210,21 @@ private fun ChatTopBar(onBack: () -> Unit) {
                 .clickable { onBack() },
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Regresar", tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = Color.White, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(16.dp))
         Text(
-            text = "Chat Bot AI",
+            text = stringResource(R.string.chat_title),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F172A)
+            color = scheme.onBackground
         )
     }
 }
 
 @Composable
 private fun ChatBubble(msg: ChatMessage) {
+    val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
 
     Row(
@@ -229,14 +233,14 @@ private fun ChatBubble(msg: ChatMessage) {
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = if (msg.isUser) Color(0xFF1169FF) else Color(0xFFF2F4F7),
+            color = if (msg.isUser) Color(0xFF1169FF) else scheme.surfaceVariant,
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
             when (msg.type) {
                 ChatMessageType.TEXT -> {
                     Text(
                         text = msg.text,
-                        color = if (msg.isUser) Color.White else Color(0xFF334155),
+                        color = if (msg.isUser) Color.White else scheme.onSurfaceVariant,
                         fontSize = 15.sp,
                         modifier = Modifier.padding(16.dp),
                     )
@@ -246,7 +250,7 @@ private fun ChatBubble(msg: ChatMessage) {
                     Column(modifier = Modifier.padding(10.dp)) {
                         AsyncImage(
                             model = msg.mediaUri,
-                            contentDescription = "Imagen del chat",
+                            contentDescription = stringResource(R.string.chat_image_content_description),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(170.dp)
@@ -255,7 +259,7 @@ private fun ChatBubble(msg: ChatMessage) {
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = msg.text,
-                            color = if (msg.isUser) Color.White else Color(0xFF334155),
+                            color = if (msg.isUser) Color.White else scheme.onSurfaceVariant,
                             fontSize = 13.sp,
                             modifier = Modifier.padding(horizontal = 6.dp),
                         )
@@ -277,13 +281,13 @@ private fun ChatBubble(msg: ChatMessage) {
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = "Reproducir audio",
-                            tint = if (msg.isUser) Color.White else Color(0xFF334155),
+                            contentDescription = stringResource(R.string.chat_play_audio),
+                            tint = if (msg.isUser) Color.White else scheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = msg.text,
-                            color = if (msg.isUser) Color.White else Color(0xFF334155),
+                            color = if (msg.isUser) Color.White else scheme.onSurfaceVariant,
                             fontSize = 14.sp,
                         )
                     }
@@ -295,17 +299,18 @@ private fun ChatBubble(msg: ChatMessage) {
 
 @Composable
 private fun TypingIndicator() {
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = Color(0xFFF2F4F7)
+            color = scheme.surfaceVariant
         ) {
             Text(
                 text = "...",
-                color = Color(0xFF334155),
+                color = scheme.onSurfaceVariant,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
@@ -325,13 +330,14 @@ private fun ChatInputArea(
     onAudioClick: () -> Unit,
     onSend: () -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(24.dp)),
+            .border(1.dp, scheme.outline.copy(alpha = 0.35f), RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
-        color = Color.White
+        color = scheme.surface
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Fila de Texto y Botón Send
@@ -341,12 +347,12 @@ private fun ChatInputArea(
             ) {
                 Box(modifier = Modifier.weight(1f)) {
                     if (text.isEmpty()) {
-                        Text("¿En qué puedo ayudarte?", color = Color(0xFFA0AEC0), fontSize = 15.sp)
+                        Text(stringResource(R.string.chat_input_placeholder), color = scheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 15.sp)
                     }
                     BasicTextField(
                         value = text,
                         onValueChange = onTextChange,
-                        textStyle = TextStyle(color = Color(0xFF334155), fontSize = 15.sp),
+                        textStyle = TextStyle(color = scheme.onSurface, fontSize = 15.sp),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -361,7 +367,7 @@ private fun ChatInputArea(
                 ) {
                     Icon(
                         Icons.AutoMirrored.Rounded.Send,
-                        contentDescription = "Enviar",
+                        contentDescription = stringResource(R.string.chat_send),
                         tint = Color.White,
                         modifier = Modifier.size(20.dp).offset(x = 2.dp)
                     )
@@ -379,8 +385,8 @@ private fun ChatInputArea(
                 Box {
                     Icon(
                         Icons.Rounded.Image,
-                        contentDescription = "Subir imagen",
-                        tint = Color(0xFF475569),
+                        contentDescription = stringResource(R.string.chat_upload_image),
+                        tint = scheme.onSurfaceVariant,
                         modifier = Modifier
                             .size(24.dp)
                             .clickable { onToggleImageMenu() },
@@ -391,7 +397,7 @@ private fun ChatInputArea(
                         onDismissRequest = onToggleImageMenu,
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Subir imagen") },
+                            text = { Text(stringResource(R.string.chat_upload_image)) },
                             onClick = onPickImage,
                         )
                     }
@@ -401,8 +407,8 @@ private fun ChatInputArea(
 
                 Icon(
                     Icons.Rounded.Mic,
-                    contentDescription = "Grabar audio",
-                    tint = if (isRecording) Color(0xFFD32F2F) else Color(0xFF475569),
+                    contentDescription = stringResource(R.string.chat_record_audio),
+                    tint = if (isRecording) Color(0xFFD32F2F) else scheme.onSurfaceVariant,
                     modifier = Modifier
                         .size(24.dp)
                         .clickable { onAudioClick() },

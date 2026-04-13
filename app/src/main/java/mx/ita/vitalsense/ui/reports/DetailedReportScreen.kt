@@ -38,10 +38,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.ita.vitalsense.R
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import mx.ita.vitalsense.ui.components.NeuCard
@@ -69,7 +71,7 @@ fun DetailedReportScreen(
     val rangeLabel = vm.getRangeLabel(state)
 
     Scaffold(
-        containerColor = NeomorphicBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Row(
                 modifier = Modifier
@@ -79,11 +81,11 @@ fun DetailedReportScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Regresar", tint = TextPrimary)
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = TextPrimary)
                 }
                 Spacer(Modifier.width(8.dp))
                 Column {
-                    Text("Reporte Detallado", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(stringResource(R.string.report_detailed_title), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Text(
                         rangeLabel,
                         fontSize = 13.sp,
@@ -114,11 +116,13 @@ fun DetailedReportScreen(
             Spacer(Modifier.height(16.dp))
 
             RealtimeLineMetricCard(
-                title = "Ritmo Cardíaco",
-                subtitle = "Promedio del periodo",
+                title = stringResource(R.string.report_heart_rate_title),
+                subtitle = stringResource(R.string.report_average_period),
                 value = if (avgHeartRate > 0) "${"%.0f".format(avgHeartRate)} BPM" else "-- BPM",
                 color = HeartRateRed,
-                points = state.vitalsHistory.takeLast(20).map { it.heartRate.toFloat() },
+                points = state.vitalsHistory
+                    .mapNotNull { it.heartRate.takeIf { value -> value > 0 }?.toFloat() }
+                    .takeLast(20),
                 icon = {
                     Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateRed, modifier = Modifier.size(22.dp))
                 },
@@ -127,11 +131,13 @@ fun DetailedReportScreen(
             Spacer(Modifier.height(16.dp))
 
             RealtimeLineMetricCard(
-                title = "Oxigenación (SpO₂)",
-                subtitle = "Promedio del periodo",
+                title = stringResource(R.string.report_spo2_oxygenation_title),
+                subtitle = stringResource(R.string.report_average_period),
                 value = if (avgSpo2 > 0) "${"%.0f".format(avgSpo2)}%" else "--%",
                 color = SpO2Green,
-                points = state.vitalsHistory.takeLast(20).map { it.spo2.toFloat() },
+                points = state.vitalsHistory
+                    .mapNotNull { it.spo2.takeIf { value -> value > 0 }?.toFloat() }
+                    .takeLast(20),
                 icon = {
                     Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = SpO2Green, modifier = Modifier.size(22.dp))
                 },
@@ -140,11 +146,13 @@ fun DetailedReportScreen(
             Spacer(Modifier.height(16.dp))
 
             RealtimeLineMetricCard(
-                title = "Glucosa",
-                subtitle = "Promedio del periodo",
+                title = stringResource(R.string.report_glucose_title),
+                subtitle = stringResource(R.string.report_average_period),
                 value = if (avgGlucose > 0.0) "${"%.0f".format(avgGlucose)} mg/dL" else "-- mg/dL",
                 color = Color(0xFF7B61FF),
-                points = state.vitalsHistory.takeLast(20).map { it.glucose.toFloat() },
+                points = state.vitalsHistory
+                    .mapNotNull { it.glucose.takeIf { value -> value > 0.0 }?.toFloat() }
+                    .takeLast(20),
                 icon = {
                     Text("G", color = Color(0xFF7B61FF), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 },
@@ -154,8 +162,8 @@ fun DetailedReportScreen(
 
             SleepDetailCard(
                 score = state.sleepData?.score ?: 0,
-                status = state.sleepData?.estado ?: "No durmió",
-                hours = state.sleepData?.horas ?: 0f,
+                status = state.sleepData?.estado ?: stringResource(R.string.sleep_not_slept),
+                durationLabel = state.sleepData?.durationLabel() ?: stringResource(R.string.sleep_no_data),
             )
 
             Spacer(Modifier.height(32.dp))
@@ -183,7 +191,7 @@ private fun DetailedRangeFilterRow(
             FilterChip(
                 selected = selectedFilter == filter,
                 onClick = { onFilterSelected(filter) },
-                label = { Text(filter.label) },
+                label = { Text(stringResource(filter.labelRes)) },
             )
         }
     }
@@ -229,7 +237,7 @@ private fun RealtimeLineMetricCard(
             Spacer(Modifier.height(10.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("-20", "-15", "-10", "-5", "Ahora").forEach {
+                listOf("-20", "-15", "-10", "-5", stringResource(R.string.report_chart_now)).forEach {
                     Text(it, fontSize = 10.sp, color = TextMuted)
                 }
             }
@@ -278,10 +286,9 @@ private fun normalize(values: List<Float>): List<Float> {
 }
 
 @Composable
-private fun SleepDetailCard(score: Int, status: String, hours: Float) {
+private fun SleepDetailCard(score: Int, status: String, durationLabel: String) {
     val safeScore = score.coerceIn(0, 100)
-    val safeHours = if (hours > 0f) hours else 0f
-    val statusColor = if (safeHours > 0f) Color(0xFF10B981) else TextSecondary
+    val statusColor = if (durationLabel != stringResource(R.string.sleep_no_data)) Color(0xFF10B981) else TextSecondary
 
     NeuCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -297,8 +304,8 @@ private fun SleepDetailCard(score: Int, status: String, hours: Float) {
             }
             Spacer(Modifier.width(16.dp))
             Column {
-                Text("Sueño", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
-                Text(if (safeHours > 0f) "${"%.1f".format(safeHours)} horas" else "0.0 horas", color = TextSecondary, fontSize = 12.sp)
+                Text(stringResource(R.string.sleep_title), fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
+                Text(durationLabel, color = TextSecondary, fontSize = 12.sp)
                 Text(status, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }

@@ -8,4 +8,8 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="notification_color">#2D9CDB</color>
+    
+    <!-- Theme colors for splash and system bars -->
+    <color name="background">#FFFFFF</color>
+    <color name="on_background">#0D1B2A</color>
 </resources>

@@ -33,6 +33,7 @@ import com.google.firebase.auth.FirebaseAuth
 import mx.ita.vitalsense.ui.archivos.DatosImportantesScreen
 import mx.ita.vitalsense.ui.cuestionario.CuestionarioScreen
 import mx.ita.vitalsense.ui.dashboard.DashboardScreen
+import mx.ita.vitalsense.ui.dashboard.DashboardViewModel
 import mx.ita.vitalsense.ui.device.DeviceScanScreen
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +46,7 @@ import mx.ita.vitalsense.ui.patient.PatientDetailScreen
 import mx.ita.vitalsense.ui.profile.ProfileScreen
 import mx.ita.vitalsense.ui.register.RegisterScreen
 import mx.ita.vitalsense.ui.reports.DailyReportScreen
+import mx.ita.vitalsense.ui.reports.HealthSummaryScreen
 import mx.ita.vitalsense.ui.splash.SplashScreen
 import mx.ita.vitalsense.ui.chat.ChatBotScreen
 import mx.ita.vitalsense.ui.components.GlobalBottomNavigationBar
@@ -54,6 +56,10 @@ import mx.ita.vitalsense.ui.emergency.EmergencyViewerScreen
 import mx.ita.vitalsense.ui.emergency.SosViewerScreen
 import mx.ita.vitalsense.ui.libre.LibreScanScreen
 import mx.ita.vitalsense.ui.medications.AddMedicationScreen
+import mx.ita.vitalsense.ui.medications.MedicationListScreen
+import mx.ita.vitalsense.ui.contact.ContactScreen
+import mx.ita.vitalsense.ui.legal.LegalHelpScreen
+import mx.ita.vitalsense.ui.rating.RatingScreen
 import mx.ita.vitalsense.MainActivity
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -75,6 +81,7 @@ object Route {
     const val PATIENT_DETAIL        = "patient_detail"
     const val REPORTE_DIARIO        = "reporte_diario"
     const val DAILY_REPORT          = "daily_report"
+    const val HEALTH_SUMMARY        = "health_summary"
     const val REPORTE_DETALLADO     = "reporte_detallado"
     const val DETAILED_REPORT       = "detailed_report"
     const val SLEEP_DETAIL          = "sleep_detail"
@@ -83,12 +90,16 @@ object Route {
     const val DATOS_IMPORTANTES     = "datos_importantes"
     const val DOCUMENTOS            = "documentos"
     const val CHAT                  = "chat"
+    const val MEDICATIONS           = "medications"
     const val ADD_MEDICATION        = "add_medication"
     const val LIBRE_SCAN            = "libre_scan"
     // ── Emergencia ──────────────────────────────────────────────────────────
     const val EMERGENCY_QR          = "emergency_qr"
     const val EMERGENCY_VIEWER      = "emergency_viewer"   // + /{tokenId}
     const val SOS_VIEWER            = "sos_viewer"         // + /{userId}/{sosId}
+    const val CONTACT               = "contact"
+    const val LEGAL_HELP            = "legal_help"
+    const val RATING                = "rating"
 }
 
 @Composable
@@ -99,6 +110,7 @@ fun AppNavigation() {
 
     // ViewModel de emergencia con scope del NavHost (sobrevive cambios de pantalla)
     val emergencyVm: EmergencyQrViewModel = viewModel()
+    val dashboardVm: DashboardViewModel = viewModel()
 
     // Manejo de deep links vitalsense:// cuando la app se abre desde el QR
     val context = LocalContext.current
@@ -136,6 +148,15 @@ fun AppNavigation() {
             launchSingleTop = true
         }
         mainActivity.consumePendingNotificationOpen()
+    }
+
+    val openMedicationRequest = mainActivity?.pendingMedicationOpen
+    LaunchedEffect(openMedicationRequest) {
+        if (openMedicationRequest != true) return@LaunchedEffect
+        navController.navigate(Route.MEDICATIONS) {
+            launchSingleTop = true
+        }
+        mainActivity.consumePendingMedicationOpen()
     }
 
     val bottomBarRoutes = listOf(
@@ -290,27 +311,28 @@ fun AppNavigation() {
                     DashboardScreen(
                         onConnectDevice = { navController.navigate(Route.DEVICE) },
                         onPatientClick = { patientId ->
-                            navController.navigate("${Route.REPORTE_DETALLADO}/$patientId")
+                            navController.navigate("${Route.PATIENT_DETAIL}/$patientId")
                         },
-                        onProfileClick = { navController.navigate(Route.EDITAR_PERFIL) },
-                        onReportClick  = { navController.navigate(Route.REPORTE_DIARIO) },
-                        onNotifClick   = { navController.navigate(Route.NOTIFICACIONES) },
-                        onNavigateToReports = { navController.navigate(Route.DAILY_REPORT) },
-                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
-                        onNavigateToNotifications = { navController.navigate(Route.NOTIFICATIONS) },
                         onNavigateToProfile = { navController.navigate(Route.PROFILE) },
+                        onNavigateToReports = { },
+                        onNavigateToDetailed = { navController.navigate(Route.REPORTE_DIARIO) },
                         onNavigateToHome = { /* Already here */ },
                         onNavigateToChat = { navController.navigate(Route.CHAT) },
-                        onMedicationClick = { navController.navigate(Route.ADD_MEDICATION) },
+                        onMedicationClick = { navController.navigate(Route.MEDICATIONS) },
                         onLibreScanClick = { navController.navigate(Route.LIBRE_SCAN) },
+                        onProfileClick = { navController.navigate(Route.EDITAR_PERFIL) },
+                        onReportClick = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onSummaryClick = { navController.navigate(Route.HEALTH_SUMMARY) },
+                        onNotifClick = { navController.navigate(Route.NOTIFICACIONES) },
+                        onContactClick = { navController.navigate(Route.CONTACT) },
+                        onLegalHelpClick = { navController.navigate(Route.LEGAL_HELP) },
+                        onRatingClick = { navController.navigate(Route.RATING) },
                         onEmergency = { vitals ->
-                            // La IA detectó anomalía crítica → preparar QR y navegar
                             val anomalyType = when {
-                                vitals.heartRate > 130              -> "Taquicardia severa (${vitals.heartRate} BPM)"
-                                vitals.heartRate in 1..39           -> "Bradicardia severa (${vitals.heartRate} BPM)"
-                                vitals.spo2 in 1..84                -> "Hipoxia crítica (SpO₂ ${vitals.spo2}%)"
-                                vitals.glucose > 300.0              -> "Hiperglucemia grave (${"%.0f".format(vitals.glucose)} mg/dL)"
-                                else                                -> "Anomalía detectada"
+                                vitals.heartRate > 130 -> "Taquicardia severa (${vitals.heartRate} BPM)"
+                                vitals.heartRate in 1..39 -> "Bradicardia severa (${vitals.heartRate} BPM)"
+                                vitals.spo2 in 1..84 -> "Hipoxia crítica (SpO₂ ${vitals.spo2}%)"
+                                else -> "Anomalía detectada"
                             }
                             emergencyVm.onAnomalyDetected(anomalyType, vitals.heartRate)
                             navController.navigate(Route.EMERGENCY_QR) {
@@ -318,6 +340,113 @@ fun AppNavigation() {
                                 popUpTo(Route.DASHBOARD) { inclusive = true }
                             }
                         },
+                        vm = dashboardVm,
+                    )
+                }
+
+                composable(Route.DEVICE) {
+                    DeviceScanScreen(onBack = { navController.popBackStack() })
+                }
+
+                composable("${Route.PATIENT_DETAIL}/{patientId}") { backStackEntry ->
+                    val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
+                    PatientDetailScreen(
+                        patientId = patientId,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
+                composable(Route.PROFILE) {
+                    ProfileScreen(
+                        onDeviceClick = { navController.navigate(Route.DEVICE) },
+                        onBack = { navController.navigateUp() },
+                        onSignOut = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate(Route.LOGIN) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onDatosImportantes = { navController.navigate(Route.DATOS_IMPORTANTES) },
+                        onHomeClick = {
+                            navController.navigate(Route.DASHBOARD) {
+                                popUpTo(Route.DASHBOARD) { inclusive = false }
+                            }
+                        },
+                        onHealthClick = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onNotifClick = { navController.navigate(Route.NOTIFICACIONES) },
+                    )
+                }
+
+                composable(Route.EDITAR_PERFIL) {
+                    ProfileScreen(
+                        onDeviceClick = { navController.navigate(Route.DEVICE) },
+                        onBack = { navController.popBackStack() },
+                        onSignOut = {
+                            FirebaseAuth.getInstance().signOut()
+                            navController.navigate(Route.ONBOARDING) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onDatosImportantes = { navController.navigate(Route.DATOS_IMPORTANTES) },
+                        onHomeClick = {
+                            navController.navigate(Route.DASHBOARD) {
+                                popUpTo(Route.DASHBOARD) { inclusive = false }
+                            }
+                        },
+                        onHealthClick = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onNotifClick = { navController.navigate(Route.NOTIFICACIONES) },
+                    )
+                }
+
+                composable(Route.REPORTE_DIARIO) {
+                    DailyReportScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
+                        onNavigateToSleepDetail = { score, minutos, sleepStartMillis, sleepEndMillis, estado ->
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$sleepStartMillis&end=$sleepEndMillis&estado=$estado")
+                        }
+                    )
+                }
+
+                composable(Route.DAILY_REPORT) {
+                    DailyReportScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
+                        onNavigateToSleepDetail = { score, minutos, sleepStartMillis, sleepEndMillis, estado ->
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$sleepStartMillis&end=$sleepEndMillis&estado=$estado")
+                        }
+                    )
+                }
+
+                composable(Route.HEALTH_SUMMARY) {
+                    HealthSummaryScreen(
+                        onBack = { navController.popBackStack() },
+                        vm = dashboardVm,
+                    )
+                }
+
+                composable(
+                    route = "${Route.SLEEP_DETAIL}?score={score}&minutos={minutos}&start={start}&end={end}&estado={estado}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("score") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
+                        androidx.navigation.navArgument("minutos") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
+                        androidx.navigation.navArgument("start") { defaultValue = 0L; type = androidx.navigation.NavType.LongType },
+                        androidx.navigation.navArgument("end") { defaultValue = 0L; type = androidx.navigation.NavType.LongType },
+                        androidx.navigation.navArgument("estado") { defaultValue = "Sin Datos"; type = androidx.navigation.NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val score = backStackEntry.arguments?.getInt("score") ?: 0
+                    val minutos = backStackEntry.arguments?.getInt("minutos") ?: 0
+                    val start = backStackEntry.arguments?.getLong("start") ?: 0L
+                    val end = backStackEntry.arguments?.getLong("end") ?: 0L
+                    val estado = backStackEntry.arguments?.getString("estado") ?: "Sin Datos"
+                    mx.ita.vitalsense.ui.reports.SleepDetailScreen(
+                        score = score,
+                        minutos = minutos,
+                        sleepStartMillis = start,
+                        sleepEndMillis = end,
+                        estado = estado,
+                        onBack = { navController.navigateUp() }
                     )
                 }
 
@@ -379,8 +508,8 @@ fun AppNavigation() {
                     DailyReportScreen(
                         onBack = { navController.popBackStack() },
                         onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
-                        onNavigateToSleepDetail = { score, horas, estado ->
-                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&horas=$horas&estado=$estado")
+                        onNavigateToSleepDetail = { score, minutos, start, end, estado ->
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$start&end=$end&estado=$estado")
                         }
                     )
                 }
@@ -388,27 +517,33 @@ fun AppNavigation() {
                 composable(Route.DAILY_REPORT) {
                     DailyReportScreen(
                         onBack = { navController.popBackStack() },
-                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
-                        onNavigateToSleepDetail = { score, horas, estado ->
-                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&horas=$horas&estado=$estado")
+                        onNavigateToDetailed = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onNavigateToSleepDetail = { score, minutos, start, end, estado ->
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$start&end=$end&estado=$estado")
                         }
                     )
                 }
 
                 composable(
-                    route = "${Route.SLEEP_DETAIL}?score={score}&horas={horas}&estado={estado}",
+                    route = "${Route.SLEEP_DETAIL}?score={score}&minutos={minutos}&start={start}&end={end}&estado={estado}",
                     arguments = listOf(
                         androidx.navigation.navArgument("score") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
-                        androidx.navigation.navArgument("horas") { defaultValue = 0f; type = androidx.navigation.NavType.FloatType },
+                        androidx.navigation.navArgument("minutos") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
+                        androidx.navigation.navArgument("start") { defaultValue = 0L; type = androidx.navigation.NavType.LongType },
+                        androidx.navigation.navArgument("end") { defaultValue = 0L; type = androidx.navigation.NavType.LongType },
                         androidx.navigation.navArgument("estado") { defaultValue = "Sin Datos"; type = androidx.navigation.NavType.StringType }
                     )
                 ) { backStackEntry ->
                     val score = backStackEntry.arguments?.getInt("score") ?: 0
-                    val horas = backStackEntry.arguments?.getFloat("horas") ?: 0f
+                    val minutos = backStackEntry.arguments?.getInt("minutos") ?: 0
+                    val start = backStackEntry.arguments?.getLong("start") ?: 0L
+                    val end = backStackEntry.arguments?.getLong("end") ?: 0L
                     val estado = backStackEntry.arguments?.getString("estado") ?: "Sin Datos"
                     mx.ita.vitalsense.ui.reports.SleepDetailScreen(
                         score = score,
-                        horas = horas,
+                        minutos = minutos,
+                        sleepStartMillis = start,
+                        sleepEndMillis = end,
                         estado = estado,
                         onBack = { navController.navigateUp() }
 
@@ -497,14 +632,25 @@ fun AppNavigation() {
                 }
 
                 composable(Route.DETAILED_REPORT) {
-                    mx.ita.vitalsense.ui.reports.DetailedReportScreen(
-                        onBack = { navController.navigateUp() }
+                    DailyReportScreen(
+                        onBack = { navController.navigateUp() },
+                        onNavigateToDetailed = { navController.navigate(Route.REPORTE_DIARIO) },
+                        onNavigateToSleepDetail = { score, minutos, start, end, estado ->
+                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$start&end=$end&estado=$estado")
+                        }
                     )
                 }
 
                 composable(Route.CHAT) {
                     ChatBotScreen(
                         onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Route.MEDICATIONS) {
+                    MedicationListScreen(
+                        onBack = { navController.popBackStack() },
+                        onAddMedication = { navController.navigate(Route.ADD_MEDICATION) },
                     )
                 }
 
@@ -518,6 +664,18 @@ fun AppNavigation() {
                     LibreScanScreen(
                         onBack = { navController.popBackStack() },
                     )
+                }
+
+                composable(Route.CONTACT) {
+                    ContactScreen(onBack = { navController.popBackStack() })
+                }
+
+                composable(Route.LEGAL_HELP) {
+                    LegalHelpScreen(onBack = { navController.popBackStack() })
+                }
+
+                composable(Route.RATING) {
+                    RatingScreen(onBack = { navController.popBackStack() })
                 }
 
                 // ── Pantalla de QR de emergencia (paciente) ───────────────────

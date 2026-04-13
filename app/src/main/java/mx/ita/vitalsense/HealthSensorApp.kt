@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.google.firebase.database.FirebaseDatabase
+import mx.ita.vitalsense.data.medications.MedicationReminderWorker
 import mx.ita.vitalsense.data.ai.ProactiveHealthWorker
 
 class HealthSensorApp : Application() {
@@ -18,6 +19,7 @@ class HealthSensorApp : Application() {
 
         createNotificationChannels()
         ProactiveHealthWorker.schedule(this)
+        MedicationReminderWorker.schedule(this)
     }
 
     private fun createNotificationChannels() {
@@ -52,6 +54,15 @@ class HealthSensorApp : Application() {
                 description = "Recomendaciones proactivas para prevenir enfermedades crónicas"
                 enableVibration(false)
             }.also { manager.createNotificationChannel(it) }
+
+            NotificationChannel(
+                CHANNEL_MEDICATIONS,
+                "Recordatorios de medicamentos",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Alertas para tomar medicamentos a tiempo"
+                enableVibration(true)
+            }.also { manager.createNotificationChannel(it) }
         }
     }
 
@@ -59,5 +70,6 @@ class HealthSensorApp : Application() {
         const val CHANNEL_ALERTS      = "vital_alerts"
         const val CHANNEL_INFO        = "vital_info"
         const val CHANNEL_AI_INSIGHTS = "ai_insights"
+        const val CHANNEL_MEDICATIONS = "medications_reminders"
     }
 }

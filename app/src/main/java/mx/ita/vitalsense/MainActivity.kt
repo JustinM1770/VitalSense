@@ -1,22 +1,31 @@
 package mx.ita.vitalsense
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.fragment.app.FragmentActivity
+import androidx.core.view.WindowCompat
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.lifecycle.lifecycleScope
+import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import kotlinx.coroutines.launch
 import mx.ita.vitalsense.data.ble.FreestyleLibreReader
 import mx.ita.vitalsense.data.health.HealthConnectRepository
+import mx.ita.vitalsense.settings.AppSettings
 import mx.ita.vitalsense.ui.health.HealthConnectViewModel
 import mx.ita.vitalsense.ui.navigation.AppNavigation
 import mx.ita.vitalsense.ui.theme.VitalSenseTheme
@@ -27,10 +36,12 @@ data class NotificationOpenRequest(
     val lng: Double,
 )
 
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
 
     val healthConnectViewModel: HealthConnectViewModel by viewModels()
     var pendingNotificationOpen by mutableStateOf<NotificationOpenRequest?>(null)
+        private set
+    var pendingMedicationOpen by mutableStateOf(false)
         private set
     private val libreReader by lazy { FreestyleLibreReader(this) }
 
@@ -42,28 +53,41 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppSettings.applySavedPreferences(this)
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.light(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT
-            ),
-            navigationBarStyle = androidx.activity.SystemBarStyle.light(
-                android.graphics.Color.TRANSPARENT,
-                android.graphics.Color.TRANSPARENT
-            )
-        )
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
-            VitalSenseTheme {
+            val themeMode by AppSettings.themeFlow.collectAsState()
+            VitalSenseTheme(themeMode = themeMode) {
+                val isDarkTheme = when (themeMode) {
+                    "dark" -> true
+                    "light" -> false
+                    else -> isSystemInDarkTheme()
+                }
+                val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
+                val view = LocalView.current
+                SideEffect {
+                    val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+                    window.statusBarColor = colorScheme.background.toArgb()
+                    window.navigationBarColor = colorScheme.background.toArgb()
+                    WindowCompat.getInsetsController(window, view).apply {
+                        isAppearanceLightStatusBars = !isDarkTheme
+                        isAppearanceLightNavigationBars = !isDarkTheme
+                    }
+                }
                 AppNavigation()
 
             }
         }
         pendingNotificationOpen = parseNotificationOpenRequest(intent)
-        // Request Health Connect permissions AFTER setContent to avoid blank-screen freeze
-        if (HealthConnectClient.getSdkStatus(this) == HealthConnectClient.SDK_AVAILABLE) {
-            hcPermissionLauncher.launch(HealthConnectRepository.PERMISSIONS)
+        pendingMedicationOpen = intent.getBooleanExtra("open_medications", false)
+        // Request Health Connect permissions only if not already granted.
+        // Launching the permission contract restarts MainActivity (via onActivityResult),
+        // so we must guard against re-requesting and creating an infinite loop.
+        if (HealthConnectClient.getSdkStatus(this) == HealthConnectClient.SDK_AVAILABLE
+            && savedInstanceState == null) {
+            requestHealthConnectPermissionsIfNeeded()
         }
     }
 
@@ -71,6 +95,7 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingNotificationOpen = parseNotificationOpenRequest(intent)
+        pendingMedicationOpen = intent.getBooleanExtra("open_medications", false)
 
         val glucose = libreReader.parseFreestyleLibre(intent)
         if (glucose != null) {
@@ -92,6 +117,29 @@ class MainActivity : FragmentActivity() {
 
     fun consumePendingNotificationOpen() {
         pendingNotificationOpen = null
+    }
+
+    fun consumePendingMedicationOpen() {
+        pendingMedicationOpen = false
+    }
+
+    /**
+     * Requests Health Connect permissions only when not already fully granted.
+     * This prevents restarting the permission Activity on every MainActivity re-creation
+     * (which would cause an infinite permission loop).
+     */
+    private fun requestHealthConnectPermissionsIfNeeded() {
+        lifecycleScope.launch {
+            try {
+                val client = HealthConnectClient.getOrCreate(this@MainActivity)
+                val granted = client.permissionController.getGrantedPermissions()
+                if (!granted.containsAll(HealthConnectRepository.PERMISSIONS)) {
+                    hcPermissionLauncher.launch(HealthConnectRepository.PERMISSIONS)
+                }
+            } catch (e: Exception) {
+                // Health Connect not available or error — skip silently
+            }
+        }
     }
 
     private fun parseNotificationOpenRequest(intent: android.content.Intent?): NotificationOpenRequest? {
@@ -122,11 +170,9 @@ class MainActivity : FragmentActivity() {
         )
 
         db.getReference("patients/$uid").updateChildren(updates)
-        db.getReference("patients/$uid/history").push().setValue(
+        db.getReference("patients/$uid/glucose_history").push().setValue(
             mapOf(
                 "glucose" to glucoseMgDl.toDouble(),
-                "heartRate" to 0,
-                "spo2" to 0,
                 "timestamp" to now,
                 "source" to "freestyle_libre_nfc",
             ),

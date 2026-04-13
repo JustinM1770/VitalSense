@@ -2,6 +2,7 @@ package mx.ita.vitalsense.ui.notifications
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,10 +26,12 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,8 +55,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import mx.ita.vitalsense.ui.components.BottomNav
-import mx.ita.vitalsense.ui.components.BottomNavTab
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
 import java.text.SimpleDateFormat
@@ -63,6 +66,8 @@ import java.util.Locale
 // ── Data model ───────────────────────────────────────────────────────────────
 data class NotifItem(
     val firebaseKey: String = "",
+    val type: String = "",
+    val status: String = "",
     val icon: ImageVector,
     val title: String,
     val body: String,
@@ -76,7 +81,7 @@ data class NotifItem(
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-private fun formatRelativeTime(timestamp: Long): String {
+private fun formatRelativeTime(timestamp: Long, nowLabel: String): String {
     val diff = System.currentTimeMillis() - timestamp
     val minutes = diff / 60_000
     val hours = minutes / 60
@@ -85,11 +90,11 @@ private fun formatRelativeTime(timestamp: Long): String {
         days > 0 -> "${days}D"
         hours > 0 -> "${hours}H"
         minutes > 0 -> "${minutes}M"
-        else -> "Ahora"
+        else -> nowLabel
     }
 }
 
-private fun dateLabel(timestamp: Long): String {
+    private fun dateLabel(timestamp: Long, locale: Locale, todayLabel: String, yesterdayLabel: String): String {
     val cal = Calendar.getInstance()
     val todayStart = cal.apply {
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
@@ -98,9 +103,9 @@ private fun dateLabel(timestamp: Long): String {
     val yesterdayStart = todayStart - 86_400_000L
 
     return when {
-        timestamp >= todayStart -> "Hoy"
-        timestamp >= yesterdayStart -> "Ayer"
-        else -> SimpleDateFormat("dd MMMM", Locale.forLanguageTag("es")).format(Date(timestamp))
+        timestamp >= todayStart -> todayLabel
+        timestamp >= yesterdayStart -> yesterdayLabel
+        else -> SimpleDateFormat("dd MMMM", locale).format(Date(timestamp))
     }
 }
 
@@ -115,7 +120,25 @@ fun NotificacionesScreen(
     onHealthClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val context = LocalContext.current
+    val locale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        context.resources.configuration.locales[0]
+    } else {
+        @Suppress("DEPRECATION") context.resources.configuration.locale
+    }
+    val nowLabel = stringResource(R.string.notifications_now)
+    val todayLabel = stringResource(R.string.notifications_today)
+    val yesterdayLabel = stringResource(R.string.notifications_yesterday)
+    val titleLabel = stringResource(R.string.notifications_title)
+    val newLabel = stringResource(R.string.notifications_new)
+    val markAllLabel = stringResource(R.string.notifications_mark_all)
+    val noNotificationsLabel = stringResource(R.string.notifications_no_notifications)
+    val datePrefix = stringResource(R.string.notifications_date)
+    val locationPrefix = stringResource(R.string.notifications_location)
+    val finishSosLabel = stringResource(R.string.notifications_finish_sos)
+    val openMapsLabel = stringResource(R.string.notifications_open_maps)
+    val closeLabel = stringResource(R.string.notifications_close)
     val database = remember { FirebaseDatabase.getInstance() }
     val auth = remember { FirebaseAuth.getInstance() }
     val userId = auth.currentUser?.uid ?: "global"
@@ -124,6 +147,14 @@ fun NotificacionesScreen(
     var showUnreadOnly by remember { mutableStateOf(false) }
     var selectedDateFilter by remember { mutableStateOf<String?>(null) }
     var selectedItem by remember { mutableStateOf<NotifItem?>(null) }
+    val handleBack = {
+        if (selectedItem != null) {
+            selectedItem = null
+        }
+        onBack()
+    }
+
+    BackHandler { handleBack() }
 
     // ── Firebase Listener ────────────────────────────────────────────────────
     DisposableEffect(userId) {
@@ -135,29 +166,32 @@ fun NotificacionesScreen(
                     @Suppress("UNCHECKED_CAST")
                     val data = child.value as? Map<String, Any> ?: continue
                     val type = data["type"] as? String ?: "SOS"
+                    val status = data["status"] as? String ?: "active"
                     val lat = (data["lat"] as? Number)?.toDouble() ?: 0.0
                     val lng = (data["lng"] as? Number)?.toDouble() ?: 0.0
                     val ts = (data["timestamp"] as? Number)?.toLong()
                         ?: System.currentTimeMillis()
                     val read = data["read"] as? Boolean ?: false
 
-                    val title = if (type == "SOS") "Alerta de Emergencia" else type
+                    val title = if (type == "SOS") context.getString(R.string.notifications_alert_title) else type
                     val body = when {
                         type == "SOS" && lat != 0.0 ->
-                            "Se detectó caída o SOS manual. Toca para ver ubicación."
+                            context.getString(R.string.notifications_sos_with_location)
                         type == "SOS" ->
-                            "Se detectó SOS sin ubicación disponible."
+                            context.getString(R.string.notifications_sos_no_location)
                         else -> data["message"] as? String ?: ""
                     }
 
                     items.add(
                         NotifItem(
                             firebaseKey = child.key ?: "",
+                            type = type,
+                            status = status,
                             icon = if (type == "SOS") Icons.Outlined.Warning
                             else Icons.Outlined.FavoriteBorder,
                             title = title,
                             body = body,
-                            time = formatRelativeTime(ts),
+                            time = formatRelativeTime(ts, nowLabel),
                             timestamp = ts,
                             isRead = read,
                             isHighlighted = !read,
@@ -190,12 +224,12 @@ fun NotificacionesScreen(
     val filtered = allAlerts.let { list ->
         var result = list
         if (showUnreadOnly) result = result.filter { !it.isRead }
-        if (selectedDateFilter != null) result = result.filter { dateLabel(it.timestamp) == selectedDateFilter }
+        if (selectedDateFilter != null) result = result.filter { dateLabel(it.timestamp, locale, todayLabel, yesterdayLabel) == selectedDateFilter }
         result
     }
 
     val unreadCount = allAlerts.count { !it.isRead }
-    val grouped = filtered.groupBy { dateLabel(it.timestamp) }
+    val grouped = filtered.groupBy { dateLabel(it.timestamp, locale, todayLabel, yesterdayLabel) }
 
     androidx.compose.runtime.LaunchedEffect(allAlerts, initialAlertId) {
         val targetId = initialAlertId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
@@ -219,7 +253,7 @@ fun NotificacionesScreen(
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
-    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Box(modifier = Modifier.fillMaxSize().background(colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -239,19 +273,19 @@ fun NotificacionesScreen(
                         .size(32.dp)
                         .clip(CircleShape)
                         .background(DashBlue.copy(alpha = 0.12f))
-                        .clickable { onBack() },
+                        .clickable { handleBack() },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Regresar",
+                        contentDescription = stringResource(R.string.back),
                         tint = DashBlue,
                         modifier = Modifier.size(18.dp),
                     )
                 }
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "Notificaciones",
+                    text = titleLabel,
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
@@ -271,7 +305,7 @@ fun NotificacionesScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Nuevos",
+                            text = newLabel,
                             fontFamily = Manrope, fontSize = 12.sp,
                             color = if (showUnreadOnly) Color.White else DashBlue,
                             fontWeight = FontWeight.SemiBold,
@@ -294,12 +328,12 @@ fun NotificacionesScreen(
             Spacer(Modifier.height(24.dp))
 
             // ── Hoy filter + Mark All ────────────────────────────────────────
-            val allDistinctDates = allAlerts.map { dateLabel(it.timestamp) }.distinct()
+            val allDistinctDates = allAlerts.map { dateLabel(it.timestamp, locale, todayLabel, yesterdayLabel) }.distinct()
             val availableDates = allDistinctDates.sortedWith(
                 compareBy {
                     when (it) {
-                        "Hoy" -> 0
-                        "Ayer" -> 1
+                        todayLabel -> 0
+                        yesterdayLabel -> 1
                         else -> 2
                     }
                 }
@@ -338,7 +372,7 @@ fun NotificacionesScreen(
                 }
                 Spacer(Modifier.width(16.dp))
                 Text(
-                    text = "Marcar todo",
+                    text = markAllLabel,
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
@@ -351,18 +385,18 @@ fun NotificacionesScreen(
             if (filtered.isEmpty()) {
                 Spacer(Modifier.height(60.dp))
                 Text(
-                    text = "No hay notificaciones",
+                    text = noNotificationsLabel,
                     fontFamily = Manrope,
                     fontSize = 15.sp,
-                    color = Color(0xFF8A8A8A),
+                    color = colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             } else {
                 val orderedKeys = grouped.keys.sortedWith(
                     compareBy {
                         when (it) {
-                            "Hoy" -> 0
-                            "Ayer" -> 1
+                            todayLabel -> 0
+                            yesterdayLabel -> 1
                             else -> 2
                         }
                     }
@@ -409,21 +443,9 @@ fun NotificacionesScreen(
             }
         }
 
-        BottomNav(
-            selected = BottomNavTab.CHAT,
-            onSelect = { tab ->
-                when (tab) {
-                    BottomNavTab.HOME    -> onHomeClick()
-                    BottomNavTab.HEALTH  -> onHealthClick()
-                    BottomNavTab.PROFILE -> onProfileClick()
-                    else -> {}
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
-
         val detail = selectedItem
         if (detail != null) {
+            val isSosActive = detail.type == "SOS" && detail.status != "resolved"
             AlertDialog(
                 onDismissRequest = { selectedItem = null },
                 title = {
@@ -438,45 +460,65 @@ fun NotificacionesScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(detail.body, fontFamily = Manrope, fontSize = 14.sp)
                         Text(
-                            text = "Fecha: ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.forLanguageTag("es")).format(Date(detail.timestamp))}",
+                            text = "$datePrefix ${SimpleDateFormat("dd/MM/yyyy HH:mm", locale).format(Date(detail.timestamp))}",
                             fontFamily = Manrope,
                             fontSize = 12.sp,
-                            color = Color(0xFF6B7280),
+                            color = colorScheme.onSurfaceVariant,
                         )
                         if (detail.lat != 0.0 && detail.lng != 0.0) {
                             Text(
-                                text = "Ubicacion: ${detail.lat}, ${detail.lng}",
+                                text = "$locationPrefix ${detail.lat}, ${detail.lng}",
                                 fontFamily = Manrope,
                                 fontSize = 12.sp,
-                                color = Color(0xFF6B7280),
+                                color = colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            selectedItem = null
-                            if (detail.lat != 0.0 && detail.lng != 0.0) {
-                                val uri = "geo:${detail.lat},${detail.lng}?q=${detail.lat},${detail.lng}(SOS)"
-                                val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
-                                    setPackage("com.google.android.apps.maps")
-                                }
-                                context.startActivity(mapIntent)
-                            }
-                        },
-                        enabled = detail.lat != 0.0 && detail.lng != 0.0,
-                        colors = ButtonDefaults.buttonColors(containerColor = DashBlue),
-                    ) {
-                        Text("Abrir en Maps", color = Color.White)
+                    if (isSosActive && detail.firebaseKey.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                database.getReference("alerts")
+                                    .child(userId)
+                                    .child(detail.firebaseKey)
+                                    .updateChildren(
+                                        mapOf(
+                                            "read" to true,
+                                            "status" to "resolved",
+                                            "resolvedAt" to System.currentTimeMillis(),
+                                            "resolvedBy" to "phone_notifications",
+                                        ),
+                                    )
+                                selectedItem = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                        ) {
+                                Text(finishSosLabel, color = Color.White)
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { selectedItem = null }) {
-                        Text("Cerrar", color = DashBlue)
+                    Row {
+                        if (detail.lat != 0.0 && detail.lng != 0.0) {
+                            TextButton(
+                                onClick = {
+                                    val uri = "geo:${detail.lat},${detail.lng}?q=${detail.lat},${detail.lng}(SOS)"
+                                    val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
+                                        setPackage("com.google.android.apps.maps")
+                                    }
+                                    context.startActivity(mapIntent)
+                                },
+                            ) {
+                                Text(openMapsLabel, color = DashBlue)
+                            }
+                        }
+                        TextButton(onClick = { selectedItem = null }) {
+                            Text(closeLabel, color = DashBlue)
+                        }
                     }
                 },
-                containerColor = Color.White,
+                containerColor = colorScheme.surface,
             )
         }
     }
@@ -485,6 +527,7 @@ fun NotificacionesScreen(
 // ── Notification Row ─────────────────────────────────────────────────────────
 @Composable
 private fun NotifRow(item: NotifItem, onClick: () -> Unit) {
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -517,21 +560,21 @@ private fun NotifRow(item: NotifItem, onClick: () -> Unit) {
                 fontFamily = Manrope,
                 fontWeight = if (item.isRead) FontWeight.Normal else FontWeight.Bold,
                 fontSize = 15.sp,
-                color = Color(0xFF1A1A2E),
+                color = colorScheme.onSurface,
             )
             Spacer(Modifier.height(3.dp))
             Text(
                 text = item.body,
                 fontFamily = Manrope,
                 fontSize = 13.sp,
-                color = Color(0xFF8A8A8A),
+                color = colorScheme.onSurfaceVariant,
             )
         }
         Text(
             text = item.time,
             fontFamily = Manrope,
             fontSize = 12.sp,
-            color = Color(0xFFB0B0B0),
+            color = colorScheme.onSurfaceVariant,
         )
     }
 }

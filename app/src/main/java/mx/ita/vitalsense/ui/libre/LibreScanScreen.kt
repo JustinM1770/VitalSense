@@ -26,6 +26,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +51,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.ble.FreestyleLibreReader
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
@@ -60,6 +63,7 @@ import java.util.Locale
 fun LibreScanScreen(
     onBack: () -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
     val db = remember { FirebaseDatabase.getInstance() }
@@ -147,10 +151,10 @@ fun LibreScanScreen(
     val displaySource = when {
         source.isNotBlank() -> source
         localSource.isNotBlank() -> localSource
-        else -> "Sin lecturas"
+        else -> stringResource(R.string.libre_scan_no_sources)
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -165,37 +169,37 @@ fun LibreScanScreen(
                 Box(
                     modifier = Modifier
                         .size(34.dp)
-                        .background(DashBlue.copy(alpha = 0.12f), CircleShape)
+                        .background(colorScheme.primary.copy(alpha = 0.12f), CircleShape)
                         .clickable { onBack() },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Regresar",
-                        tint = DashBlue,
+                        contentDescription = stringResource(R.string.back),
+                        tint = colorScheme.onSurface,
                     )
                 }
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
-                    text = "Escanear Libre",
+                    text = stringResource(R.string.libre_scan_title),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = DashBlue,
+                    color = colorScheme.onSurface,
                 )
             }
 
             StatusCard(
-                title = "NFC del telefono",
+                title = stringResource(R.string.libre_scan_nfc_title),
                 value = when {
-                    !nfcSupported -> "No soportado por este dispositivo"
-                    nfcEnabled -> "Encendido"
-                    else -> "Apagado"
+                    !nfcSupported -> stringResource(R.string.libre_scan_nfc_unsupported)
+                    nfcEnabled -> stringResource(R.string.libre_scan_nfc_on)
+                    else -> stringResource(R.string.libre_scan_nfc_off)
                 },
                 subtitle = when {
-                    !nfcSupported -> "Este telefono no tiene hardware NFC"
-                    nfcEnabled -> "Listo para escanear FreeStyle Libre"
-                    else -> "Activalo en ajustes para escanear"
+                    !nfcSupported -> stringResource(R.string.libre_scan_nfc_hardware_missing)
+                    nfcEnabled -> stringResource(R.string.libre_scan_ready)
+                    else -> stringResource(R.string.libre_scan_enable_settings)
                 },
                 highlight = when {
                     !nfcSupported -> Color(0xFFD32F2F)
@@ -209,27 +213,30 @@ fun LibreScanScreen(
                 Button(
                     onClick = { reader.openNfcSettings() },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = DashBlue),
+                    colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary),
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Text("Abrir ajustes NFC", color = Color.White, fontFamily = Manrope)
+                    Text(stringResource(R.string.libre_scan_open_nfc_settings), color = colorScheme.onPrimary, fontFamily = Manrope)
                 }
             }
 
             StatusCard(
-                title = "Ultima glucosa",
-                value = if (displayGlucose > 0.0) "${"%.0f".format(displayGlucose)} mg/dL" else "Sin lectura",
+                title = stringResource(R.string.libre_scan_latest_glucose),
+                value = if (displayGlucose > 0.0) "${"%.0f".format(displayGlucose)} mg/dL" else stringResource(R.string.libre_scan_no_reading),
                 subtitle = if (displayTime > 0L) {
-                    "Hora: ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.forLanguageTag("es")).format(Date(displayTime))}"
+                    stringResource(
+                        R.string.libre_scan_time_label,
+                        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(displayTime)),
+                    )
                 } else {
-                    "Acerca el sensor FreeStyle Libre al telefono"
+                    stringResource(R.string.libre_scan_place_sensor)
                 },
-                highlight = DashBlue,
+                highlight = colorScheme.primary,
                 icon = Icons.Rounded.MonitorHeart,
             )
 
             StatusCard(
-                title = "Fuente de datos",
+                title = stringResource(R.string.libre_scan_data_source),
                 value = displaySource,
                 subtitle = confidence,
                 highlight = Color(0xFF6B7280),
@@ -237,29 +244,29 @@ fun LibreScanScreen(
             )
 
             StatusCard(
-                title = "Bateria del wearable",
-                value = wearableBattery?.let { "$it%" } ?: "No disponible",
-                subtitle = "Se muestra si el reloj reporta batteryPercent o battery",
+                title = stringResource(R.string.libre_scan_wearable_battery),
+                value = wearableBattery?.let { "$it%" } ?: stringResource(R.string.libre_scan_unavailable),
+                subtitle = stringResource(R.string.libre_scan_wearable_hint),
                 highlight = Color(0xFF0EA5E9),
                 icon = Icons.Rounded.BatteryChargingFull,
             )
 
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Como escanear",
+                        text = stringResource(R.string.libre_scan_how_to),
                         fontFamily = Manrope,
                         fontWeight = FontWeight.Bold,
-                        color = DashBlue,
+                        color = colorScheme.onSurface,
                     )
-                    Text("1. Activa NFC en tu telefono.", fontFamily = Manrope, fontSize = 13.sp)
-                    Text("2. Abre esta pantalla.", fontFamily = Manrope, fontSize = 13.sp)
-                    Text("3. Acerca el sensor Libre al telefono por 1-2 segundos.", fontFamily = Manrope, fontSize = 13.sp)
-                    Text("4. La lectura se guarda automaticamente en la app.", fontFamily = Manrope, fontSize = 13.sp)
+                    Text("1. Activa NFC en tu telefono.", fontFamily = Manrope, fontSize = 13.sp, color = colorScheme.onSurfaceVariant)
+                    Text("2. Abre esta pantalla.", fontFamily = Manrope, fontSize = 13.sp, color = colorScheme.onSurfaceVariant)
+                    Text("3. Acerca el sensor Libre al telefono por 1-2 segundos.", fontFamily = Manrope, fontSize = 13.sp, color = colorScheme.onSurfaceVariant)
+                    Text("4. La lectura se guarda automaticamente en la app.", fontFamily = Manrope, fontSize = 13.sp, color = colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -274,9 +281,10 @@ private fun StatusCard(
     highlight: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+        colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -291,10 +299,10 @@ private fun StatusCard(
             }
             Spacer(modifier = Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF6B7280))
-                Text(value, fontFamily = Manrope, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF111827))
+                Text(title, fontFamily = Manrope, fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
+                Text(value, fontFamily = Manrope, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colorScheme.onSurface)
                 if (!subtitle.isNullOrBlank()) {
-                    Text(subtitle, fontFamily = Manrope, fontSize = 12.sp, color = Color(0xFF6B7280))
+                    Text(subtitle, fontFamily = Manrope, fontSize = 12.sp, color = colorScheme.onSurfaceVariant)
                 }
             }
         }

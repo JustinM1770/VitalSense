@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,18 +54,19 @@ fun VitalsLineChart(
     activeMetric: ChartMetric = ChartMetric.GLUCOSE,
 ) {
     if (snapshots.isEmpty()) {
+        val textColor = MaterialTheme.colorScheme.onSurfaceVariant
         Box(
             modifier = modifier
                 .fillMaxWidth()
                 .height(160.dp)
-                .background(NeomorphicBackground),
+                .background(if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surface else NeomorphicBackground),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 "Sin historial aún — conecta un wearable o espera lecturas de Firebase",
                 fontFamily = Manrope,
                 fontSize = 12.sp,
-                color = TextMuted,
+                color = textColor,
                 modifier = Modifier.padding(16.dp),
             )
         }
@@ -94,6 +97,8 @@ fun VitalsLineChart(
     val values = chartData.values
     val color  = chartData.color
     val label  = chartData.label
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     val minVal = values.min()
     val maxVal = values.max()
@@ -122,14 +127,14 @@ fun VitalsLineChart(
                     fontFamily = Manrope,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = TextSecondary,
+                    color = labelColor,
                 )
             }
             Text(
                 "${snapshots.size} lecturas",
                 fontFamily = Manrope,
                 fontSize = 11.sp,
-                color = TextMuted,
+                color = mutedColor,
             )
         }
 
@@ -146,8 +151,8 @@ fun VitalsLineChart(
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("%.0f".format(maxVal), fontFamily = Manrope, fontSize = 9.sp, color = TextMuted)
-                Text("%.0f".format(minVal), fontFamily = Manrope, fontSize = 9.sp, color = TextMuted)
+                Text("%.0f".format(maxVal), fontFamily = Manrope, fontSize = 9.sp, color = mutedColor)
+                Text("%.0f".format(minVal), fontFamily = Manrope, fontSize = 9.sp, color = mutedColor)
             }
 
             // Canvas de la línea

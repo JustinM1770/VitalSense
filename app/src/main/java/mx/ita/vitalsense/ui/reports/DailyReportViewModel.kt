@@ -1,6 +1,8 @@
 package mx.ita.vitalsense.ui.reports
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.annotation.StringRes
+import androidx.lifecycle.AndroidViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -8,6 +10,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
 import java.time.LocalDate
@@ -15,12 +18,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
-enum class ReportRangeFilter(val label: String) {
-    TODAY("Hoy"),
-    YESTERDAY("Ayer"),
-    LAST_7_DAYS("7 dias"),
-    THIS_MONTH("Mes"),
-    SELECTED_DAY("Dia")
+enum class ReportRangeFilter(@StringRes val labelRes: Int) {
+    TODAY(R.string.report_range_today),
+    YESTERDAY(R.string.report_range_yesterday),
+    LAST_7_DAYS(R.string.report_range_last_7_days),
+    THIS_MONTH(R.string.report_range_this_month),
+    SELECTED_DAY(R.string.report_range_selected_day)
 }
 
 data class DailyReportUiState(
@@ -31,7 +34,7 @@ data class DailyReportUiState(
     val isLoading: Boolean = false
 )
 
-class DailyReportViewModel : ViewModel() {
+class DailyReportViewModel(application: Application) : AndroidViewModel(application) {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseDatabase.getInstance()
     private var sleepRef: com.google.firebase.database.Query? = null
@@ -70,9 +73,9 @@ class DailyReportViewModel : ViewModel() {
 
     fun getRangeLabel(state: DailyReportUiState): String {
         return when (state.selectedFilter) {
-            ReportRangeFilter.TODAY -> "Hoy"
-            ReportRangeFilter.YESTERDAY -> "Ayer"
-            ReportRangeFilter.LAST_7_DAYS -> "Ultimos 7 dias"
+            ReportRangeFilter.TODAY -> getApplication<Application>().getString(R.string.report_range_today)
+            ReportRangeFilter.YESTERDAY -> getApplication<Application>().getString(R.string.report_range_yesterday)
+            ReportRangeFilter.LAST_7_DAYS -> getApplication<Application>().getString(R.string.report_range_last_7_days)
             ReportRangeFilter.THIS_MONTH -> {
                 val start = state.selectedDate.withDayOfMonth(1)
                 start.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
@@ -149,18 +152,21 @@ class DailyReportViewModel : ViewModel() {
 
         historyListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val history = snapshot.children.mapNotNull { child ->
+                val historyRaw = snapshot.children.mapNotNull { child ->
                     val vitals = child.getValue(VitalsData::class.java)
                     if (vitals != null) {
                         vitals.copy(patientId = userId)
                     } else {
-                        val hr = child.child("heartRate").getValue(Int::class.java) ?: return@mapNotNull null
-                        val glucose = child.child("glucose").getValue(Double::class.java) ?: 0.0
-                        val spo2 = child.child("spo2").getValue(Int::class.java) ?: 0
-                        val ts = child.child("timestamp").getValue(Long::class.java) ?: 0L
+                        val hr = child.child("heartRate").getValue(Number::class.java)?.toInt() ?: 0
+                        val glucose = child.child("glucose").getValue(Number::class.java)?.toDouble() ?: 0.0
+                        val spo2 = child.child("spo2").getValue(Number::class.java)?.toInt() ?: 0
+                        val ts = child.child("timestamp").getValue(Number::class.java)?.toLong() ?: 0L
+                        if (ts <= 0L) return@mapNotNull null
                         VitalsData(patientId = userId, heartRate = hr, glucose = glucose, spo2 = spo2, timestamp = ts)
                     }
                 }.sortedBy { it.timestamp }
+
+                val history = compactHistorySamples(historyRaw)
 
                 _uiState.value = _uiState.value.copy(
                     vitalsHistory = history,
@@ -177,21 +183,36 @@ class DailyReportViewModel : ViewModel() {
 
     private fun mergeSleepData(sleepList: List<SleepData>): SleepData {
         if (sleepList.isEmpty()) {
-            return SleepData(score = 0, horas = 0f, estado = "No durmio")
+            return SleepData(
+                score = 0,
+                minutosTotales = 0,
+                horasCompletas = 0,
+                sleepStartMillis = 0L,
+                sleepEndMillis = 0L,
+                horas = 0f,
+                estado = getApplication<Application>().getString(R.string.sleep_not_slept),
+            )
         }
 
-        val avgScore = sleepList.map { it.score }.average().roundToInt().coerceIn(0, 100)
-        val avgHours = sleepList.map { it.horas.toDouble() }.average().toFloat().coerceAtLeast(0f)
+        val totalMinutes = sleepList.sumOf { it.totalMinutes }
+        val avgScore = ((totalMinutes / 480f) * 100f).roundToInt().coerceIn(0, 100)
+        val completeHours = totalMinutes / 60
+        val startMillis = sleepList.mapNotNull { it.sleepStartMillis.takeIf { millis -> millis > 0L } }.minOrNull() ?: 0L
+        val endMillis = sleepList.mapNotNull { it.sleepEndMillis.takeIf { millis -> millis > 0L } }.maxOrNull() ?: 0L
         val status = when {
-            avgScore >= 85 -> "Excelente"
-            avgScore >= 70 -> "Bueno"
-            avgScore >= 50 -> "Regular"
-            else -> "Malo"
+            avgScore >= 85 -> getApplication<Application>().getString(R.string.sleep_interpretation_excellent)
+            avgScore >= 70 -> getApplication<Application>().getString(R.string.sleep_interpretation_good)
+            avgScore >= 50 -> getApplication<Application>().getString(R.string.sleep_interpretation_regular)
+            else -> getApplication<Application>().getString(R.string.sleep_interpretation_low)
         }
 
         return SleepData(
             score = avgScore,
-            horas = avgHours,
+            minutosTotales = totalMinutes,
+            horasCompletas = completeHours,
+            sleepStartMillis = startMillis,
+            sleepEndMillis = endMillis,
+            horas = completeHours.toFloat(),
             estado = status,
         )
     }
@@ -201,6 +222,20 @@ class DailyReportViewModel : ViewModel() {
         if (pendingLoads == 0) {
             _uiState.value = _uiState.value.copy(isLoading = false)
         }
+    }
+
+    /**
+     * Reduce ruido por escrituras muy frecuentes con el mismo valor en ventanas cortas.
+     */
+    private fun compactHistorySamples(history: List<VitalsData>): List<VitalsData> {
+        if (history.isEmpty()) return emptyList()
+
+        return history
+            .distinctBy {
+                val minuteBucket = it.timestamp / 60_000L
+                Triple(minuteBucket, it.heartRate, it.spo2)
+            }
+            .sortedBy { it.timestamp }
     }
 
     override fun onCleared() {

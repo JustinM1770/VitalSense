@@ -26,8 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.ui.theme.DashBlue
 import mx.ita.vitalsense.ui.theme.Manrope
 
@@ -57,7 +59,7 @@ fun BottomNav(
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 NavItem(
                     icon = Icons.Outlined.Home,
-                    label = "Inicio",
+                    label = stringResource(R.string.bottom_nav_home),
                     selected = selected == BottomNavTab.HOME,
                     onClick = { onSelect(BottomNavTab.HOME) },
                 )
@@ -65,7 +67,7 @@ fun BottomNav(
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 NavItem(
                     icon = Icons.Outlined.FavoriteBorder,
-                    label = "Salud",
+                    label = stringResource(R.string.bottom_nav_health),
                     selected = selected == BottomNavTab.HEALTH,
                     onClick = { onSelect(BottomNavTab.HEALTH) },
                 )
@@ -73,7 +75,7 @@ fun BottomNav(
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 NavItem(
                     icon = Icons.Outlined.ChatBubbleOutline,
-                    label = "Chat",
+                    label = stringResource(R.string.bottom_nav_chat),
                     selected = selected == BottomNavTab.CHAT,
                     onClick = { onSelect(BottomNavTab.CHAT) },
                 )
@@ -81,7 +83,7 @@ fun BottomNav(
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 NavItem(
                     icon = Icons.Outlined.PersonOutline,
-                    label = "Perfil",
+                    label = stringResource(R.string.bottom_nav_profile),
                     selected = selected == BottomNavTab.PROFILE,
                     onClick = { onSelect(BottomNavTab.PROFILE) },
                 )

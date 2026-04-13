@@ -16,6 +16,7 @@ struct ChatBotView: View {
     ]
     @State private var inputText = ""
     @State private var isLoading = false
+    @State private var messageCount = 1
 
     var body: some View {
         ZStack {
@@ -59,7 +60,7 @@ struct ChatBotView: View {
                         }
                         .padding()
                     }
-                    .onChange(of: messages.count) { _ in
+                    .onChange(of: messageCount) { _ in
                         withAnimation { proxy.scrollTo(messages.last?.id) }
                     }
                 }
@@ -111,12 +112,14 @@ struct ChatBotView: View {
         let text = inputText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
         messages.append(ChatMessage(text: text, isUser: true))
+        messageCount = messages.count
         inputText = ""
         isLoading = true
         Task {
             let response = await callClaudeAPI(prompt: text)
             await MainActor.run {
                 messages.append(ChatMessage(text: response, isUser: false))
+                messageCount = messages.count
                 isLoading = false
             }
         }

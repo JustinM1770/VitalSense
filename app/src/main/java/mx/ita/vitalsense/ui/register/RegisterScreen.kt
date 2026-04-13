@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.ui.theme.Manrope
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -53,6 +55,13 @@ fun RegisterScreen(
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val colorScheme = MaterialTheme.colorScheme
+    val screenBg = colorScheme.background
+    val textPrimary = colorScheme.onBackground
+    val fieldBg = colorScheme.surfaceVariant
+    val fieldIcon = colorScheme.onSurfaceVariant
+    val borderSoft = colorScheme.outlineVariant
+    val secondaryText = colorScheme.onSurfaceVariant
 
     var name            by remember { mutableStateOf("") }
     var email           by remember { mutableStateOf("") }
@@ -74,7 +83,7 @@ fun RegisterScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(screenBg)
                 .verticalScroll(rememberScrollState())
                 .padding(top = 52.dp, bottom = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -92,17 +101,17 @@ fun RegisterScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Regresar",
-                        tint = TextDark,
+                        contentDescription = stringResource(R.string.back),
+                        tint = textPrimary,
                         modifier = Modifier.size(24.dp),
                     )
                 }
                 Text(
-                    text = "Regístrate",
+                    text = stringResource(R.string.register_title),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = TextDark,
+                    color = textPrimary,
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -119,24 +128,33 @@ fun RegisterScreen(
                 FigmaTextField(
                     value = name,
                     onValueChange = { name = it },
-                    placeholder = "Nombre",
+                    placeholder = stringResource(R.string.register_name),
                     leadingIcon = Icons.Outlined.Person,
+                    textColor = textPrimary,
+                    iconTint = fieldIcon,
+                    inputBg = fieldBg,
                 )
                 FigmaTextField(
                     value = email,
                     onValueChange = { email = it },
-                    placeholder = "Email",
+                    placeholder = stringResource(R.string.register_email),
                     leadingIcon = Icons.Outlined.Email,
+                    textColor = textPrimary,
+                    iconTint = fieldIcon,
+                    inputBg = fieldBg,
                     keyboardType = KeyboardType.Email,
                 )
                 FigmaTextField(
                     value = password,
                     onValueChange = { password = it },
-                    placeholder = "Contraseña",
+                    placeholder = stringResource(R.string.register_password),
                     leadingIcon = Icons.Outlined.Lock,
                     trailingIcon = if (passwordVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                     onTrailingClick = { passwordVisible = !passwordVisible },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    textColor = textPrimary,
+                    iconTint = fieldIcon,
+                    inputBg = fieldBg,
                     keyboardType = KeyboardType.Password,
                 )
             }
@@ -175,10 +193,10 @@ fun RegisterScreen(
                 }
                 Text(
                     text = buildAnnotatedString {
-                        withStyle(SpanStyle(color = TextDark)) { append("Acepto los ") }
-                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Términos de Servicio") }
-                        withStyle(SpanStyle(color = TextDark)) { append(" y ") }
-                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Políticas de Privacidad") }
+                        withStyle(SpanStyle(color = textPrimary)) { append("${stringResource(R.string.register_accept)} ") }
+                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append(stringResource(R.string.register_terms)) }
+                        withStyle(SpanStyle(color = textPrimary)) { append(" ${stringResource(R.string.register_and)} ") }
+                        withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append(stringResource(R.string.register_privacy)) }
                     },
                     fontFamily = Manrope,
                     fontSize = 13.sp,
@@ -207,7 +225,7 @@ fun RegisterScreen(
                     CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
                 } else {
                     Text(
-                        text = "Regístrate",
+                        text = stringResource(R.string.register_action),
                         fontFamily = Manrope,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
@@ -224,15 +242,15 @@ fun RegisterScreen(
                     .padding(horizontal = 32.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.weight(1f).height(1.dp).background(Color(0xFFE5E5E5)))
+                Box(Modifier.weight(1f).height(1.dp).background(borderSoft))
                 Text(
                     text = "  O  ",
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
-                    color = Color(0xFF8A8A8A),
+                    color = secondaryText,
                 )
-                Box(Modifier.weight(1f).height(1.dp).background(Color(0xFFE5E5E5)))
+                Box(Modifier.weight(1f).height(1.dp).background(borderSoft))
             }
 
             Spacer(Modifier.height(24.dp))
@@ -245,10 +263,10 @@ fun RegisterScreen(
                     .padding(horizontal = 24.dp)
                     .height(52.dp),
                 shape = RoundedCornerShape(32.dp),
-                border = BorderStroke(1.dp, Color(0xFFE5E5E5)),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, borderSoft),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
-                Text("Regístrate con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
+                Text("${stringResource(R.string.register_with)} ", color = textPrimary, fontFamily = Manrope, fontSize = 14.sp)
                 Text(
                     text = buildAnnotatedString {
                         withStyle(SpanStyle(color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)) { append("G") }
@@ -270,12 +288,12 @@ fun RegisterScreen(
                     .padding(horizontal = 24.dp)
                     .height(52.dp),
                 shape = RoundedCornerShape(32.dp),
-                border = BorderStroke(1.dp, Color(0xFFE5E5E5)),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, borderSoft),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
-                Text("Regístrate con ", color = TextDark, fontFamily = Manrope, fontSize = 14.sp)
+                Text("${stringResource(R.string.register_with)} ", color = textPrimary, fontFamily = Manrope, fontSize = 14.sp)
                 Text(
-                    text = "Facebook",
+                    text = stringResource(R.string.login_facebook),
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     color = Color(0xFF1877F2),
@@ -287,8 +305,8 @@ fun RegisterScreen(
             // ── Login link ───────────────────────────────────────────────────
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = TextDark)) { append("¿Ya tienes cuenta? ") }
-                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Inicia Sesión") }
+                    withStyle(SpanStyle(color = textPrimary)) { append("${stringResource(R.string.register_have_account)} ") }
+                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append(stringResource(R.string.register_login)) }
                 },
                 fontFamily = Manrope,
                 fontSize = 14.sp,
@@ -307,6 +325,9 @@ private fun FigmaTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     leadingIcon: ImageVector,
+    textColor: Color,
+    iconTint: Color,
+    inputBg: Color,
     trailingIcon: ImageVector? = null,
     onTrailingClick: (() -> Unit)? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None,
@@ -316,7 +337,7 @@ private fun FigmaTextField(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(InputBg)
+            .background(inputBg)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(
@@ -326,7 +347,7 @@ private fun FigmaTextField(
             Icon(
                 leadingIcon,
                 contentDescription = null,
-                tint = IconTint,
+                tint = iconTint,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(12.dp))
@@ -336,7 +357,7 @@ private fun FigmaTextField(
                         text = placeholder,
                         fontFamily = Manrope,
                         fontSize = 14.sp,
-                        color = IconTint,
+                        color = iconTint,
                     )
                 }
                 BasicTextField(
@@ -346,7 +367,7 @@ private fun FigmaTextField(
                     textStyle = TextStyle(
                         fontFamily = Manrope,
                         fontSize = 14.sp,
-                        color = TextDark,
+                        color = textColor,
                     ),
                     keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
                     visualTransformation = visualTransformation,
@@ -359,7 +380,7 @@ private fun FigmaTextField(
                 Icon(
                     trailingIcon,
                     contentDescription = null,
-                    tint = IconTint,
+                    tint = iconTint,
                     modifier = Modifier
                         .size(22.dp)
                         .clickable { onTrailingClick?.invoke() }

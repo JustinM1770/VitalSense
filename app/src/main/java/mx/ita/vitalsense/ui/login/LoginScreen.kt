@@ -31,6 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHost
@@ -48,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +65,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import mx.ita.vitalsense.R
 import mx.ita.vitalsense.ui.theme.Manrope
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -82,6 +85,11 @@ fun LoginScreen(
 ) {
     val uiState by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val colorScheme = MaterialTheme.colorScheme
+    val screenBg = colorScheme.background
+    val textPrimary = colorScheme.onBackground
+    val inputBg = colorScheme.surfaceVariant
+    val dividerColor = colorScheme.outlineVariant
 
     var email           by remember { mutableStateOf("") }
     var password        by remember { mutableStateOf("") }
@@ -100,7 +108,7 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(screenBg)
                 .padding(top = 52.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -118,17 +126,17 @@ fun LoginScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Regresar",
-                        tint = TextDark,
+                        contentDescription = stringResource(R.string.back),
+                        tint = textPrimary,
                         modifier = Modifier.size(24.dp),
                     )
                 }
                 Text(
-                    text = "Iniciar Sesión",
+                    text = stringResource(R.string.login_title),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = TextDark,
+                    color = textPrimary,
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -145,19 +153,23 @@ fun LoginScreen(
                 LoginField(
                     value = email,
                     onValueChange = { email = it },
-                    placeholder = "Email",
+                    placeholder = stringResource(R.string.login_email),
                     leadingIcon = Icons.Outlined.Email,
+                    textColor = textPrimary,
+                    inputBg = inputBg,
                     keyboardType = KeyboardType.Email,
                     enabled = uiState !is LoginUiState.Loading,
                 )
                 LoginField(
                     value = password,
                     onValueChange = { password = it },
-                    placeholder = "Contraseña",
+                    placeholder = stringResource(R.string.login_password),
                     leadingIcon = Icons.Outlined.Lock,
                     trailingIcon = if (passwordVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                     onTrailingClick = { passwordVisible = !passwordVisible },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    textColor = textPrimary,
+                    inputBg = inputBg,
                     keyboardType = KeyboardType.Password,
                     enabled = uiState !is LoginUiState.Loading,
                 )
@@ -167,7 +179,7 @@ fun LoginScreen(
 
             // ── Olvidaste contraseña ───────────────────────────────────────────
             Text(
-                text = "¿Olvidaste tu contraseña?",
+                text = stringResource(R.string.login_forgot),
                 fontFamily = Manrope,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
@@ -203,7 +215,7 @@ fun LoginScreen(
                 if (uiState is LoginUiState.Loading) {
                     CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
                 } else {
-                    Text("Iniciar Sesión", fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text(stringResource(R.string.login_action), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
             }
 
@@ -212,8 +224,8 @@ fun LoginScreen(
             // ── "No tienes cuenta?" ───────────────────────────────────────────
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = TextDark)) { append("No tienes cuenta?  ") }
-                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append("Registrate") }
+                    withStyle(SpanStyle(color = textPrimary)) { append("${stringResource(R.string.login_no_account)}  ") }
+                    withStyle(SpanStyle(color = PrimaryBtn, fontWeight = FontWeight.SemiBold)) { append(stringResource(R.string.login_register)) }
                 },
                 fontFamily = Manrope,
                 fontSize = 14.sp,
@@ -229,14 +241,14 @@ fun LoginScreen(
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = DividerClr)
+                HorizontalDivider(modifier = Modifier.weight(1f), color = dividerColor)
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 12.dp)
                         .size(20.dp)
-                        .border(1.dp, DividerClr, CircleShape),
+                        .border(1.dp, dividerColor, CircleShape),
                 )
-                HorizontalDivider(modifier = Modifier.weight(1f), color = DividerClr)
+                HorizontalDivider(modifier = Modifier.weight(1f), color = dividerColor)
             }
 
             Spacer(Modifier.height(20.dp))
@@ -245,6 +257,7 @@ fun LoginScreen(
             SocialButton(
                 onClick = { vm.signInWithGoogle(context) },
                 enabled = uiState !is LoginUiState.Loading,
+                borderColor = dividerColor,
             ) {
                 Text(
                     text = buildAnnotatedString {
@@ -259,20 +272,24 @@ fun LoginScreen(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "Continuar con Google",
+                    text = stringResource(R.string.login_continue_google),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    color = TextDark,
+                    color = textPrimary,
                 )
             }
 
             Spacer(Modifier.height(12.dp))
 
             // ── Botón Facebook ────────────────────────────────────────────────
-            SocialButton(onClick = { vm.signInWithFacebook(context) }, enabled = uiState !is LoginUiState.Loading) {
+            SocialButton(
+                onClick = { vm.signInWithFacebook(context) },
+                enabled = uiState !is LoginUiState.Loading,
+                borderColor = dividerColor,
+            ) {
                 Text(
-                    text = "Facebook",
+                    text = stringResource(R.string.login_facebook),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
@@ -280,11 +297,11 @@ fun LoginScreen(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "Continuar con Facebook",
+                    text = stringResource(R.string.login_continue_facebook),
                     fontFamily = Manrope,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    color = TextDark,
+                    color = textPrimary,
                 )
             }
 
@@ -303,6 +320,7 @@ fun LoginScreen(
 private fun SocialButton(
     onClick: () -> Unit,
     enabled: Boolean,
+    borderColor: Color,
     content: @Composable () -> Unit,
 ) {
     Box(
@@ -310,7 +328,7 @@ private fun SocialButton(
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
             .height(52.dp)
-            .border(1.dp, DividerClr, RoundedCornerShape(10.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -329,6 +347,8 @@ private fun LoginField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     leadingIcon: ImageVector,
+    textColor: Color,
+    inputBg: Color,
     trailingIcon: ImageVector? = null,
     onTrailingClick: (() -> Unit)? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None,
@@ -341,14 +361,14 @@ private fun LoginField(
         modifier = Modifier.fillMaxWidth().height(59.dp),
         enabled = enabled,
         placeholder = {
-            Text(placeholder, fontFamily = Manrope, fontSize = 14.sp, color = TextDark.copy(alpha = 0.4f))
+            Text(placeholder, fontFamily = Manrope, fontSize = 14.sp, color = textColor.copy(alpha = 0.6f))
         },
         leadingIcon = {
-            Icon(leadingIcon, contentDescription = null, tint = TextDark.copy(alpha = 0.5f), modifier = Modifier.size(22.dp))
+            Icon(leadingIcon, contentDescription = null, tint = textColor.copy(alpha = 0.65f), modifier = Modifier.size(22.dp))
         },
         trailingIcon = if (trailingIcon != null) {
             { IconButton(onClick = { onTrailingClick?.invoke() }) {
-                Icon(trailingIcon, contentDescription = null, tint = TextDark.copy(alpha = 0.5f), modifier = Modifier.size(22.dp))
+                Icon(trailingIcon, contentDescription = null, tint = textColor.copy(alpha = 0.65f), modifier = Modifier.size(22.dp))
             } }
         } else null,
         visualTransformation = visualTransformation,
@@ -358,10 +378,10 @@ private fun LoginField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor      = PrimaryBtn,
             unfocusedBorderColor    = Color.Transparent,
-            focusedContainerColor   = InputBg,
-            unfocusedContainerColor = InputBg,
-            focusedTextColor   = TextDark,
-            unfocusedTextColor = TextDark,
+            focusedContainerColor   = inputBg,
+            unfocusedContainerColor = inputBg,
+            focusedTextColor   = textColor,
+            unfocusedTextColor = textColor,
             cursorColor = PrimaryBtn,
         ),
     )

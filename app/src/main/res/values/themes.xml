@@ -2,18 +2,22 @@
 <resources>
 
     <!-- App theme (used after splash) -->
-    <style name="Theme.VitalSense" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.VitalSense" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorBackground">@color/background</item>
+        <item name="colorOnBackground">@color/on_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 
     <!--
         System SplashScreen theme (Android 12+).
-        - White background matches the top of our gradient so the transition is seamless.
+        - Uses system background color that adapts to dark/light mode.
         - windowSplashScreenAnimatedIcon shows the VitalSense eye logo.
         - postSplashScreenTheme hands off to the regular app theme.
     -->
     <style name="Theme.VitalSense.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#FFFFFF</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_logo_eye</item>
-        <item name="windowSplashScreenIconBackgroundColor">#FFFFFF</item>
+        <item name="windowSplashScreenBackground">@color/background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/icono</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/background</item>
         <item name="postSplashScreenTheme">@style/Theme.VitalSense</item>
     </style>
 
