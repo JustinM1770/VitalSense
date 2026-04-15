@@ -23,9 +23,8 @@ struct LoginView: View {
     private let dividerClr = Color.divider
 
     var body: some View {
-        if #available(iOS 17.0, *) {
-            ZStack {
-                Color.white.ignoresSafeArea()
+        ZStack {
+            Color.white.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 0) {
@@ -204,13 +203,9 @@ struct LoginView: View {
                 }
             }
             .navigationBarHidden(true)
-            .onChange(of: viewModel.state) { _, newValue in
+            .onChange(of: viewModel.state) { newValue in
                 handleStateChange(newValue)
             }
-        } else {
-            // Fallback iOS 16
-            Text("Requiere iOS 17+")
-        }
     }
 
     private func handleLogin() {

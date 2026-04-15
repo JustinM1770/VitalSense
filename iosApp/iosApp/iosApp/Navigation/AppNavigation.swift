@@ -49,6 +49,9 @@ struct AppNavigation: View {
             if isAuthenticated {
                 checkCuestionario()
                 SOSMonitorService.shared.startListening()
+                Task { await SubscriptionService.shared.setup() }
+            } else {
+                SubscriptionService.shared.teardown()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSOSAlert)) { _ in
@@ -67,6 +70,7 @@ struct AppNavigation: View {
         if isAuthenticated {
             checkCuestionario()
             SOSMonitorService.shared.startListening()
+            Task { await SubscriptionService.shared.setup() }
         }
     }
 
@@ -161,45 +165,52 @@ struct MainTabView: View {
     @StateObject private var emergencyVm = EmergencyQrViewModel()
     @State private var showEmergency = false
 
+    private var safeAreaBottom: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .windows.first?.safeAreaInsets.bottom ?? 0
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Full-screen background — covers status bar + home indicator
             Color.dashBg.ignoresSafeArea()
 
-            // Cada tab tiene su propio NavigationStack independiente para que
-            // la pila de navegación de un tab no afecte a los demás.
-            ZStack {
-                if selectedTab == .home {
-                    NavigationStack {
-                        DashboardView(onEmergency: { type, hr in
-                            emergencyVm.onAnomalyDetected(type, hr)
-                            showEmergency = true
-                        })
+            // ── Cada tab tiene su propio NavigationStack independiente ──
+            // opacity+allowsHitTesting preserva estado (scroll, formularios) al cambiar tab
+
+            TabShell(isVisible: selectedTab == .home) {
+                NavigationStack {
+                    DashboardView(onEmergency: { type, hr in
+                        emergencyVm.onAnomalyDetected(type, hr)
+                        showEmergency = true
+                    })
+                    .navigationDestination(isPresented: $showEmergency) {
+                        EmergencyQrView(vm: emergencyVm, onResolve: { showEmergency = false })
                     }
                 }
-                if selectedTab == .salud {
-                    NavigationStack { DailyReportView() }
-                }
-                if selectedTab == .ia {
-                    NavigationStack { AIInsightsView() }
-                }
-                if selectedTab == .chat {
-                    NavigationStack { ChatBotView() }
-                }
-                if selectedTab == .perfil {
-                    NavigationStack { ProfileView() }
-                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            TabShell(isVisible: selectedTab == .salud) {
+                NavigationStack { DailyReportView() }
+            }
+
+            TabShell(isVisible: selectedTab == .ia) {
+                NavigationStack { AIInsightsView() }
+            }
+
+            TabShell(isVisible: selectedTab == .chat) {
+                NavigationStack { ChatBotView() }
+            }
+
+            TabShell(isVisible: selectedTab == .perfil) {
+                NavigationStack { ProfileView() }
+            }
+
+            // ── Bottom nav flotante ──
             BiometricBottomNav(selectedTab: $selectedTab)
                 .padding(.horizontal, 16)
-                .padding(.bottom, max((UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets.bottom ?? 0, 8))
+                .padding(.bottom, max(safeAreaBottom, 8))
         }
         .ignoresSafeArea(edges: .bottom)
-        .fullScreenCover(isPresented: $showEmergency) {
-            EmergencyQrView(vm: emergencyVm, onResolve: { showEmergency = false })
-        }
         .onReceive(NotificationCenter.default.publisher(for: .AuthStateChanged)) { _ in
             if Auth.auth().currentUser == nil { onSignOut() }
         }
@@ -212,6 +223,19 @@ struct MainTabView: View {
             emergencyVm.onAnomalyDetected(type, hr)
             showEmergency = true
         }
+    }
+}
+
+/// Wrapper que muestra/oculta un tab sin destruirlo, preservando su estado de navegación.
+private struct TabShell<Content: View>: View {
+    let isVisible: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .opacity(isVisible ? 1 : 0)
+            .allowsHitTesting(isVisible)
     }
 }
 

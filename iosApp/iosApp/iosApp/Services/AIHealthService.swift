@@ -396,7 +396,8 @@ class AIHealthService: ObservableObject {
     // STOP-BANG Sleep Apnea (sensitivity 93%), and WHO SpO2 guidelines.
 
     private func fallbackAnalysis(stats: VitalStats, reason: String) -> HealthAnalysis {
-        let predictions = ClinicalScoringEngine.score(stats: stats)
+        // Usar CoreML (PhysioNet PTB-XL) si está disponible, heurísticas si no
+        let predictions = ClinicalScoringEngine.scoreWithML(stats: stats)
 
         let overallRisk: RiskLevel = predictions.contains { $0.riskLevel == .critico } ? .critico :
                                      predictions.contains { $0.riskLevel == .alto } ? .alto :

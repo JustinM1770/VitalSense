@@ -52,7 +52,7 @@ struct CuestionarioView: View {
                         }
                         Spacer().frame(width: 12)
                         Text("Datos Personales")
-                            .font(Font.custom("LeagueSpartan-SemiBold", size: 24))
+                            .font(.manropeBold(size: 24))
                             .foregroundColor(Color.primaryBlueDark)
                         Spacer()
                     }
@@ -168,7 +168,7 @@ struct CuestionarioView: View {
                                 ProgressView().tint(.white)
                             } else {
                                 Text("Siguiente")
-                                    .font(Font.custom("LeagueSpartan-Regular", size: 16))
+                                    .font(.manropeSemiBold(size: 16))
                                     .foregroundColor(Color(hex: "#ECF1FF"))
                             }
                         }

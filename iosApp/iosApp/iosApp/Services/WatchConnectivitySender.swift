@@ -2,11 +2,10 @@
 import Foundation
 import WatchConnectivity
 import FirebaseAuth
-import OSLog
-
-private let logger = Logger(subsystem: "mx.ita.vitalsense.ios", category: "WatchConnectivity")
+import FirebaseDatabase
 
 /// Envía el userId de Firebase al Apple Watch via WatchConnectivity.
+/// También recibe el código de emparejamiento desde el Watch y lo registra en Firebase.
 /// Llamar `setup()` una vez al arrancar la app.
 class WatchConnectivitySender: NSObject, WCSessionDelegate {
 
@@ -24,17 +23,8 @@ class WatchConnectivitySender: NSObject, WCSessionDelegate {
     func setup() {
         Auth.auth().addStateDidChangeListener { [weak self] _, user in
             guard let self else { return }
-            let isPaired = UserDefaults.standard.bool(forKey: "code_paired")
             let uid = user?.uid ?? ""
-            
-            logger.debug("Auth state changed. User: \(uid), Paired: \(isPaired)")
-            
-            if !uid.isEmpty && isPaired {
-                self.sendUserId(uid)
-            } else {
-                // Si no hay usuario o no está emparejado, asegurar que el reloj lo sepa
-                self.sendUnpair()
-            }
+            self.sendUserId(uid)
         }
     }
 
@@ -46,24 +36,16 @@ class WatchConnectivitySender: NSObject, WCSessionDelegate {
         }
     }
 
-    func sendUnpair() {
-        guard WCSession.default.activationState == .activated else { return }
-        try? WCSession.default.updateApplicationContext(["unpair": true])
-        if WCSession.default.isReachable {
-            WCSession.default.sendMessage(["unpair": true], replyHandler: nil)
-        }
-    }
-
     func sendTestPing() {
         guard WCSession.default.isReachable else {
-            logger.warning("El reloj no está accesible en este momento.")
+            print("[WatchConnectivity] El reloj no está accesible en este momento.")
             return
         }
-        logger.debug("Enviando PING de prueba al reloj...")
+        print("[WatchConnectivity] Enviando PING de prueba al reloj...")
         WCSession.default.sendMessage(["testPing": Date().timeIntervalSince1970], replyHandler: { reply in
-            logger.debug("PONG recibido del reloj: \(reply)")
+            print("[WatchConnectivity] PONG recibido del reloj: \(reply)")
         }) { error in
-            logger.error("Error al enviar PING: \(error.localizedDescription)")
+            print("[WatchConnectivity] Error al enviar PING: \(error.localizedDescription)")
         }
     }
 
@@ -72,28 +54,78 @@ class WatchConnectivitySender: NSObject, WCSessionDelegate {
                  activationDidCompleteWith activationState: WCSessionActivationState,
                  error: Error?) {
         if let error = error {
-            logger.error("Error de activación en iPhone: \(error.localizedDescription)")
+            print("[WatchConnectivity] Error de activación en iPhone: \(error.localizedDescription)")
             return
         }
-
-        logger.info("Sesión activada en iPhone. Estado: \(activationState.rawValue)")
         
-        let isPaired = UserDefaults.standard.bool(forKey: "code_paired")
-
-        if activationState == .activated {
-            if let uid = Auth.auth().currentUser?.uid, isPaired {
-                logger.debug("Enviando userId actual: \(uid)")
-                sendUserId(uid)
-            } else {
-                logger.debug("No emparejado o sin sesión. Enviando señal de desvinculación preventiva.")
-                sendUnpair()
-            }
+        print("[WatchConnectivity] Sesión activada en iPhone. Estado: \(activationState.rawValue)")
+        
+        if activationState == .activated, let uid = Auth.auth().currentUser?.uid {
+            print("[WatchConnectivity] Enviando userId actual: \(uid)")
+            sendUserId(uid)
         }
     }
 
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) {
         WCSession.default.activate()
+    }
+
+    // MARK: - Recibir mensajes del Watch
+
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        handleIncomingFromWatch(message, replyHandler: nil)
+    }
+
+    func session(_ session: WCSession,
+                 didReceiveMessage message: [String: Any],
+                 replyHandler: @escaping ([String: Any]) -> Void) {
+        handleIncomingFromWatch(message, replyHandler: replyHandler)
+    }
+
+    func session(_ session: WCSession,
+                 didReceiveApplicationContext applicationContext: [String: Any]) {
+        handleIncomingFromWatch(applicationContext, replyHandler: nil)
+    }
+
+    private func handleIncomingFromWatch(_ payload: [String: Any],
+                                         replyHandler: (([String: Any]) -> Void)?) {
+        // Código de emparejamiento enviado desde el Watch
+        if let code = payload["pairingCode"] as? String, !code.isEmpty {
+            let deviceName = payload["deviceName"] as? String ?? "Apple Watch"
+            registerPairingCodeFromWatch(code, deviceName: deviceName) { success in
+                replyHandler?(["registered": success])
+            }
+        }
+    }
+
+    /// Registra el código de emparejamiento en Firebase usando el SDK autenticado del iPhone.
+    private func registerPairingCodeFromWatch(_ code: String,
+                                               deviceName: String,
+                                               completion: @escaping (Bool) -> Void) {
+        let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        let data: [String: Any] = [
+            "code":              code,
+            "active":            true,
+            "paired":            false,
+            "deviceName":        deviceName,
+            "timestamp":         timestamp,
+            "platform":          "watchOS",
+            "registeredByPhone": true
+        ]
+
+        Database.database()
+            .reference()
+            .child("patients/pairing_codes/\(code)")
+            .setValue(data) { error, _ in
+                if let error = error {
+                    print("[WatchConnectivity] Error registrando código \(code): \(error.localizedDescription)")
+                    completion(false)
+                } else {
+                    print("[WatchConnectivity] Código \(code) registrado en Firebase por iPhone ✓")
+                    completion(true)
+                }
+            }
     }
 }
 

@@ -105,6 +105,22 @@ struct AddMedicationView: View {
         .animation(.easeInOut, value: isCustomFreq)
     }
 
+    /// Convierte la cadena de frecuencia a horas; retorna 0 si es personalizada o no reconocida.
+    static func hoursFromFrequency(_ freq: String) -> Int {
+        switch freq {
+        case "Cada 4 horas":  return 4
+        case "Cada 6 horas":  return 6
+        case "Cada 8 horas":  return 8
+        case "Cada 12 horas": return 12
+        case "Cada 24 horas": return 24
+        default:
+            // Intentar parsear "Cada X horas" personalizado
+            let parts = freq.components(separatedBy: " ")
+            if parts.count >= 2, let h = Int(parts[1]) { return h }
+            return 0
+        }
+    }
+
     private func save() {
         nombreError = nombre.trimmingCharacters(in: .whitespaces).isEmpty
         guard formValid else { return }
@@ -123,6 +139,15 @@ struct AddMedicationView: View {
         Database.database().reference().child("medications/\(uid)/\(id)").setValue(data) { _, _ in
             isSaving = false
             saved = true
+            // Programar notificación recurrente si la frecuencia es conocida
+            let hours = Self.hoursFromFrequency(freq)
+            if hours > 0 {
+                Task {
+                    await NotificationService.shared.scheduleMedicationReminder(
+                        id: id, name: nombre, dosis: dosis, intervalHours: hours
+                    )
+                }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { onBack() }
         }
     }

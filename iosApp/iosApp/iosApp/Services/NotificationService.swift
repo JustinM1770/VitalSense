@@ -247,6 +247,46 @@ class NotificationService: NSObject, ObservableObject {
     }
     #endif
 
+    // MARK: - Medication Reminders
+
+    /// Programa notificaciones repetidas para un medicamento.
+    /// - Parameters:
+    ///   - id: UUID del medicamento (usado como prefijo de ID para poder cancelarlas)
+    ///   - name: Nombre del medicamento (ej. "Metformina 500mg")
+    ///   - intervalHours: Intervalo en horas entre dosis (4, 6, 8, 12 o 24)
+    func scheduleMedicationReminder(id: String, name: String, dosis: String, intervalHours: Int) async {
+        guard isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "💊 Recordatorio — VitalSense"
+        content.body = "Hora de tomar \(name)\(dosis.isEmpty ? "" : " \(dosis)"). ¿Lo tomaste?"
+        content.sound = .default
+        content.categoryIdentifier = VitalNotificationType.medicationReminder.categoryId
+        content.threadIdentifier = VitalNotificationType.medicationReminder.threadId
+        content.interruptionLevel = .timeSensitive
+        content.userInfo = ["medId": id, "medName": name, "notifType": VitalNotificationType.medicationReminder.rawValue]
+
+        let intervalSeconds = TimeInterval(intervalHours * 3600)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: intervalSeconds, repeats: true)
+        let request = UNNotificationRequest(
+            identifier: "med-\(id)",
+            content: content,
+            trigger: trigger
+        )
+
+        do {
+            try await center.add(request)
+            print("[Notifications] Recordatorio de \(name) cada \(intervalHours)h programado.")
+        } catch {
+            print("[Notifications] Error al programar medicamento: \(error.localizedDescription)")
+        }
+    }
+
+    /// Cancela los recordatorios de un medicamento específico.
+    func cancelMedicationReminder(id: String) {
+        center.removePendingNotificationRequests(withIdentifiers: ["med-\(id)"])
+    }
+
     // MARK: - Pending management
 
     func clearBadge() {

@@ -3,16 +3,13 @@
 
 import Foundation
 import WatchKit
-import OSLog
-
-private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "Pairing")
+import WatchConnectivity
 
 class PairingManager {
 
     static let shared = PairingManager()
 
     private let dbBase   = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com"
-    private let apiKey   = "AIzaSyC031HwEG-y0cCvdcASeJ7hPRPhezWmZnY"
     private let prefs    = UserDefaults.standard
 
     // UserDefaults keys
@@ -21,9 +18,8 @@ class PairingManager {
     private let keyUserId       = "biometric_user_id"
     private let keyLastCodeTime = "last_code_time"
 
-    // Anonymous auth token cache
-    private var cachedToken: String?
-    private var tokenExpiry: Date = .distantPast
+    // Timer activo de polling
+    private var pollingTimer: Timer?
 
     private init() {}
 
@@ -41,7 +37,7 @@ class PairingManager {
         let code = String((0..<8).map { _ in characters.randomElement()! })
         prefs.set(code,                          forKey: keyPairingCode)
         prefs.set(Date().timeIntervalSince1970,  forKey: keyLastCodeTime)
-        logger.debug("Generated code: \(code)")
+        print("[PairingManager] Generated code: \(code)")
         return code
     }
 
@@ -50,132 +46,144 @@ class PairingManager {
         return elapsed > 300
     }
 
-    // MARK: - Firebase Anonymous Auth
+    // MARK: - Registrar código en Firebase
+    // Estrategia dual:
+    // 1. Intenta PUT directo a Firebase REST (sin auth — funciona si las reglas lo permiten)
+    // 2. Envía el código al iPhone por WatchConnectivity → iPhone registra con su token autenticado
 
-    /// Obtiene (o reutiliza) un token de autenticación anónima de Firebase.
-    private func getAuthToken(completion: @escaping (String?) -> Void) {
-        // Reusar token si aún es válido (expira en ~55 min de margen)
-        if let token = cachedToken, Date() < tokenExpiry {
-            completion(token)
+    func registerCodeInFirebase(code: String, completion: @escaping (Bool) -> Void) {
+        // Canal 1: WatchConnectivity — siempre primero, es el más confiable
+        // applicationContext garantiza entrega incluso si iPhone no está abierto ahora
+        sendCodeToIPhone(code: code)
+
+        // Canal 2: REST directo (funciona si las reglas de Firebase permiten escritura anónima)
+        attemptDirectRegistration(code: code) { success in
+            if success {
+                completion(true)
+            } else {
+                // REST falló, pero WC ya envió el código al iPhone.
+                // Si la sesión WC está activa, el iPhone registrará el código en Firebase.
+                // Retornar true para que la UI muestre el código sin "Sin conexión".
+                let wcActive = WCSession.default.activationState == .activated
+                print("[PairingManager] REST falló, WC activo=\(wcActive) → completion(\(wcActive))")
+                completion(wcActive)
+            }
+        }
+    }
+
+    /// Intenta registrar directamente en Firebase REST sin autenticación.
+    private func attemptDirectRegistration(code: String, completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(dbBase)/patients/pairing_codes/\(code).json") else {
+            completion(false)
             return
         }
 
-        guard let url = URL(string: "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=\(apiKey)") else {
-            completion(nil)
+        let deviceName = WKInterfaceDevice.current().name
+        let timestamp  = Int64(Date().timeIntervalSince1970 * 1000)
+
+        let data: [String: Any] = [
+            "code":       code,
+            "active":     true,
+            "paired":     false,
+            "deviceName": deviceName,
+            "timestamp":  timestamp,
+            "platform":   "watchOS"
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 5
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: data)
+        } catch {
+            print("[PairingManager] Serialization error: \(error)")
+            completion(false)
             return
         }
 
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["returnSecureToken": true])
-
-        URLSession.shared.dataTask(with: req) { [weak self] data, _, error in
-            guard let self, let data, error == nil,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let token = json["idToken"] as? String else {
-                logger.error("Anonymous auth failed: \(error?.localizedDescription ?? "unknown")")
-                completion(nil)
+        URLSession.shared.dataTask(with: request) { _, response, error in
+            if let error = error {
+                print("[PairingManager] REST directo error: \(error.localizedDescription)")
+                completion(false)
                 return
             }
-
-            self.cachedToken = token
-            self.tokenExpiry = Date().addingTimeInterval(55 * 60) // 55 min
-            logger.info("Anonymous auth OK")
-            completion(token)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 200 {
+                print("[PairingManager] Código \(code) registrado en Firebase (REST directo) ✓")
+                completion(true)
+            } else {
+                print("[PairingManager] Firebase REST rechazó: HTTP \(status)")
+                completion(false)
+            }
         }.resume()
     }
 
-    // MARK: - Registrar código en Firebase
+    /// Envía el código al iPhone vía WatchConnectivity para que él lo registre en Firebase.
+    /// No bloquea — fire-and-forget con fallback a applicationContext.
+    private func sendCodeToIPhone(code: String) {
+        let payload: [String: Any] = [
+            "pairingCode": code,
+            "timestamp":   Int64(Date().timeIntervalSince1970 * 1000),
+            "deviceName":  WKInterfaceDevice.current().name
+        ]
 
-    func registerCodeInFirebase(code: String, completion: @escaping (Bool) -> Void) {
-        getAuthToken { [weak self] token in
-            guard let self else { return }
+        // Guardar siempre en applicationContext como red de seguridad
+        try? WCSession.default.updateApplicationContext(payload)
 
-            let authParam = token.map { "?auth=\($0)" } ?? ""
-            guard let url = URL(string: "\(self.dbBase)/patients/pairing_codes/\(code).json\(authParam)") else {
-                completion(false)
-                return
-            }
-
-            let deviceName = WKInterfaceDevice.current().name
-            let timestamp  = Int64(Date().timeIntervalSince1970 * 1000)
-
-            let data: [String: Any] = [
-                "code":       code,
-                "active":     true,
-                "paired":     false,
-                "deviceName": deviceName,
-                "timestamp":  timestamp,
-                "platform":   "watchOS"
-            ]
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "PUT"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-            do {
-                request.httpBody = try JSONSerialization.data(withJSONObject: data)
-            } catch {
-                logger.error("Serialization error: \(error)")
-                completion(false)
-                return
-            }
-
-            URLSession.shared.dataTask(with: request) { _, response, error in
-                if let error = error {
-                    logger.error("Network error: \(error.localizedDescription)")
-                    completion(false)
-                    return
-                }
-
-                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if status == 200 {
-                    logger.info("Code \(code) registered in Firebase")
-                    completion(true)
-                } else {
-                    logger.error("Firebase rejected write: HTTP \(status)")
-                    completion(false)
-                }
-            }.resume()
+        // Intentar sendMessage si el iPhone está accesible
+        if WCSession.default.activationState == .activated && WCSession.default.isReachable {
+            WCSession.default.sendMessage(payload, replyHandler: { reply in
+                let ok = reply["registered"] as? Bool ?? false
+                print("[PairingManager] WC sendMessage reply: registered=\(ok)")
+            }, errorHandler: { error in
+                print("[PairingManager] WC sendMessage error: \(error.localizedDescription)")
+            })
+        } else {
+            print("[PairingManager] iPhone no accesible, código guardado en applicationContext")
         }
     }
 
-    // MARK: - Escuchar emparejamiento
+    // MARK: - Escuchar emparejamiento (polling)
+
+    func stopListening() {
+        pollingTimer?.invalidate()
+        pollingTimer = nil
+    }
 
     func listenForPairing(code: String, callback: @escaping (String?) -> Void) {
-        getAuthToken { [weak self] token in
-            guard let self else { return }
+        stopListening()
 
-            let authParam = token.map { "?auth=\($0)" } ?? ""
-            guard let url = URL(string: "\(self.dbBase)/patients/pairing_codes/\(code).json\(authParam)") else {
-                callback(nil)
-                return
-            }
-
-            // Polling cada 2 segundos
-            Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
-                URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-                    guard let self,
-                          let data,
-                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                        return
-                    }
-
-                    if let paired = json["paired"] as? Bool, paired,
-                       let userId = json["userId"] as? String {
-
-                        timer.invalidate()
-
-                        self.prefs.set(true,   forKey: self.keyPaired)
-                        self.prefs.set(userId, forKey: self.keyUserId)
-
-                        logger.info("Paired successfully with userId: \(userId)")
-                        DispatchQueue.main.async { callback(userId) }
-                    }
-                }.resume()
-            }
+        guard let url = URL(string: "\(dbBase)/patients/pairing_codes/\(code).json") else {
+            callback(nil)
+            return
         }
+
+        // Polling cada 2 segundos
+        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] t in
+            URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+                guard let self,
+                      let data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    return
+                }
+
+                if let paired = json["paired"] as? Bool, paired,
+                   let userId = json["userId"] as? String {
+
+                    t.invalidate()
+                    self.pollingTimer = nil
+
+                    self.prefs.set(true,   forKey: self.keyPaired)
+                    self.prefs.set(userId, forKey: self.keyUserId)
+
+                    print("[PairingManager] Emparejado exitosamente con userId: \(userId)")
+                    DispatchQueue.main.async { callback(userId) }
+                }
+            }.resume()
+        }
+        pollingTimer = timer
     }
 
     // MARK: - Desemparejar
@@ -184,6 +192,6 @@ class PairingManager {
         prefs.set(false, forKey: keyPaired)
         prefs.removeObject(forKey: keyUserId)
         prefs.removeObject(forKey: keyPairingCode)
-        logger.info("Unpaired")
+        print("[PairingManager] Unpaired")
     }
 }

@@ -28,7 +28,7 @@ class DoctorSessionService {
             .queryOrdered(byChild: "timestamp").queryLimited(toLast: 20).getData()
 
         var historyList: [[String: Any]] = []
-        for child in historySnap.children {
+        for child in historySnap.children.allObjects {
             guard let snap  = child as? DataSnapshot,
                   let dict  = snap.value as? [String: Any],
                   let hr    = dict["heartRate"] as? Int else { continue }

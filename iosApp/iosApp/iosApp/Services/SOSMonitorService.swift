@@ -30,13 +30,15 @@ class SOSMonitorService: ObservableObject {
     private let db  = Database.database().reference()
     private var uid: String { Auth.auth().currentUser?.uid ?? "" }
     private var handle: DatabaseHandle?
+    private var listeningUid: String = ""   // uid para el que ya hay un observer activo
 
     private init() {}
 
     // MARK: - Start/Stop
 
     func startListening() {
-        guard !uid.isEmpty else {
+        let currentUid = uid
+        guard !currentUid.isEmpty else {
             // Reintentar cuando haya sesión
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
                 self?.startListening()
@@ -44,7 +46,16 @@ class SOSMonitorService: ObservableObject {
             return
         }
 
-        handle = db.child("alerts/\(uid)").observe(.childAdded) { [weak self] snapshot in
+        // Evitar observadores duplicados para el mismo uid
+        guard currentUid != listeningUid else { return }
+
+        // Limpiar observer anterior si cambió el uid (ej. logout + nuevo login)
+        if let h = handle, !listeningUid.isEmpty {
+            db.child("alerts/\(listeningUid)").removeObserver(withHandle: h)
+        }
+        listeningUid = currentUid
+
+        handle = db.child("alerts/\(currentUid)").observe(.childAdded) { [weak self] snapshot in
             guard let self,
                   let dict = snapshot.value as? [String: Any] else { return }
 
@@ -78,7 +89,11 @@ class SOSMonitorService: ObservableObject {
     }
 
     func stopListening() {
-        if let h = handle { db.child("alerts/\(uid)").removeObserver(withHandle: h) }
+        if let h = handle, !listeningUid.isEmpty {
+            db.child("alerts/\(listeningUid)").removeObserver(withHandle: h)
+        }
+        handle = nil
+        listeningUid = ""
     }
 
     func dismissAlert(sosId: String) {

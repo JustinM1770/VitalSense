@@ -5,219 +5,166 @@ import FirebaseAuth
 import FirebaseDatabase
 
 // MARK: - WearableViewModel
-// Equivalente completo a DeviceViewModel.kt de Android.
-// Maneja: emparejamiento por código, lectura Firebase en tiempo real,
-// persistencia en UserDefaults, y control de BLEService.
-
 @MainActor
 class WearableViewModel: ObservableObject {
 
-    // MARK: - Estado publicado (mirror de DeviceViewModel StateFlow)
-    @Published var isCodePaired: Bool
-    @Published var pairedDeviceName: String
+    // ── Estado publicado ─────────────────────────────────────────────────────
     @Published var codeError: String?  = nil
-    @Published var connectionState: BLEConnectionState = .disconnected
-    @Published var vitals = BLEVitals()
+    @Published var vitals              = BLEVitals()
+    @Published var activeDeviceCode    = ""    // código del device que está activo/monitoreando
+    @Published var pairingSuccess      = false // pulso que cierra el sheet de vinculación
 
     let bleService = BLEService()
 
-    // MARK: - Constantes (equivalente a companion object)
-    private let KEY_CODE_PAIRED       = "code_paired"
-    private let KEY_PAIRED_CODE       = "paired_code"
-    private let KEY_PAIRED_DEVICE_NAME = "paired_device_name"
-
+    // MARK: - Privado
     private let db = Database.database().reference()
     private var vitalsHandle: DatabaseHandle?
     private var cancellables = Set<AnyCancellable>()
-    private var lastFirebaseSave: Date = .distantPast   // throttle a 30s
+    private var lastFirebaseSave: Date = .distantPast
 
-    // MARK: - Init (equivalente al init {} de DeviceViewModel)
-
+    // MARK: - Init
     init() {
-        isCodePaired    = UserDefaults.standard.bool(forKey: "code_paired")
-        pairedDeviceName = UserDefaults.standard.string(forKey: "paired_device_name") ?? "Wearable"
-
-        // Propagar cambios de BLEService → ViewModel (mismo patrón que StateFlow en Android)
-        bleService.$connectionState
-            .receive(on: RunLoop.main)
-            .assign(to: \.connectionState, on: self)
-            .store(in: &cancellables)
-
+        // BLE vitals → publicar + guardar en Firebase
         bleService.$vitals
             .receive(on: RunLoop.main)
-            .sink { [weak self] newVitals in
+            .sink { [weak self] v in
                 guard let self else { return }
-                self.vitals = newVitals
-                self.persistBLEVitalsIfNeeded(newVitals)
+                self.vitals = v
+                self.persistVitalsIfNeeded(v, source: "ble_direct")
             }
             .store(in: &cancellables)
 
-        if isCodePaired {
-            startWatchDataReading()
+        // Si ya había un dispositivo activo (sesión previa), reanudarlo
+        let savedCode = UserDefaults.standard.string(forKey: "active_device_code") ?? ""
+        if !savedCode.isEmpty {
+            activeDeviceCode = savedCode
+            startVitalsListener(code: savedCode)
         }
     }
 
-    // MARK: - Escaneo BLE (equivalente a startScan / stopScan)
+    // MARK: - connectWithCode (llamado desde AddDeviceSheet)
+    // Valida el código en Firebase, registra el dispositivo en SubscriptionService,
+    // y comienza a escuchar vitales.
 
-    func startScan() { bleService.startScan() }
-    func stopScan()  { bleService.stopScan() }
-
-    // MARK: - connectWithCode (idéntico a DeviceViewModel.connectWithCode)
-    // Valida el código contra Firebase pairing_codes/{code},
-    // guarda en UserDefaults y comienza a leer vitales.
-
-    func connectWithCode(_ code: String) {
+    func connectWithCode(_ code: String, deviceName: String, platform: String) {
         codeError = nil
         bleService.setConnecting()
 
-        let upperCode = code.uppercased().trimmingCharacters(in: .whitespaces)
-        guard upperCode.count == 8 else {
-            codeError = "El código debe tener 8 caracteres."
+        let upper = code.uppercased().trimmingCharacters(in: .whitespaces)
+
+        db.child("patients/pairing_codes").child(upper).getData { [weak self] error, snapshot in
+            guard let self else { return }
+            Task { @MainActor in
+                // Firebase error → aceptar de todas formas (modo offline)
+                if error != nil {
+                    await self.finalizePairing(code: upper, deviceName: deviceName, platform: platform)
+                    return
+                }
+
+                guard let snapshot, snapshot.exists() else {
+                    self.codeError = "Código inválido. Verifica el código en tu reloj e inténtalo de nuevo."
+                    self.bleService.setDisconnected()
+                    return
+                }
+
+                // Marcar como emparejado en Firebase
+                let resolvedName = snapshot.childSnapshot(forPath: "deviceName").value as? String ?? deviceName
+                let uid = Auth.auth().currentUser?.uid ?? "global"
+                self.db.child("patients/pairing_codes").child(upper)
+                    .updateChildValues(["paired": true, "userId": uid]) { _, _ in }
+
+                await self.finalizePairing(code: upper, deviceName: resolvedName, platform: platform)
+            }
+        }
+    }
+
+    private func finalizePairing(code: String, deviceName: String, platform: String) async {
+        // Registrar en SubscriptionService (guarda en Firebase patients/{uid}/devices)
+        let added = await SubscriptionService.shared.addDevice(
+            name:     deviceName,
+            platform: platform,
+            code:     code
+        )
+        guard added else {
+            codeError = "Límite de dispositivos alcanzado. Actualiza a Premium."
             bleService.setDisconnected()
             return
         }
 
-        let userId = Auth.auth().currentUser?.uid ?? "global"
-
-        // Escribir directamente el userId en el path del código.
-        // El Watch hace polling en este mismo path cada 2s y detecta el emparejamiento
-        // aunque no haya podido registrar el código previamente en Firebase.
-        db.child("patients/pairing_codes").child(upperCode)
-            .getData { [weak self] error, snapshot in
-                guard let self else { return }
-
-                Task { @MainActor in
-                    let deviceName = snapshot?.childSnapshot(forPath: "deviceName").value as? String ?? "Apple Watch"
-
-                    self.db.child("patients/pairing_codes").child(upperCode)
-                        .updateChildValues(["paired": true, "userId": userId]) { dbError, _ in
-                            Task { @MainActor in
-                                if let dbError {
-                                    self.codeError = "Error al conectar: \(dbError.localizedDescription)"
-                                    self.bleService.setDisconnected()
-                                } else {
-                                    self.pairSuccessfully(code: upperCode, deviceName: deviceName)
-                                }
-                            }
-                        }
-                }
-            }
-    }
-
-    // MARK: - Desconectar reloj (idéntico a disconnectWatch)
-
-    func disconnectWatch() {
-        stopWatchDataReading()
-
-        Task { @MainActor in
-            if let pairedCode = UserDefaults.standard.string(forKey: KEY_PAIRED_CODE) {
-                db.child("patients/pairing_codes").child(pairedCode)
-                    .updateChildValues(["paired": false])
-            }
-            if let userId = Auth.auth().currentUser?.uid {
-                db.child("vitals/current/\(userId)").removeValue()
-            }
-
-            UserDefaults.standard.set(false, forKey: KEY_CODE_PAIRED)
-            UserDefaults.standard.removeObject(forKey: KEY_PAIRED_CODE)
-            UserDefaults.standard.removeObject(forKey: KEY_PAIRED_DEVICE_NAME)
-
-            isCodePaired = false
-            pairedDeviceName = "Wearable"
-            bleService.disconnect()
-            
-            // Notificar al reloj que se desvinculó para que regrese a la pantalla de código
-            WatchConnectivitySender.shared.sendUnpair()
-        }
-    }
-
-    // MARK: - Private
-
-    private func pairSuccessfully(code: String, deviceName: String) {
-        UserDefaults.standard.set(true, forKey: KEY_CODE_PAIRED)
-        UserDefaults.standard.set(code, forKey: KEY_PAIRED_CODE)
-        UserDefaults.standard.set(deviceName, forKey: KEY_PAIRED_DEVICE_NAME)
-
-        isCodePaired = true
-        pairedDeviceName = deviceName
+        // Activar monitoreo de vitals
+        activeDeviceCode = code
+        UserDefaults.standard.set(code, forKey: "active_device_code")
         bleService.setConnected(deviceName: deviceName)
-        startWatchDataReading()
+        startVitalsListener(code: code)
 
-        // Notificar al Watch directamente via WatchConnectivity
-        // Esto hace que el Watch salga de la pantalla de código inmediatamente
-        if let uid = Auth.auth().currentUser?.uid {
-            WatchConnectivitySender.shared.sendUserId(uid)
-        }
+        pairingSuccess = true
+        // Reset para permitir que el onChange de la sheet vuelva a dispararse después
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.pairingSuccess = false }
     }
 
-    // startWatchDataReading — equivalente a startWatchDataReading() en Android
-    // Observa vitals/current/{userId} en Firebase (el Wear OS escribe ahí).
+    // MARK: - Desconectar dispositivo activo
+    func disconnectActive() {
+        stopVitalsListener()
+        activeDeviceCode = ""
+        UserDefaults.standard.removeObject(forKey: "active_device_code")
+        bleService.setDisconnected()
+        vitals = BLEVitals()
+    }
 
-    private func startWatchDataReading() {
-        bleService.setConnected(deviceName: pairedDeviceName)
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+    // MARK: - Escucha vitals/current/{uid} en Firebase
+    // El reloj/wearable escribe aquí; el iPhone muestra en tiempo real.
 
-        vitalsHandle = db.child("vitals/current/\(userId)").observe(.value) { [weak self] snapshot in
+    private func startVitalsListener(code: String) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        stopVitalsListener()
+
+        vitalsHandle = db.child("vitals/current/\(uid)").observe(.value) { [weak self] snapshot in
             guard let self, let dict = snapshot.value as? [String: Any] else { return }
-
             Task { @MainActor in
-                let heartRate = dict["heartRate"] as? Int
-                let glucose   = (dict["glucose"] as? Double)
-                             ?? (dict["glucose"] as? Int).map { Double($0) }
-                let spo2      = dict["spo2"] as? Int
-                let timestamp = dict["timestamp"] as? Double
-
-                self.bleService.updateVitals(BLEVitals(
-                    heartRate: heartRate,
-                    glucose:   glucose,
-                    spo2:      spo2,
-                    timestamp: timestamp
-                ))
+                self.vitals = BLEVitals(
+                    heartRate: dict["heartRate"] as? Int,
+                    glucose:   (dict["glucose"] as? Double) ?? (dict["glucose"] as? Int).map { Double($0) },
+                    spo2:      dict["spo2"] as? Int,
+                    timestamp: dict["timestamp"] as? Double
+                )
             }
         }
     }
 
-    // MARK: - BLE → Firebase persistence
-    // Guarda cada lectura BLE en vitals/current y en history (throttled 30s)
-    // para que el ClinicalScoringEngine y la IA puedan analizarlos.
+    private func stopVitalsListener() {
+        guard let handle = vitalsHandle,
+              let uid = Auth.auth().currentUser?.uid else { return }
+        db.child("vitals/current/\(uid)").removeObserver(withHandle: handle)
+        vitalsHandle = nil
+    }
 
-    private func persistBLEVitalsIfNeeded(_ v: BLEVitals) {
+    // MARK: - BLE persistence → Firebase
+
+    private func persistVitalsIfNeeded(_ v: BLEVitals, source: String) {
         guard let hr = v.heartRate, hr > 0,
               let uid = Auth.auth().currentUser?.uid else { return }
 
-        let now = Date()
-        let ts  = now.timeIntervalSince1970 * 1000
-
+        let ts  = Date().timeIntervalSince1970 * 1000
         let data: [String: Any] = [
             "heartRate": hr,
-            "spo2":      v.spo2  ?? 0,
+            "spo2":      v.spo2    ?? 0,
             "glucose":   v.glucose ?? 0,
             "timestamp": ts,
-            "source":    "ble_direct"
+            "source":    source
         ]
 
-        // Siempre actualizar vitals/current (para que Dashboard lo muestre en vivo)
         db.child("vitals/current/\(uid)").setValue(data)
 
-        // Escribir en history máximo cada 30 segundos (evita saturar Firebase)
+        let now = Date()
         guard now.timeIntervalSince(lastFirebaseSave) >= 30 else { return }
         lastFirebaseSave = now
-        let key = "\(Int(ts))"
-        db.child("patients/\(uid)/history/\(key)").setValue(data)
-    }
-
-    private func stopWatchDataReading() {
-        guard let handle = vitalsHandle,
-              let userId = Auth.auth().currentUser?.uid else { return }
-        db.child("vitals/current/\(userId)").removeObserver(withHandle: handle)
-        vitalsHandle = nil
+        db.child("patients/\(uid)/history/\(Int(ts))").setValue(data)
     }
 
     deinit {
         guard let handle = vitalsHandle,
-              let userId = Auth.auth().currentUser?.uid else { return }
-        db.child("vitals/current/\(userId)").removeObserver(withHandle: handle)
+              let uid = Auth.auth().currentUser?.uid else { return }
+        db.child("vitals/current/\(uid)").removeObserver(withHandle: handle)
     }
 }
-
 #endif

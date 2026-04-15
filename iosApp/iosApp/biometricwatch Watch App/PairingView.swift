@@ -9,13 +9,14 @@ private let codeBlue = Color(red: 34/255, green: 95/255, blue: 255/255) // #225F
 
 struct PairingView: View {
     @State private var code: String = ""
-    @State private var status: String = ""
     @State private var secondsLeft: Int = 300
     @State private var isRegistering = true
+    @State private var registrationFailed = false
     @State private var countdownTimer: Timer? = nil
+    @State private var retryTimer: Timer? = nil   // timer de reintento (separado del countdown)
+    @State private var retryCount: Int = 0
 
     var body: some View {
-        // Tarjeta blanca (replica el "QR Code" frame del Figma)
         ZStack {
             Color.white.ignoresSafeArea()
 
@@ -28,23 +29,37 @@ struct PairingView: View {
 
                 Spacer()
 
-                // Spinner mientras registra, luego muestra el código
                 if isRegistering {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(Color(red: 34/255, green: 31/255, blue: 31/255))
-                        .scaleEffect(1.2)
+                    VStack(spacing: 6) {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(Color(red: 34/255, green: 31/255, blue: 31/255))
+                            .scaleEffect(1.2)
+                        if retryCount > 0 {
+                            Text("Reintentando…")
+                                .font(.system(size: 10))
+                                .foregroundColor(.gray)
+                        }
+                    }
                 } else {
-                    // Código en azul — "9 W E - 8 O P" style, size=24, weight=600
+                    // Código en azul — siempre el mismo hasta que expire
                     Text(formattedCode)
                         .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                        .foregroundColor(codeBlue)
+                        .foregroundColor(registrationFailed ? .gray : codeBlue)
                         .multilineTextAlignment(.center)
+
+                    if registrationFailed {
+                        Text("Sin conexión — usa este código de todos modos")
+                            .font(.system(size: 9))
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                            .padding(.top, 4)
+                    }
                 }
 
                 Spacer()
 
-                // "El código expira en 5 minutos" — size=14, color=(34,31,31)
                 Text(timeString)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(Color(red: 34/255, green: 31/255, blue: 31/255))
@@ -54,7 +69,10 @@ struct PairingView: View {
             .padding(.horizontal, 8)
         }
         .onAppear { startPairingFlow() }
-        .onDisappear { countdownTimer?.invalidate() }
+        .onDisappear {
+            cancelAllTimers()
+            PairingManager.shared.stopListening()
+        }
     }
 
     // MARK: - Código formateado: "9WE8OPXY" → "9 W E 8\nO P X Y"
@@ -77,41 +95,66 @@ struct PairingView: View {
     // MARK: - Flujo de emparejamiento
 
     private func startPairingFlow() {
-        countdownTimer?.invalidate()
-        secondsLeft   = 300
+        cancelAllTimers()
+        secondsLeft       = 300
+        isRegistering     = true
+        registrationFailed = false
+        retryCount        = 0
 
-        // Mostrar código inmediatamente, sin esperar a Firebase
-        let newCode = PairingManager.shared.generatePairingCode()
+        // Generar código nuevo solo si no hay uno vigente
+        let existing = PairingManager.shared.currentPairingCode
+        let useExisting = !existing.isEmpty && !PairingManager.shared.isCodeExpired()
+        let newCode = useExisting ? existing : PairingManager.shared.generatePairingCode()
         code = newCode
-        isRegistering = false
 
-        // Registrar en Firebase en background — si falla, reintenta sin tocar el countdown
-        registerInBackground(code: newCode, attempt: 1)
+        registerCode(newCode)
+        startCountdown()
+    }
 
-        // Countdown: solo regenera cuando llega a 0
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+    /// Registra el código en Firebase; en caso de fallo reintenta con el MISMO código
+    /// hasta un máximo de 5 intentos, luego muestra el código de todas formas.
+    private func registerCode(_ codeToRegister: String) {
+        PairingManager.shared.registerCodeInFirebase(code: codeToRegister) { success in
             DispatchQueue.main.async {
-                secondsLeft -= 1
-                if secondsLeft <= 0 { t.invalidate(); startPairingFlow() }
+                if success {
+                    isRegistering = false
+                    registrationFailed = false
+                    retryCount = 0
+                    listenForPairing(code: codeToRegister)
+                } else if retryCount < 4 {
+                    // Reintentar con el MISMO código — sin cambiar el display
+                    retryCount += 1
+                    retryTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { _ in
+                        registerCode(codeToRegister)
+                    }
+                } else {
+                    // Agotados los reintentos: mostrar código de todas formas
+                    // El usuario puede ingresarlo manualmente; la app iOS también
+                    // intenta leer de Firebase pero puede funcionar en modo offline.
+                    isRegistering = false
+                    registrationFailed = true
+                }
             }
         }
     }
 
-    private func registerInBackground(code: String, attempt: Int) {
-        PairingManager.shared.registerCodeInFirebase(code: code) { success in
+    private func startCountdown() {
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
             DispatchQueue.main.async {
-                if success {
-                    listenForPairing(code: code)
-                } else if attempt < 5 && self.code == code {
-                    // Reintento silencioso con backoff, sin regenerar código
-                    let delay = Double(attempt) * 4.0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                        guard self.code == code else { return }
-                        self.registerInBackground(code: code, attempt: attempt + 1)
-                    }
+                secondsLeft -= 1
+                if secondsLeft <= 0 {
+                    t.invalidate()
+                    startPairingFlow()   // código expiró → generar nuevo
                 }
             }
         }
+    }
+
+    private func cancelAllTimers() {
+        countdownTimer?.invalidate()
+        retryTimer?.invalidate()
+        countdownTimer = nil
+        retryTimer = nil
     }
 
     private func listenForPairing(code: String) {
