@@ -271,6 +271,42 @@ fun WearApp(
     val currentSpO2 by (vitalSignsService?.currentSpO2?.collectAsState() ?: remember { mutableStateOf(0) })
     val isSpO2Supported by (vitalSignsService?.isSpO2Supported?.collectAsState() ?: remember { mutableStateOf(true) })
     val activeSosId by (vitalSignsService?.activeSosId?.collectAsState() ?: remember { mutableStateOf(null) })
+    var lastObservedSosId by remember { mutableStateOf<String?>(null) }
+    var forcedSosSetAt by remember { mutableStateOf<Long?>(null) }
+    var dismissedSosId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(activeSosId) {
+        val previousSosId = lastObservedSosId
+        if (previousSosId != null && activeSosId == null) {
+            forcedSosId = null
+            forcedSosUserId = null
+            forcedSosSetAt = null
+        }
+        if (activeSosId != null && activeSosId != dismissedSosId) {
+            dismissedSosId = null
+        }
+        lastObservedSosId = activeSosId
+    }
+
+    LaunchedEffect(forcedSosId, activeSosId, forcedSosSetAt) {
+        val forcedId = forcedSosId ?: return@LaunchedEffect
+        val startedAt = forcedSosSetAt ?: return@LaunchedEffect
+
+        // If notification-opened SOS is not confirmed as active by the service shortly after,
+        // clear the forced state to avoid a stuck QR screen.
+        if (activeSosId == null && System.currentTimeMillis() - startedAt > 15_000L) {
+            forcedSosId = null
+            forcedSosUserId = null
+            forcedSosSetAt = null
+            return@LaunchedEffect
+        }
+
+        if (activeSosId != null && activeSosId != forcedId) {
+            forcedSosId = null
+            forcedSosUserId = null
+            forcedSosSetAt = null
+        }
+    }
 
     DisposableEffect(context) {
         val connection = object : ServiceConnection {
@@ -315,6 +351,7 @@ fun WearApp(
         if (openSosFromNotification) {
             forcedSosId = initialSosId
             forcedSosUserId = initialSosUserId
+            forcedSosSetAt = System.currentTimeMillis()
             onSosNotificationConsumed()
         }
     }
@@ -349,6 +386,9 @@ fun WearApp(
         context.stopService(intent)
     }
 
+    val currentSosDisplayId = activeSosId ?: forcedSosId
+    val shouldShowSosQr = currentSosDisplayId != null && currentSosDisplayId != dismissedSosId
+
     // UI
     VitalSenseWearTheme {
         Box(
@@ -379,13 +419,15 @@ fun WearApp(
                     anomalyType = activeEmergencyType,
                     expiresAt  = activeEmergencyExpires,
                 )
-            } else if (activeSosId != null || forcedSosId != null) {
+            } else if (shouldShowSosQr) {
                 SosQrScreen(
-                    sosId = activeSosId ?: forcedSosId.orEmpty(),
+                    sosId = currentSosDisplayId.orEmpty(),
                     userId = forcedSosUserId ?: (prefs.getString(KEY_USER_ID, "global") ?: "global"),
-                    onDismiss = {
+                    onDismiss = { dismissedId ->
+                        dismissedSosId = dismissedId
                         forcedSosId = null
                         forcedSosUserId = null
+                        forcedSosSetAt = null
                         vitalSignsService?.clearSos()
                     }
                 )
@@ -782,24 +824,25 @@ fun MonitoringScreen(
 fun SosQrScreen(
     sosId: String,
     userId: String,
-    onDismiss: () -> Unit,
+    onDismiss: (String) -> Unit,
 ) {
     val database = remember { FirebaseDatabase.getInstance("https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com") }
-    // El QR codifica userId + sosId para que el socorrista pueda ver los datos de la alerta
-    val qrData   = "vitalsense://sos/$userId/$sosId"
+    // QR web para abrir en cualquier camara/navegador sin app instalada
+    val qrData   = "https://vitalsenseai-1cb9f.web.app/emergency.html?u=$userId&s=$sosId"
     val qrBitmap = remember(qrData) { generateZxingQr(qrData) }
 
-    LaunchedEffect(sosId, userId) {
+    DisposableEffect(sosId, userId) {
         val ref = database.getReference("alerts").child(userId).child(sosId)
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (!snapshot.exists()) { onDismiss(); return }
+                if (!snapshot.exists()) { onDismiss(sosId); return }
                 val status = snapshot.child("status").getValue(String::class.java) ?: "active"
-                if (status == "resolved") onDismiss()
+                if (status != "active") onDismiss(sosId)
             }
             override fun onCancelled(error: DatabaseError) {}
         }
         ref.addValueEventListener(listener)
+        onDispose { ref.removeEventListener(listener) }
     }
 
     Box(
@@ -821,6 +864,14 @@ fun SosQrScreen(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text("Escanea para ayudar", color = Color.Black, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Cerrar",
+                color = Color(0xFF1565C0),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onDismiss(sosId) },
+            )
         }
     }
 }
@@ -839,8 +890,8 @@ fun EmergencyQrWearScreen(
     anomalyType: String,
     expiresAt: Long,
 ) {
-    val deepLink = "vitalsense://emergency/$tokenId"
-    val qrBitmap = remember(deepLink) { generateZxingQr(deepLink, size = 200) }
+    val webUrl = "https://vitalsenseai-1cb9f.web.app/emergency.html?t=$tokenId"
+    val qrBitmap = remember(webUrl) { generateZxingQr(webUrl, size = 200) }
 
     var secondsLeft by remember { mutableStateOf(((expiresAt - System.currentTimeMillis()) / 1000L).toInt().coerceAtLeast(0)) }
     LaunchedEffect(expiresAt) {

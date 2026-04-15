@@ -38,7 +38,6 @@ import com.google.firebase.database.ValueEventListener
 import mx.ita.vitalsense.HealthSensorApp
 import mx.ita.vitalsense.MainActivity
 import mx.ita.vitalsense.R
-import mx.ita.vitalsense.ui.theme.DashBlue
 
 private const val DB_URL = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com"
 
@@ -48,6 +47,7 @@ fun GlobalSosOverlay() {
     val userId = auth.currentUser?.uid ?: return
     val database = remember { FirebaseDatabase.getInstance(DB_URL) }
     val context = LocalContext.current
+    val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
 
     var activeSosId by rememberSaveable { mutableStateOf<String?>(null) }
     var sosLat by remember { mutableStateOf(0.0) }
@@ -89,16 +89,6 @@ fun GlobalSosOverlay() {
                 if (foundId != previousActiveId) {
                     dismissedSosId = null
                 }
-
-                if (!foundId.isNullOrBlank() && foundId != lastNotifiedSosId) {
-                    showLocalSosNotification(
-                        context = context,
-                        alertId = foundId,
-                        lat = foundLat,
-                        lng = foundLng,
-                    )
-                    lastNotifiedSosId = foundId
-                }
             }
             override fun onCancelled(error: DatabaseError) {}
         }
@@ -116,12 +106,12 @@ fun GlobalSosOverlay() {
                 Icon(
                     imageVector = Icons.Filled.Warning,
                     contentDescription = "Emergencia",
-                    tint = Color.Red
+                    tint = colorScheme.error
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = "¡EMERGENCIA SOS!",
-                    color = Color.Red,
+                    color = colorScheme.error,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -130,6 +120,7 @@ fun GlobalSosOverlay() {
         text = {
             Text(
                 text = "Se ha activado una alerta SOS desde el reloj por internet (sin Bluetooth).",
+                color = colorScheme.onSurface,
                 fontSize = 15.sp
             )
         },
@@ -150,9 +141,9 @@ fun GlobalSosOverlay() {
                             ),
                         )
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = DashBlue)
+                colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)
             ) {
-                Text("Finalizar SOS", color = Color.White)
+                Text("Finalizar SOS", color = colorScheme.onPrimary)
             }
         },
         dismissButton = {
@@ -167,7 +158,7 @@ fun GlobalSosOverlay() {
                             context.startActivity(mapIntent)
                         }
                     ) {
-                        Text("Abrir en Maps", color = DashBlue)
+                        Text("Abrir en Maps", color = colorScheme.primary)
                     }
                 }
 
@@ -181,51 +172,12 @@ fun GlobalSosOverlay() {
                             .setValue(true)
                     }
                 ) {
-                    Text("Cerrar", color = DashBlue)
+                    Text("Cerrar", color = colorScheme.primary)
                 }
             }
         },
-        containerColor = Color.White
+        containerColor = colorScheme.surface
     )
 }
 
-private fun showLocalSosNotification(
-    context: android.content.Context,
-    alertId: String,
-    lat: Double,
-    lng: Double,
-) {
-    val openIntent = Intent(context, MainActivity::class.java).apply {
-        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        putExtra("open_notifications", true)
-        putExtra("alert_id", alertId)
-        putExtra("alert_lat", lat)
-        putExtra("alert_lng", lng)
-    }
-    val pending = PendingIntent.getActivity(
-        context,
-        alertId.hashCode(),
-        openIntent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
-
-    val body = if (lat != 0.0 && lng != 0.0) {
-        "SOS detectado. Toca para ver detalles y abrir ubicacion en Google Maps."
-    } else {
-        "SOS detectado. Toca para abrir los detalles de la alerta."
-    }
-
-    val notification = NotificationCompat.Builder(context, HealthSensorApp.CHANNEL_ALERTS)
-        .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle("SOS desde el reloj")
-        .setContentText(body)
-        .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-        .setPriority(NotificationCompat.PRIORITY_MAX)
-        .setCategory(NotificationCompat.CATEGORY_ALARM)
-        .setContentIntent(pending)
-        .setAutoCancel(true)
-        .build()
-
-    val manager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as NotificationManager
-    manager.notify(alertId.hashCode(), notification)
-}
+// La notificación del SOS ahora la emite EmergencyListenerService en segundo plano.

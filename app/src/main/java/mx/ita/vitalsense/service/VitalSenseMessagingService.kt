@@ -5,11 +5,15 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.compose.ui.graphics.toArgb
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import mx.ita.vitalsense.HealthSensorApp
 import mx.ita.vitalsense.MainActivity
 import mx.ita.vitalsense.R
+import mx.ita.vitalsense.ui.theme.DashBlue
 
 /**
  * Servicio FCM: recibe push notifications desde Firebase Cloud Functions.
@@ -22,8 +26,14 @@ import mx.ita.vitalsense.R
 class VitalSenseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
-        // Aquí podrías guardar el token en Firebase para el tutor actual
-        // AuthRepository().saveDeviceToken(token)
+        FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
+            FirebaseDatabase.getInstance()
+                .getReference("patients/$uid/deviceToken")
+                .setValue(token)
+            FirebaseDatabase.getInstance()
+                .getReference("patients/$uid/deviceTokenUpdatedAt")
+                .setValue(System.currentTimeMillis())
+        }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -35,13 +45,19 @@ class VitalSenseMessagingService : FirebaseMessagingService() {
             ?: message.data["body"]
             ?: "Un paciente requiere atención"
 
-        val patientName = message.data["patientName"] ?: ""
-        showNotification(title, body, patientName)
+        val alertId = message.data["alertId"] ?: ""
+        val lat = message.data["lat"]?.toDoubleOrNull() ?: 0.0
+        val lng = message.data["lng"]?.toDoubleOrNull() ?: 0.0
+        showNotification(title, body, alertId, lat, lng)
     }
 
-    private fun showNotification(title: String, body: String, patientName: String) {
+    private fun showNotification(title: String, body: String, alertId: String, lat: Double, lng: Double) {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("open_notifications", true)
+            putExtra("alert_id", alertId)
+            putExtra("alert_lat", lat)
+            putExtra("alert_lng", lng)
         }
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
@@ -54,6 +70,8 @@ class VitalSenseMessagingService : FirebaseMessagingService() {
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setColor(DashBlue.toArgb())
+            .setColorized(true)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()

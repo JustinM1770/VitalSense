@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 import mx.ita.vitalsense.BuildConfig
 import mx.ita.vitalsense.MainActivity
 import mx.ita.vitalsense.R
+import mx.ita.vitalsense.data.ai.BioMetricMLEngine
 import mx.ita.vitalsense.data.model.Medication
 import mx.ita.vitalsense.data.model.SleepData
 import mx.ita.vitalsense.data.model.VitalsData
@@ -63,6 +64,7 @@ class ProactiveHealthWorker(
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+    private val bioMetricEngine by lazy { BioMetricMLEngine(ctx.applicationContext) }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val userId = auth.currentUser?.uid ?: return@withContext Result.success()
@@ -146,6 +148,7 @@ class ProactiveHealthWorker(
         val avgHr      = data.vitals.map { it.heartRate }.average()
         val avgGlucose = data.vitals.filter { it.glucose > 0 }.map { it.glucose }.average()
         val avgSpo2    = data.vitals.filter { it.spo2 > 0 }.map { it.spo2 }.average()
+        val minSpo2    = data.vitals.mapNotNull { it.spo2.takeIf { value -> value > 0 } }.minOrNull() ?: 95
         val avgSleepMinutes = data.sleep.filter { it.totalMinutes > 0 }.map { it.totalMinutes }.average()
         val avgSleepScore = data.sleep.filter { it.score > 0 }.map { it.score }.average()
 
@@ -177,6 +180,34 @@ class ProactiveHealthWorker(
         val medsText = if (data.medications.isEmpty()) "ninguno"
         else data.medications.joinToString(", ") { it.nombre }
 
+        val anomalyCount = data.vitals.count { it.heartRate > 100 || (it.spo2 in 1..93) || it.glucose > 140 }
+        val anomalyRate = anomalyCount.toFloat() / maxOf(data.vitals.size, 1).toFloat()
+        val localRisks = if (bioMetricEngine.isAvailable()) {
+            bioMetricEngine.predictRisks(
+                avgHr = avgHr.toFloat(),
+                anomalyRate = anomalyRate,
+                avgSpo2 = if (!avgSpo2.isNaN()) avgSpo2.toFloat() else 97f,
+                minSpo2 = minSpo2.toFloat(),
+                avgGlucose = if (!avgGlucose.isNaN()) avgGlucose.toFloat() else 100f,
+                maxGlucose = data.vitals.filter { it.glucose > 0 }.maxOfOrNull { it.glucose }?.toFloat() ?: 110f,
+                highHrNight = if (data.vitals.any { it.heartRate > 85 }) 1f else 0f,
+                hrTrend = if (hrTrend.contains("subiendo", ignoreCase = true)) 4f else if (hrTrend.contains("bajando", ignoreCase = true)) -4f else 0f,
+                glucoseTrend = if (glucoseTrend.contains("subiendo", ignoreCase = true)) 4f else if (glucoseTrend.contains("bajando", ignoreCase = true)) -4f else 0f,
+            )
+        } else {
+            floatArrayOf()
+        }
+
+        val localRiskSummary = if (localRisks.size == 6) {
+            val names = listOf("FA", "HTA", "CVD", "IC", "ARRITMIA", "DIABETES")
+            names.zip(localRisks.toList())
+                .sortedByDescending { it.second }
+                .take(3)
+                .joinToString("; ") { (name, prob) -> "$name=${"%.0f".format(prob * 100)}%" }
+        } else {
+            "motor local no disponible"
+        }
+
         val systemPrompt = """
             Eres un sistema de análisis preventivo de salud para adultos mayores.
             Tu misión es detectar patrones de riesgo para enfermedades crónicas
@@ -201,12 +232,14 @@ class ProactiveHealthWorker(
             - Prioriza tendencias sobre valores puntuales.
             - Mensajes en español, sin tecnicismos innecesarios.
             - El mensaje debe sugerir una acción preventiva concreta.
+            - Si se incluyen probabilidades de un modelo local, úsalas como contexto clínico complementario, no como diagnóstico definitivo.
         """.trimIndent()
 
         val userPrompt = buildString {
             appendLine("Paciente: ${data.nombre}, ${data.edad} años")
             if (data.padecimientos.isNotBlank()) appendLine("Padecimientos: ${data.padecimientos}")
             appendLine("Medicamentos activos: $medsText")
+            appendLine("Riesgo local BioMetric ML: $localRiskSummary")
             appendLine()
             appendLine("Promedios últimos 7 días (${data.vitals.size} lecturas):")
             if (!avgHr.isNaN())      appendLine("- FC promedio: ${"%.0f".format(avgHr)} BPM — tendencia: $hrTrend")
@@ -243,6 +276,9 @@ class ProactiveHealthWorker(
         }
 
         val apiKey  = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isBlank()) {
+            return localRiskFallback(data, avgHr, avgGlucose, avgSpo2, localRisks)
+        }
         val url     = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey"
         val request = Request.Builder()
             .url(url)
@@ -279,6 +315,43 @@ class ProactiveHealthWorker(
                 categoria = json.optString("categoria","general"),
             )
         }.getOrNull()
+    }
+
+    private fun localRiskFallback(
+        data: HealthSummary,
+        avgHr: Double,
+        avgGlucose: Double,
+        avgSpo2: Double,
+        localRisks: FloatArray,
+    ): GeminiInsight? {
+        if (localRisks.size != 6) return null
+
+        val names = listOf("FA", "HTA", "CVD", "IC", "ARRITMIA", "DIABETES")
+        val top = names.zip(localRisks.toList()).maxByOrNull { it.second } ?: return null
+        val label = when (top.first) {
+            "FA" -> "Riesgo de fibrilación auricular"
+            "HTA" -> "Riesgo de hipertensión"
+            "CVD" -> "Riesgo cardiovascular"
+            "IC" -> "Riesgo de insuficiencia cardíaca"
+            "ARRITMIA" -> "Riesgo de arritmia"
+            else -> "Riesgo de diabetes"
+        }
+
+        val message = buildString {
+            append("Modelo local detecta $label ")
+            append("(${"%.0f".format(top.second * 100)}%). ")
+            append("FC ${"%.0f".format(avgHr)} BPM, SpO₂ ${"%.0f".format(avgSpo2)}%, glucosa ${"%.0f".format(avgGlucose)} mg/dL. ")
+            append("Revisar con el médico si persiste o empeora.")
+        }
+
+        return GeminiInsight(
+            titulo = "Análisis preventivo local",
+            mensaje = message,
+            categoria = when (top.first) {
+                "FA", "HTA", "CVD", "IC", "ARRITMIA" -> "corazon"
+                else -> "glucosa"
+            },
+        )
     }
 
     // ── Notificación ─────────────────────────────────────────────────────────

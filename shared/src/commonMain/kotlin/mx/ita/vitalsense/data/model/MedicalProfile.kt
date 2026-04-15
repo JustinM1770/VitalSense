@@ -25,6 +25,8 @@ data class MedicalProfile(
     val apellidos:         String = "",
     val curp:              String = "",
     val fechaNacimiento:   String = "",
+        val nacimiento:        String = "",
+        val genero:            String = "",
     val tipoSangre:        String = "",   // BloodType.label
     val alergias:          String = "",
     val padecimientos:     String = "",

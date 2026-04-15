@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.android.image.cropper)
     implementation(libs.coil.compose)
     implementation(libs.work.runtime.ktx)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

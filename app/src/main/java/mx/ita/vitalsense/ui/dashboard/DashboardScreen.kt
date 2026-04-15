@@ -641,6 +641,7 @@ private fun UserHeader(
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     // Dynamic badge: check Firebase for unread alerts
     var hasUnread by remember { mutableStateOf(false) }
     val auth = FirebaseAuth.getInstance()
@@ -697,8 +698,8 @@ private fun UserHeader(
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(stringResource(R.string.dashboard_welcome), color = TextGray, fontSize = 14.sp, fontFamily = Manrope)
-            Text(name, color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
+            Text(stringResource(R.string.dashboard_welcome), color = colorScheme.onSurfaceVariant, fontSize = 14.sp, fontFamily = Manrope)
+            Text(name, color = colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
         }
 
         // Campana de notificaciones con punto rojo
@@ -706,14 +707,14 @@ private fun UserHeader(
             Surface(
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(16.dp),
-                color = Color.White,
+                color = colorScheme.surface,
                 shadowElevation = 2.dp
             ) {
                 Icon(
                     Icons.Filled.Notifications,
                     contentDescription = stringResource(R.string.dashboard_notifications),
                     modifier = Modifier.padding(12.dp),
-                    tint = TextDark
+                    tint = colorScheme.onSurface
                 )
             }
             // Red dot
@@ -876,12 +877,13 @@ private fun WatchStatusCard(
 
 @Composable
 private fun SectionHeader(title: String, showArrow: Boolean = false, onClick: (() -> Unit)? = null) {
+    val colorScheme = MaterialTheme.colorScheme
     val rowModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     Row(modifier = rowModifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
+        Text(title, color = colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = Manrope)
         if (showArrow) {
             Spacer(Modifier.width(8.dp))
-            Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp), tint = TextDark)
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, modifier = Modifier.size(16.dp), tint = colorScheme.onSurface)
         }
     }
 }

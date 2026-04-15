@@ -14,14 +14,109 @@
  *   twilio.account_sid   = "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
  *   twilio.auth_token    = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
  *   twilio.from_number   = "+1XXXXXXXXXX"   (número Twilio verificado)
+ *
+ * Variables opcionales:
+ *   twilio.whatsapp_from = "whatsapp:+14155238886" (sender habilitado para WhatsApp)
  */
 
 const functions = require("firebase-functions");
+const admin = require("firebase-admin");
 const twilio    = require("twilio");
 const admin     = require("firebase-admin");
 const crypto    = require("crypto");
 
 admin.initializeApp();
+
+admin.initializeApp();
+
+function normalizePhone(input) {
+  const value = String(input || "").trim();
+  if (!value) return "";
+  if (value.startsWith("+")) return value;
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  return `+${digits}`;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildContactList({ contacts, toPhone }) {
+  const incoming = Array.isArray(contacts) ? contacts : [];
+  const normalized = incoming
+    .map((c, idx) => ({
+      name: c && c.name ? String(c.name).trim() : `Contacto ${idx + 1}`,
+      phone: normalizePhone(c && c.phone),
+    }))
+    .filter((c) => c.phone);
+
+  const fallback = normalizePhone(toPhone);
+  if (fallback && !normalized.some((c) => c.phone === fallback)) {
+    normalized.unshift({ name: "Contacto principal", phone: fallback });
+  }
+
+  const seen = new Set();
+  return normalized.filter((c) => {
+    if (seen.has(c.phone)) return false;
+    seen.add(c.phone);
+    return true;
+  });
+}
+
+async function callWithFallback({ client, fromNumber, twiml, contactList, retryWaitSecs }) {
+  const pollEveryMs = 3_000;
+  const waitMs = Math.max(8, Number(retryWaitSecs) || 18) * 1_000;
+  const attempts = [];
+
+  for (const contact of contactList) {
+    const call = await client.calls.create({
+      twiml,
+      to: contact.phone,
+      from: fromNumber,
+    });
+
+    const startedAt = Date.now();
+    let finalStatus = call.status || "queued";
+    let answered = false;
+
+    while (Date.now() - startedAt < waitMs) {
+      await sleep(pollEveryMs);
+      const refreshed = await client.calls(call.sid).fetch();
+      finalStatus = refreshed.status || finalStatus;
+
+      if (finalStatus === "in-progress" || finalStatus === "completed") {
+        answered = true;
+        break;
+      }
+
+      if (["busy", "failed", "no-answer", "canceled"].includes(finalStatus)) {
+        break;
+      }
+    }
+
+    if (!answered && ["queued", "ringing", "initiated"].includes(finalStatus)) {
+      await client.calls(call.sid)
+        .update({ status: "completed" })
+        .catch(() => null);
+      finalStatus = "timeout";
+    }
+
+    attempts.push({
+      name: contact.name,
+      phone: contact.phone,
+      sid: call.sid,
+      status: finalStatus,
+      answered,
+    });
+
+    if (answered) {
+      return { answered: true, attempts, answeredBy: contact.phone };
+    }
+  }
+
+  return { answered: false, attempts, answeredBy: null };
+}
 
 // ─── Handler principal ────────────────────────────────────────────────────────
 
@@ -94,21 +189,30 @@ exports.triggerEmergencyCall = functions.https.onRequest(async (req, res) => {
     anomalyType  = "anomalía crítica",
     heartRate    = 0,
     pin          = "0000",
+    webUrl,
     lat          = 0,
     lng          = 0,
     toPhone,
+    contacts,
+    retryWaitSecs = 18,
   } = req.body;
-
-  if (!toPhone) {
-    return res.status(400).json({ error: "toPhone es requerido" });
-  }
 
   // Leer configuración de Twilio
   const cfg           = functions.config().twilio;
   const accountSid    = cfg.account_sid;
   const authToken     = cfg.auth_token;
   const fromNumber    = cfg.from_number;
+  const whatsappFrom  = cfg.whatsapp_from || `whatsapp:${fromNumber}`;
   const client        = twilio(accountSid, authToken);
+  const contactList   = buildContactList({ contacts, toPhone });
+
+  if (!accountSid || !authToken || !fromNumber) {
+    return res.status(500).json({ error: "Configuración Twilio incompleta" });
+  }
+
+  if (!contactList.length) {
+    return res.status(400).json({ error: "No hay contactos de emergencia válidos" });
+  }
 
   // Formatear PIN para texto a voz: "2324" → "2, 3, 2, 4"
   const pinSpoken = pin.split("").join(", ");
@@ -137,17 +241,127 @@ exports.triggerEmergencyCall = functions.https.onRequest(async (req, res) => {
   </Repeat>
 </Response>`;
 
-  try {
-    const call = await client.calls.create({
-      twiml,
-      to:   toPhone,
-      from: fromNumber,
-    });
+  const emergencyUrl = webUrl || `https://vitalsenseai-1cb9f.web.app/emergency.html?t=${tokenId}`;
+  const textMessage = [
+    "Alerta VitalSense BioMetric.",
+    `${patientName} presenta ${anomalyType}.`,
+    `FC: ${heartRate} BPM.`,
+    `PIN de acceso: ${pin}.`,
+    `Abrir ficha de emergencia: ${emergencyUrl}`,
+  ].join(" ");
 
-    console.log(`[EmergencyCall] tokenId=${tokenId} callSid=${call.sid} to=${toPhone}`);
-    return res.status(200).json({ success: true, callSid: call.sid });
+  try {
+    const channels = {
+      call: null,
+      sms: null,
+      whatsapp: null,
+    };
+
+    // 1) Llamada de voz (comportamiento existente)
+    const voiceResult = await callWithFallback({
+      client,
+      fromNumber,
+      twiml,
+      contactList,
+      retryWaitSecs,
+    });
+    channels.call = voiceResult;
+
+    // 2) SMS con PIN + URL a todos los contactos
+    channels.sms = await Promise.all(
+      contactList.map((contact) =>
+        client.messages.create({
+          body: textMessage,
+          to: contact.phone,
+          from: fromNumber,
+        }).then((msg) => ({
+          sid: msg.sid,
+          to: contact.phone,
+          status: msg.status,
+        }))
+      )
+    );
+
+    // 3) WhatsApp con PIN + URL a todos los contactos (si el sender está habilitado)
+    channels.whatsapp = await Promise.all(
+      contactList.map(async (contact) => {
+        try {
+          const wa = await client.messages.create({
+            body: textMessage,
+            to: `whatsapp:${contact.phone}`,
+            from: whatsappFrom,
+          });
+          return { sid: wa.sid, to: contact.phone, status: wa.status };
+        } catch (waErr) {
+          console.warn(`[EmergencyCall] WhatsApp no enviado a ${contact.phone}: ${waErr.message}`);
+          return { sid: null, to: contact.phone, status: "failed", error: waErr.message };
+        }
+      })
+    );
+
+    console.log(
+      `[EmergencyCall] tokenId=${tokenId} answered=${channels.call.answered} answeredBy=${channels.call.answeredBy || "none"} sms=${channels.sms.length} wa=${channels.whatsapp.length}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      channels: {
+        call: channels.call,
+        sms: channels.sms,
+        whatsapp: channels.whatsapp,
+      },
+    });
   } catch (err) {
     console.error("[EmergencyCall] Twilio error:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });
+
+exports.notifySosCreated = functions.database
+  .ref("/alerts/{uid}/{sosId}")
+  .onCreate(async (snapshot, context) => {
+    const uid = context.params.uid;
+    const sosId = context.params.sosId;
+    const alert = snapshot.val() || {};
+
+    if (alert.type !== "SOS") {
+      return null;
+    }
+
+    const tokenSnap = await admin.database().ref(`patients/${uid}/deviceToken`).get();
+    const deviceToken = tokenSnap.val();
+    if (!deviceToken) {
+      console.log(`[notifySosCreated] No deviceToken for uid=${uid}`);
+      return null;
+    }
+
+    const title = "¡EMERGENCIA SOS!";
+    const body = alert.lat && alert.lng
+      ? `Se activó una alerta SOS con ubicación disponible.`
+      : `Se activó una alerta SOS desde el reloj.`;
+
+    await admin.messaging().send({
+      token: deviceToken,
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        alertId: sosId,
+        lat: String(alert.lat || 0),
+        lng: String(alert.lng || 0),
+        title,
+        body,
+        open_notifications: "true",
+      },
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "vital_alerts",
+        },
+      },
+    });
+
+    console.log(`[notifySosCreated] Push sent uid=${uid} sosId=${sosId}`);
+    return null;
+  });

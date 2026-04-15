@@ -66,7 +66,7 @@ fun SplashScreen(
     // Check auth + biometric, then navigate
     LaunchedEffect(Unit) {
         visible = true
-        delay(2000)
+        delay(350)
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser == null) {
             onNavigateToOnboarding()
@@ -164,11 +164,10 @@ fun SplashScreen(
             modifier = Modifier.alpha(alpha)
         ) {
             Image(
-                painter = painterResource(R.drawable.icono),
+                painter = painterResource(R.drawable.ic_logo_eye),
                 contentDescription = "BioMetric AI Logo",
                 modifier = Modifier
-                    .fillMaxWidth(0.72f)
-                    .height(120.dp),
+                    .size(138.dp),
                 contentScale = ContentScale.Fit,
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -177,7 +176,7 @@ fun SplashScreen(
                     withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)) {
                         append("BioMetric")
                     }
-                    withStyle(style = SpanStyle(color = Color(0xFF1169FF), fontWeight = FontWeight.Bold)) {
+                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                         append(" AI")
                     }
                 },

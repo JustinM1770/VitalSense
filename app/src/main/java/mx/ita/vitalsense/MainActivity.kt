@@ -14,7 +14,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
@@ -22,10 +22,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
 import mx.ita.vitalsense.data.ble.FreestyleLibreReader
 import mx.ita.vitalsense.data.health.HealthConnectRepository
 import mx.ita.vitalsense.settings.AppSettings
+import mx.ita.vitalsense.service.EmergencyListenerService
 import mx.ita.vitalsense.ui.health.HealthConnectViewModel
 import mx.ita.vitalsense.ui.navigation.AppNavigation
 import mx.ita.vitalsense.ui.theme.VitalSenseTheme
@@ -44,6 +46,13 @@ class MainActivity : AppCompatActivity() {
     var pendingMedicationOpen by mutableStateOf(false)
         private set
     private val libreReader by lazy { FreestyleLibreReader(this) }
+    private val auth by lazy { FirebaseAuth.getInstance() }
+    private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        firebaseAuth.currentUser?.uid?.let { uid ->
+            syncPushToken(uid)
+            startEmergencyListener(uid)
+        } ?: stopEmergencyListener()
+    }
 
     // Use the official Health Connect permission contract
     private val hcPermissionLauncher = registerForActivityResult(
@@ -54,8 +63,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppSettings.applySavedPreferences(this)
-        installSplashScreen()
         super.onCreate(savedInstanceState)
+        auth.addAuthStateListener(authListener)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             val themeMode by AppSettings.themeFlow.collectAsState()
@@ -89,6 +98,17 @@ class MainActivity : AppCompatActivity() {
             && savedInstanceState == null) {
             requestHealthConnectPermissionsIfNeeded()
         }
+
+        auth.currentUser?.uid?.let { uid ->
+            syncPushToken(uid)
+            startEmergencyListener(uid)
+        }
+    }
+
+    override fun onDestroy() {
+        stopEmergencyListener()
+        auth.removeAuthStateListener(authListener)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -186,5 +206,30 @@ class MainActivity : AppCompatActivity() {
             .apply()
 
         Toast.makeText(this, "Glucosa NFC: ${"%.0f".format(glucoseMgDl)} mg/dL", Toast.LENGTH_LONG).show()
+    }
+
+    private fun syncPushToken(uid: String) {
+        if (uid.isBlank()) return
+        FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                FirebaseDatabase.getInstance()
+                    .getReference("patients/$uid/deviceToken")
+                    .setValue(token)
+                FirebaseDatabase.getInstance()
+                    .getReference("patients/$uid/deviceTokenUpdatedAt")
+                    .setValue(System.currentTimeMillis())
+            }
+    }
+
+    private fun startEmergencyListener(uid: String) {
+        if (uid.isBlank()) return
+        val intent = Intent(this, EmergencyListenerService::class.java).apply {
+            putExtra(EmergencyListenerService.EXTRA_USER_ID, uid)
+        }
+        ContextCompat.startForegroundService(this, intent)
+    }
+
+    private fun stopEmergencyListener() {
+        stopService(Intent(this, EmergencyListenerService::class.java))
     }
 }

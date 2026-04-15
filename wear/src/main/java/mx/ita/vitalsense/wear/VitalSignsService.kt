@@ -22,6 +22,8 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.*
@@ -68,6 +70,8 @@ class VitalSignsService : Service() {
     private var keepAliveJob: Job? = null
     private var activeSosRef: DatabaseReference? = null
     private var activeSosListener: ValueEventListener? = null
+    private var directSosRef: DatabaseReference? = null
+    private var directSosListener: ValueEventListener? = null
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var shakeDetector: ShakeDetector? = null
@@ -341,6 +345,7 @@ class VitalSignsService : Service() {
     private fun observeActiveSosState(userId: String) {
         if (userId.isBlank()) {
             _activeSosId.value = null
+            clearDirectSosObserver()
             return
         }
 
@@ -355,12 +360,17 @@ class VitalSignsService : Service() {
                 for (child in snapshot.children) {
                     val status = child.child("status").getValue(String::class.java) ?: ""
                     val type = child.child("type").getValue(String::class.java) ?: ""
-                    if (type == "SOS" && status != "resolved") {
+                    if (type == "SOS" && status == "active") {
                         foundId = child.key
                         break
                     }
                 }
                 _activeSosId.value = foundId
+                if (foundId == null) {
+                    clearDirectSosObserver()
+                } else {
+                    observeDirectSos(userId, foundId)
+                }
             }
 
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
@@ -369,6 +379,45 @@ class VitalSignsService : Service() {
         activeSosRef = ref
         activeSosListener = listener
         ref.addValueEventListener(listener)
+    }
+
+    private fun observeDirectSos(userId: String, sosId: String) {
+        if (userId.isBlank() || sosId.isBlank()) return
+
+        val sameTarget = directSosRef?.key == sosId && directSosRef?.parent?.key == userId
+        if (sameTarget) return
+
+        clearDirectSosObserver()
+
+        val ref = database.getReference("alerts").child(userId).child(sosId)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) {
+                    _activeSosId.value = null
+                    clearDirectSosObserver()
+                    return
+                }
+                val status = snapshot.child("status").getValue(String::class.java) ?: "active"
+                if (status != "active") {
+                    _activeSosId.value = null
+                    clearDirectSosObserver()
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {}
+        }
+
+        directSosRef = ref
+        directSosListener = listener
+        ref.addValueEventListener(listener)
+    }
+
+    private fun clearDirectSosObserver() {
+        directSosListener?.let { listener ->
+            directSosRef?.removeEventListener(listener)
+        }
+        directSosRef = null
+        directSosListener = null
     }
 
     private suspend fun hasBlockingEmergency(userId: String): Boolean {
@@ -382,7 +431,7 @@ class VitalSignsService : Service() {
         for (child in alertsSnapshot.children) {
             val status = child.child("status").getValue(String::class.java) ?: ""
             val type = child.child("type").getValue(String::class.java) ?: ""
-            if (type == "SOS" && status != "resolved") {
+            if (type == "SOS" && status == "active") {
                 _activeSosId.value = child.key
                 return true
             }
@@ -604,6 +653,7 @@ class VitalSignsService : Service() {
         val alertRef = database.getReference("alerts").child(remoteUid).push()
         val sosId = alertRef.key ?: System.currentTimeMillis().toString()
         _activeSosId.value = sosId
+        observeDirectSos(remoteUid, sosId)
         alertRef.setValue(
             mapOf(
                 "timestamp" to System.currentTimeMillis(),
@@ -694,5 +744,6 @@ class VitalSignsService : Service() {
 
     fun clearSos() {
         _activeSosId.value = null
+        clearDirectSosObserver()
     }
 }

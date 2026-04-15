@@ -2,602 +2,857 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>BioMetric AI — Ficha de Emergencia</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VitalSense - Ficha Clinica de Emergencia</title>
   <style>
     :root {
-      --navy:       #0A2540;
-      --blue:       #1169FF;
-      --blue-dark:  #225FFF;
-      --blue-light: #E5EBFF;
-      --teal:       #52A2C4;
-      --cyan:       #93EDFC;
-      --green:      #34A853;
-      --red:        #EB4B62;
-      --red-soft:   #FDE8E8;
-      --amber:      #FFB300;
-      --amber-soft: #FFF8E1;
-      --text:       #040415;
-      --text-nav:   #03314B;
-      --text-sub:   #8C8C8C;
-      --border:     #EFEFEF;
-      --bg:         #F4F7FF;
-      --white:      #FFFFFF;
+      --bg: #e8ebf2;
+      --hero-start: #173f95;
+      --hero-end: #2d66f4;
+      --card: #ffffff;
+      --text: #1d2b4f;
+      --muted: #6f7b99;
+      --line: #d8deef;
+      --warn-bg: #f8efd5;
+      --warn-border: #edd8a4;
+      --warn-text: #8b6613;
+      --primary: #2463ea;
+      --primary-dark: #1d52c1;
+      --error: #cf2f48;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       background: var(--bg);
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
       color: var(--text);
+      min-height: 100vh;
     }
 
-    /* ── Screens ──────────────────────────────────────── */
-    .screen { display: none; min-height: 100vh; }
-    .screen.active { display: flex; }
-
-    /* ── Loading ──────────────────────────────────────── */
-    #s-loading {
+    .loading-screen,
+    .error-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex-direction: column;
-      align-items: center; justify-content: center; gap: 20px;
-      background: linear-gradient(160deg, var(--navy), var(--blue-dark));
+      gap: 14px;
+      text-align: center;
+      padding: 24px;
+      color: white;
+      background: linear-gradient(145deg, #11357d, #2a63f0);
     }
+
     .spinner {
-      width: 44px; height: 44px;
-      border: 3px solid rgba(255,255,255,.18);
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(255, 255, 255, 0.28);
       border-top-color: #fff;
       border-radius: 50%;
-      animation: spin .8s linear infinite;
+      animation: spin .9s linear infinite;
     }
+
     @keyframes spin { to { transform: rotate(360deg); } }
-    #s-loading p     { color: #fff; font-size: 14px; font-weight: 600; letter-spacing: .2px; }
-    #s-loading small { color: rgba(255,255,255,.45); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
 
-    /* ── Error ────────────────────────────────────────── */
-    #s-error {
-      flex-direction: column;
-      align-items: center; justify-content: center; gap: 12px;
-      background: var(--bg); padding: 32px; text-align: center;
+    .page {
+      display: none;
+      min-height: 100vh;
     }
-    .err-icon {
-      width: 56px; height: 56px; border-radius: 50%;
-      background: var(--red-soft);
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 4px;
-    }
-    .err-icon svg { width: 26px; height: 26px; stroke: var(--red); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    #s-error h2 { font-size: 18px; font-weight: 700; color: var(--text-nav); }
-    #s-error p  { font-size: 13px; color: var(--text-sub); max-width: 300px; line-height: 1.65; }
 
-    /* ── Main ─────────────────────────────────────────── */
-    #s-main { flex-direction: column; animation: fadeIn .3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* ─ Header ───────────────────────────────────────── */
-    .header {
-      background: linear-gradient(160deg, var(--navy) 0%, var(--blue-dark) 55%, var(--blue) 100%);
-      padding: 44px 24px 28px;
-      text-align: center;
+    .hero {
+      background: radial-gradient(1200px 300px at 20% 0%, rgba(255, 255, 255, 0.2), transparent 45%),
+                  linear-gradient(135deg, var(--hero-start), var(--hero-end));
       color: #fff;
+      padding: 42px 20px 24px;
+      text-align: center;
+      box-shadow: 0 12px 30px rgba(13, 45, 129, 0.28);
     }
 
     .brand {
-      display: inline-flex; align-items: center; gap: 8px;
-      margin-bottom: 22px;
-    }
-    .brand-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--cyan);
-    }
-    .brand-name {
-      font-size: 10px; font-weight: 800;
-      letter-spacing: 2.5px; color: rgba(255,255,255,.65);
+      font-size: 11px;
+      letter-spacing: 3px;
       text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.74);
+      margin-bottom: 18px;
+      font-weight: 700;
     }
 
     .avatar {
-      width: 64px; height: 64px; border-radius: 50%;
-      background: rgba(255,255,255,.12);
-      border: 2px solid rgba(255,255,255,.28);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; font-weight: 800;
-      margin: 0 auto 14px; letter-spacing: -1px;
-      color: #fff;
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 10px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(6px);
     }
 
     .patient-name {
-      font-size: 20px; font-weight: 700; margin-bottom: 14px; letter-spacing: -.3px;
+      font-size: 33px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      margin-bottom: 18px;
     }
 
-    .pills {
-      display: flex; gap: 8px;
-      justify-content: center; flex-wrap: wrap;
-      margin-bottom: 20px;
-    }
-    .pill {
-      border-radius: 30px; padding: 5px 14px;
-      font-size: 12px; font-weight: 600;
-      background: rgba(255,255,255,.14);
-      color: #fff;
-    }
-    .pill.blood {
-      background: var(--white); color: var(--red);
-      font-size: 14px; font-weight: 800; padding: 4px 16px;
-    }
-    .pill.alert-type {
-      background: rgba(235,75,98,.22);
-      border: 1px solid rgba(235,75,98,.4);
-      font-size: 11px;
-    }
-
-    /* Vitals strip */
     .vitals {
-      display: flex;
-      background: rgba(255,255,255,.08);
-      border-radius: 12px; overflow: hidden;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
     }
-    .v { flex: 1; padding: 10px 6px; text-align: center;
-         border-right: 1px solid rgba(255,255,255,.08); }
-    .v:last-child { border-right: none; }
-    .v-val { font-size: 18px; font-weight: 800; }
-    .v-lbl { font-size: 9px; opacity: .5; font-weight: 600; margin-top: 3px; letter-spacing: .4px; text-transform: uppercase; }
 
-    /* ─ Body ──────────────────────────────────────────── */
-    .body { padding: 16px; max-width: 520px; margin: 0 auto; width: 100%; }
+    .vital {
+      padding: 12px 8px;
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
+    }
 
-    /* ─ Card base ─────────────────────────────────────── */
+    .vital:last-child { border-right: none; }
+
+    .vital-value {
+      display: block;
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .vital-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: rgba(255, 255, 255, 0.64);
+      font-weight: 600;
+    }
+
+    .container {
+      width: min(880px, 100% - 24px);
+      margin: 14px auto 26px;
+    }
+
     .card {
-      background: var(--white);
+      background: var(--card);
       border-radius: 14px;
-      padding: 16px 18px;
+      padding: 16px;
+      box-shadow: 0 7px 24px rgba(16, 30, 77, 0.08);
+      border: 1px solid transparent;
       margin-bottom: 10px;
-      box-shadow: 0 1px 8px rgba(4,4,21,.05);
-    }
-    .card-label {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 10px; font-weight: 700;
-      color: var(--text-sub); text-transform: uppercase;
-      letter-spacing: .8px; margin-bottom: 8px;
-    }
-    .card-label svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-    .card-value {
-      font-size: 14px; color: var(--text); font-weight: 500; line-height: 1.7;
     }
 
-    /* ─ Public data card ──────────────────────────────── */
-    .public-card {
-      background: var(--amber-soft);
-      border: 1px solid rgba(255,179,0,.3);
-      border-radius: 14px;
-      padding: 16px 18px;
-      margin-bottom: 10px;
+    .warn {
+      background: var(--warn-bg);
+      border-color: var(--warn-border);
+      color: var(--warn-text);
     }
-    .public-card .section-header {
-      display: flex; align-items: center; gap: 8px;
+
+    .title {
+      font-size: 19px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .pin-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .pin-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
       margin-bottom: 12px;
     }
-    .public-card .section-header svg { width: 15px; height: 15px; stroke: #8D6E00; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .public-card .section-title { font-size: 11px; font-weight: 700; color: #8D6E00; text-transform: uppercase; letter-spacing: .8px; }
 
-    .public-row {
-      display: flex; gap: 12px; align-items: flex-start;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255,179,0,.18);
-    }
-    .public-row:last-of-type { border-bottom: none; }
-
-    .pub-icon-wrap {
-      width: 30px; height: 30px; border-radius: 8px;
-      background: rgba(255,179,0,.2);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; margin-top: 1px;
-    }
-    .pub-icon-wrap svg { width: 15px; height: 15px; stroke: #8D6E00; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-    .pub-inner .pub-lbl {
-      font-size: 10px; font-weight: 700; color: #8D6E00;
-      text-transform: uppercase; letter-spacing: .5px;
-    }
-    .pub-inner .pub-val {
-      font-size: 14px; color: var(--text-nav); font-weight: 500; margin-top: 2px; line-height: 1.55;
-    }
-    .public-note {
-      font-size: 10px; color: #8D6E00; margin-top: 12px;
-      padding-top: 10px; border-top: 1px solid rgba(255,179,0,.18);
-      line-height: 1.6; font-weight: 500;
+    .pin-box {
+      width: 52px;
+      height: 56px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #f4f6fb;
+      font-size: 28px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      transition: border-color .2s ease, box-shadow .2s ease;
     }
 
-    /* ─ PIN card ──────────────────────────────────────── */
-    .pin-card {
-      background: var(--white);
-      border-radius: 14px;
-      padding: 18px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 8px rgba(4,4,21,.05);
-      border-top: 3px solid var(--blue);
+    .pin-box.active {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(36, 99, 234, 0.14);
     }
 
-    .pin-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .pin-header svg { width: 16px; height: 16px; stroke: var(--blue); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .pin-title { font-size: 14px; font-weight: 700; color: var(--text-nav); }
-    .pin-sub {
-      font-size: 12px; color: var(--text-sub);
-      margin-bottom: 20px; line-height: 1.6; margin-top: 4px;
+    .pin-hidden {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 1px;
+      height: 1px;
     }
-    .pin-sub strong { color: var(--blue); font-weight: 600; }
 
-    .digit-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; }
-    .digit-box {
-      width: 56px; height: 64px;
-      border: 2px solid var(--border); border-radius: 12px;
-      font-size: 26px; font-weight: 700; text-align: center;
-      color: var(--text); background: var(--bg);
-      outline: none; transition: border-color .15s, background .15s;
-      -moz-appearance: textfield;
-      font-family: 'Manrope', sans-serif;
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 11px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 13px 14px;
+      cursor: pointer;
+      transition: background .2s ease;
     }
-    .digit-box::-webkit-inner-spin-button,
-    .digit-box::-webkit-outer-spin-button { -webkit-appearance: none; }
-    .digit-box:focus  { border-color: var(--blue); background: var(--white); }
-    .digit-box.filled { border-color: var(--blue); background: var(--blue-light); }
-    .digit-box.shake  { animation: shake .32s ease; }
-    @keyframes shake {
-      0%,100% { transform: translateX(0); }
-      20%     { transform: translateX(-5px); }
-      40%     { transform: translateX(5px); }
-      60%     { transform: translateX(-3px); }
-      80%     { transform: translateX(3px); }
-    }
+
+    .btn:hover { background: var(--primary-dark); }
+    .btn:disabled { background: #9cb4ef; cursor: not-allowed; }
 
     .pin-error {
-      color: var(--red); font-size: 12px; font-weight: 600;
-      min-height: 16px; opacity: 0; transition: opacity .2s;
-      text-align: center; margin-bottom: 6px;
-    }
-    .pin-error.visible { opacity: 1; }
-    .pin-attempts { font-size: 11px; color: var(--text-sub); text-align: center; margin-bottom: 12px; }
-
-    .pin-btn {
-      width: 100%; background: var(--blue); color: #fff;
-      border: none; border-radius: 12px; padding: 15px;
-      font-size: 14px; font-weight: 700; cursor: pointer;
-      transition: background .15s, transform .08s;
-      font-family: 'Manrope', sans-serif;
-      letter-spacing: .2px;
-    }
-    .pin-btn:hover:not(:disabled)  { background: var(--blue-dark); transform: translateY(-1px); }
-    .pin-btn:active:not(:disabled) { transform: translateY(0); }
-    .pin-btn:disabled { background: #C8D0E0; cursor: default; }
-
-    /* ─ Full record ───────────────────────────────────── */
-    #full-record { display: none; }
-    .card.alert-card {
-      border-left: 3px solid var(--red);
-      background: var(--red-soft);
+      display: none;
+      margin-top: 8px;
+      color: var(--error);
+      font-size: 13px;
+      font-weight: 600;
     }
 
-    /* Action buttons */
-    .action-btn {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      border-radius: 12px; padding: 15px; text-decoration: none;
-      font-weight: 700; font-size: 14px; margin-bottom: 10px;
-      transition: filter .12s; letter-spacing: .1px;
-      font-family: 'Manrope', sans-serif;
+    .attempts {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
     }
-    .action-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-    .action-btn:hover { filter: brightness(1.08); }
-    .action-btn.green { background: var(--green); color: #fff; box-shadow: 0 4px 14px rgba(52,168,83,.25); }
-    .action-btn.blue  { background: var(--blue);  color: #fff; box-shadow: 0 4px 14px rgba(17,105,255,.25); }
 
-    /* ─ Footer ────────────────────────────────────────── */
+    .unlocked {
+      display: none;
+      margin-top: 12px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      color: #5f6f96;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+
+    .section-value {
+      font-size: 15px;
+      line-height: 1.55;
+      color: #24335c;
+    }
+
+    .call-btn {
+      margin-top: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      color: #fff;
+      background: #168f50;
+      padding: 10px 14px;
+      border-radius: 10px;
+    }
+
+    .docs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .doc {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .doc-link {
+      text-decoration: none;
+      color: #1454c8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 800;
+      border-radius: 6px;
+      padding: 4px 7px;
+      flex: 0 0 auto;
+    }
+
+    .badge.pdf { background: #ffe6e8; color: #c12943; }
+    .badge.img { background: #e6efff; color: #1a52c8; }
+
+    .img-preview {
+      width: 100%;
+      max-height: 210px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid var(--line);
+    }
+
     .footer {
-      text-align: center; font-size: 10px; color: #B0BAC5;
-      padding: 20px 20px 44px; line-height: 1.8;
-      letter-spacing: .2px;
+      text-align: center;
+      color: #8d97b3;
+      font-size: 11px;
+      padding: 12px 0 8px;
     }
-    .footer strong { color: var(--text-sub); font-weight: 700; }
 
-    /* ─ Print ─────────────────────────────────────────── */
-    @media print {
-      .pin-card { display: none; }
-      .card { box-shadow: none; border: 1px solid var(--border); }
-      .header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    @media (max-width: 600px) {
+      .patient-name { font-size: 27px; }
+      .pin-box { width: 48px; height: 52px; font-size: 26px; }
+      .container { width: calc(100% - 16px); }
+      .hero { padding: 30px 12px 14px; }
+      .vital-value { font-size: 17px; }
     }
   </style>
 </head>
 <body>
 
-<!-- Loading -->
-<div id="s-loading" class="screen active">
+<div id="loading-screen" class="loading-screen">
   <div class="spinner"></div>
-  <p>Cargando ficha de emergencia</p>
-  <small>BioMetric AI</small>
+  <p>Cargando ficha de emergencia...</p>
 </div>
 
-<!-- Error -->
-<div id="s-error" class="screen">
-  <div class="err-icon">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-  </div>
-  <h2 id="err-title">No disponible</h2>
-  <p  id="err-msg"></p>
+<div id="error-screen" class="error-screen" style="display:none">
+  <div style="font-size:56px">⚠</div>
+  <h2 id="error-title">Acceso no disponible</h2>
+  <p id="error-msg" style="max-width: 360px; opacity: .88; line-height: 1.5"></p>
 </div>
 
-<!-- Main -->
-<div id="s-main" class="screen">
+<div id="page" class="page">
+  <header class="hero">
+    <div class="brand">BIO METRIC AI</div>
+    <div id="avatar" class="avatar">P</div>
+    <h1 id="patient-name" class="patient-name">Paciente</h1>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="brand">
-      <div class="brand-dot"></div>
-      <span class="brand-name">BioMetric AI</span>
-    </div>
-    <div id="avatar" class="avatar"></div>
-    <div id="patient-name" class="patient-name"></div>
-    <div id="pills" class="pills"></div>
     <div class="vitals">
-      <div class="v"><div id="v-hr"   class="v-val">—</div><div class="v-lbl">Frec. cardiaca</div></div>
-      <div class="v"><div id="v-spo2" class="v-val">—</div><div class="v-lbl">SpO₂</div></div>
-      <div class="v"><div id="v-glu"  class="v-val">—</div><div class="v-lbl">Glucosa</div></div>
-    </div>
-  </div>
-
-  <div class="body">
-
-    <!-- Datos públicos -->
-    <div class="public-card" id="pub-card">
-      <div class="section-header">
-        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <span class="section-title">Datos de emergencia — acceso inmediato</span>
+      <div class="vital">
+        <span id="hr-value" class="vital-value">--</span>
+        <span class="vital-label">BPM (Frec. Card.)</span>
       </div>
-      <div id="pub-rows"></div>
-      <p class="public-note">
-        Esta información no requiere contraseña. Para el expediente médico completo,
-        ingresa el PIN recibido por WhatsApp.
-      </p>
-    </div>
-
-    <!-- PIN -->
-    <div class="pin-card" id="pin-card">
-      <div class="pin-header">
-        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <div class="pin-title">Expediente médico completo</div>
+      <div class="vital">
+        <span id="spo2-value" class="vital-value">--</span>
+        <span class="vital-label">SpO2 (Oxígeno)</span>
       </div>
-      <p class="pin-sub">
-        Ingresa el PIN de 4 dígitos enviado por <strong>WhatsApp cifrado</strong>
-        al contacto de emergencia del paciente.
-      </p>
-      <div class="digit-row">
-        <input class="digit-box" id="d0" type="tel" inputmode="numeric" maxlength="1">
-        <input class="digit-box" id="d1" type="tel" inputmode="numeric" maxlength="1">
-        <input class="digit-box" id="d2" type="tel" inputmode="numeric" maxlength="1">
-        <input class="digit-box" id="d3" type="tel" inputmode="numeric" maxlength="1">
+      <div class="vital">
+        <span id="glucose-value" class="vital-value">--</span>
+        <span class="vital-label">Glucosa</span>
       </div>
-      <div id="pin-error"    class="pin-error"></div>
-      <div id="pin-attempts" class="pin-attempts"></div>
-      <button id="pin-btn" class="pin-btn" onclick="verifyPin()">
-        Desbloquear expediente
-      </button>
     </div>
+  </header>
 
-    <!-- Expediente completo (tras PIN correcto) -->
-    <div id="full-record">
-      <div id="full-sections"></div>
-      <div id="call-wrap"></div>
-    </div>
+  <main class="container">
+    <section class="card warn">
+      <div style="font-weight: 700; margin-bottom: 7px;">Datos de emergencia - acceso inmediato</div>
+      <div style="font-size: 13px; line-height: 1.45;">
+        Esta informacion no requiere contrasena. Para el expediente medico completo,
+        ingresa el PIN recibido en llamada o WhatsApp.
+      </div>
+    </section>
 
-    <div class="footer">
-      <strong>BioMetric AI</strong> &nbsp;&middot;&nbsp; Ficha Clínica de Emergencia<br>
-      Sesión activa 30 min &nbsp;&middot;&nbsp; Canal cifrado E2E &nbsp;&middot;&nbsp; NOM-024-SSA3
-    </div>
+    <section id="pin-card" class="card" style="border-color:#8db1ff;">
+      <div class="title">Expediente medico completo</div>
+      <p class="subtitle">Ingresa el PIN de 4 digitos para desbloquear los archivos y datos clinicos del paciente.</p>
 
-  </div>
+      <p class="pin-label">Codigo PIN</p>
+      <div id="pin-row" class="pin-row" onclick="focusPinInput()">
+        <div class="pin-box" data-idx="0"></div>
+        <div class="pin-box" data-idx="1"></div>
+        <div class="pin-box" data-idx="2"></div>
+        <div class="pin-box" data-idx="3"></div>
+      </div>
+      <input id="pin-input" class="pin-hidden" type="tel" inputmode="numeric" maxlength="4" autocomplete="off">
+
+      <button id="pin-btn" class="btn" onclick="verifyPin()">Desbloquear expediente</button>
+      <div id="pin-error" class="pin-error">PIN incorrecto. Verifica el codigo de 4 digitos.</div>
+      <div id="pin-attempts" class="attempts"></div>
+    </section>
+
+    <section id="unlocked" class="unlocked">
+      <article class="card" id="summary-card"></article>
+      <article class="card" id="docs-card" style="display:none">
+        <div class="section-title">Archivos medicos subidos</div>
+        <div id="docs-list" class="docs-list"></div>
+      </article>
+    </section>
+
+    <div class="footer">BioMetric AI · Ficha Clinica de Emergencia · Canal cifrado E2E</div>
+  </main>
 </div>
 
-<script>
-  const DB         = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com";
-  const VERIFY_URL = "https://us-central1-vitalsenseai-1cb9f.cloudfunctions.net/verifyEmergencyPin";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-  const params  = new URLSearchParams(window.location.search);
-  const tokenId = params.get('t');
-  let   attempts = 0;
-
-  /* ── helpers ──────────────────────────────────────── */
-  function show(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-  }
-  function err(title, msg) {
-    document.getElementById('err-title').textContent = title;
-    document.getElementById('err-msg').textContent   = msg;
-    show('s-error');
-  }
-
-  /* ── SVG icon strings ─────────────────────────────── */
-  const ICONS = {
-    blood:    '<svg viewBox="0 0 24 24"><path d="M12 2C6 9 3 13.5 3 17a9 9 0 0 0 18 0c0-3.5-3-8-9-15z"/></svg>',
-    allergy:  '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-    condition:'<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
-    contact:  '<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
-    medicine: '<svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
-    location: '<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
-    phone:    '<svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.06-1.06a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  const firebaseConfig = {
+    apiKey: "__FIREBASE_API_KEY__",
+    authDomain: "vitalsenseai-1cb9f.firebaseapp.com",
+    databaseURL: "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com",
+    projectId: "vitalsenseai-1cb9f",
+    storageBucket: "vitalsenseai-1cb9f.firebasestorage.app",
+    messagingSenderId: "576196499899",
+    appId: "1:576196499899:web:vitalsenseweb"
   };
 
-  /* ── load public data ─────────────────────────────── */
-  async function init() {
-    if (!tokenId) { err("Enlace inválido", "No se encontró un token de emergencia en esta URL."); return; }
-    try {
-      const res  = await fetch(`${DB}/emergency_public/${tokenId}.json`);
-      const data = await res.json();
-      if (!data)                          { err("Sesión no encontrada", "Este enlace ya no es válido."); return; }
-      if (data.expiresAt < Date.now())    { err("Sesión expirada", "El enlace de emergencia expiró. Genera uno nuevo desde la app."); return; }
-      render(data);
-      show('s-main');
-      boxes[0].focus();
-    } catch {
-      err("Sin conexión", "Verifica tu acceso a internet e intenta de nuevo.");
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const params = new URLSearchParams(window.location.search);
+  const tokenId = params.get("t");
+  const sosUserId = params.get("u");
+  const sosId = params.get("s");
+
+  let tokenData = null;
+  let attempts = 0;
+  const MAX_ATTEMPTS = 5;
+
+  const loadingEl = document.getElementById("loading-screen");
+  const errorEl = document.getElementById("error-screen");
+  const pageEl = document.getElementById("page");
+  const pinInput = document.getElementById("pin-input");
+  const pinBoxes = [...document.querySelectorAll(".pin-box")];
+
+  function escapeHtml(v) {
+    return String(v ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function showError(title, message) {
+    loadingEl.style.display = "none";
+    pageEl.style.display = "none";
+    errorEl.style.display = "flex";
+    document.getElementById("error-title").textContent = title;
+    document.getElementById("error-msg").textContent = message;
+  }
+
+  function showPage() {
+    loadingEl.style.display = "none";
+    errorEl.style.display = "none";
+    pageEl.style.display = "block";
+  }
+
+  function fillHero(data) {
+    const initials = `${data.nombre?.[0] || ""}${data.apellidos?.[0] || ""}`.trim().toUpperCase() || "P";
+    document.getElementById("avatar").textContent = initials;
+    document.getElementById("patient-name").textContent = `${data.nombre || ""} ${data.apellidos || ""}`.trim() || "Paciente";
+    document.getElementById("hr-value").textContent = data.heartRateAtAlert ? `${data.heartRateAtAlert}` : "--";
+    document.getElementById("spo2-value").textContent = data.spo2 !== undefined ? `${data.spo2}%` : "--";
+    document.getElementById("glucose-value").textContent = data.glucose !== undefined ? `${data.glucose} mg/dL` : "--";
+  }
+
+  function toText(value) {
+    return value == null ? "" : String(value).trim();
+  }
+
+  function toNumber(value) {
+    if (value == null || value === "") return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  function updatePinBoxes() {
+    const digits = pinInput.value.replace(/\D/g, "").slice(0, 4);
+    pinInput.value = digits;
+    pinBoxes.forEach((box, idx) => {
+      box.textContent = digits[idx] || "";
+      box.classList.toggle("active", idx === digits.length && digits.length < 4);
+    });
+    if (digits.length === 4) {
+      pinBoxes[3].classList.remove("active");
     }
   }
 
-  /* ── render public header & data ─────────────────── */
-  function render(d) {
-    const initials = (d.nombre || 'P').trim().split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-    document.getElementById('avatar').textContent       = initials;
-    document.getElementById('patient-name').textContent = d.nombre || 'Paciente';
+  window.focusPinInput = function() {
+    pinInput.focus();
+  };
 
-    const pillsEl = document.getElementById('pills');
-    if (d.tipoSangre)  pillsEl.innerHTML += `<span class="pill blood">${d.tipoSangre}</span>`;
-    if (d.anomalyType) pillsEl.innerHTML += `<span class="pill alert-type">${d.anomalyType}</span>`;
-
-    if (d.heartRate) document.getElementById('v-hr').textContent = d.heartRate + ' bpm';
-
-    const rows = document.getElementById('pub-rows');
-    const row  = (iconKey, label, val) => {
-      if (!val) return;
-      rows.innerHTML += `
-        <div class="public-row">
-          <div class="pub-icon-wrap">${ICONS[iconKey]}</div>
-          <div class="pub-inner">
-            <div class="pub-lbl">${label}</div>
-            <div class="pub-val">${val}</div>
-          </div>
-        </div>`;
-    };
-    row('blood',     'Tipo de sangre',      d.tipoSangre);
-    row('allergy',   'Alergias conocidas',  d.alergias);
-    row('condition', 'Condiciones médicas', d.padecimientos);
+  function normalizeDocs(rawDocs) {
+    if (!Array.isArray(rawDocs)) return [];
+    return rawDocs
+      .map(doc => {
+        if (!doc) return null;
+        const nombre = String(doc.nombre || "").trim();
+        const url = String(doc.url || "").trim();
+        const tipo = String(doc.tipo || "pdf").toLowerCase();
+        if (!nombre || !url) return null;
+        return { nombre, url, tipo: tipo === "imagen" ? "imagen" : "pdf" };
+      })
+      .filter(Boolean);
   }
 
-  /* ── PIN boxes ────────────────────────────────────── */
-  const boxes = [0,1,2,3].map(i => document.getElementById(`d${i}`));
-  boxes.forEach((b, i) => {
-    b.addEventListener('input', e => {
-      b.value = e.target.value.replace(/\D/g,'').slice(-1);
-      b.classList.toggle('filled', !!b.value);
-      if (b.value && i < 3) boxes[i+1].focus();
-      if (pin().length === 4) verifyPin();
+  function mergeDocs(tokenDocs, profileDocs) {
+    const merged = [...tokenDocs, ...profileDocs];
+    const map = new Map();
+    merged.forEach(doc => {
+      const key = `${doc.nombre}|${doc.url}`;
+      if (!map.has(key)) map.set(key, doc);
     });
-    b.addEventListener('keydown', e => {
-      if (e.key === 'Backspace' && !b.value && i > 0) {
-        boxes[i-1].value = '';
-        boxes[i-1].classList.remove('filled');
-        boxes[i-1].focus();
-      }
-    });
-    b.addEventListener('paste', e => {
-      e.preventDefault();
-      const t = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'');
-      if (t.length === 4) {
-        boxes.forEach((bx,j) => { bx.value = t[j]||''; bx.classList.toggle('filled', !!bx.value); });
-        setTimeout(verifyPin, 50);
-      }
-    });
-  });
-  const pin   = () => boxes.map(b => b.value).join('');
-  const shake = () => boxes.forEach(b => { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); });
-  const clear = () => { boxes.forEach(b => { b.value=''; b.classList.remove('filled','shake'); }); boxes[0].focus(); };
+    return [...map.values()];
+  }
 
-  /* ── verify PIN ───────────────────────────────────── */
-  window.verifyPin = async () => {
-    if (pin().length < 4) return;
-    const errEl = document.getElementById('pin-error');
-    const attEl = document.getElementById('pin-attempts');
-    const btn   = document.getElementById('pin-btn');
+  async function loadLatestDocuments(userId) {
+    if (!userId) return [];
+    const docsSnap = await get(ref(db, `patients/${userId}/profile/storageDocuments`));
+    if (!docsSnap.exists()) return [];
 
-    btn.disabled    = true;
-    btn.textContent = 'Verificando...';
+    return docsSnap.children
+      .map(child => {
+        const nombre = child.child("nombre").val();
+        const url = child.child("url").val();
+        const tipo = child.child("tipo").val() || "pdf";
+        if (!nombre || !url) return null;
+        return {
+          nombre: String(nombre),
+          url: String(url),
+          tipo: String(tipo).toLowerCase() === "imagen" ? "imagen" : "pdf"
+        };
+      })
+      .filter(Boolean);
+  }
+
+  async function safeGet(path) {
+    try {
+      const snap = await get(ref(db, path));
+      return snap.exists() ? snap.val() : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function loadPublicProfile(userId) {
+    const fields = [
+      "nombre",
+      "apellidos",
+      "nacimiento",
+      "fechaNacimiento",
+      "genero",
+      "tipoSangre",
+      "alergias",
+      "padecimientos",
+      "medicamentos",
+      "contactoEmergencia",
+      "telefonoEmergencia",
+    ];
+
+    const [fromPatients, fromLegacyUsers] = await Promise.all([
+      Promise.all(fields.map((f) => safeGet(`patients/${userId}/profile/${f}`))),
+      Promise.all(fields.map((f) => safeGet(`users/${userId}/datosMedicos/${f}`))),
+    ]);
+
+    const profile = {};
+    fields.forEach((f, idx) => {
+      profile[f] = toText(fromPatients[idx] ?? fromLegacyUsers[idx]);
+    });
+    return profile;
+  }
+
+  function renderSummary(data) {
+    const summary = document.getElementById("summary-card");
+    const sections = [];
+
+    // Titulo de datos médicos
+    sections.push(`<div style="margin-bottom: 16px;"><div class="title" style="margin-bottom: 10px;">Datos Médicos Críticos</div></div>`);
+
+    // Información demográfica
+    let demoInfo = [];
+    const birthRaw = data.nacimiento || data.fechaNacimiento;
+    if (birthRaw) {
+      const birthDate = new Date(birthRaw);
+      if (!Number.isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+        if (age >= 0 && age <= 130) demoInfo.push(`${age} años`);
+      }
+    }
+    if (data.genero) {
+      demoInfo.push(data.genero === "Masculino" || data.genero === "Hombre" ? "👨 Hombre" : "👩 Mujer");
+    }
+    if (demoInfo.length > 0) {
+      sections.push(`
+        <div style="margin-bottom: 16px; padding: 12px; background: #f0f3ff; border-left: 4px solid #2463ea; border-radius: 6px;">
+          <div class="section-title">👤 INFORMACIÓN PERSONAL</div>
+          <div class="section-value">${demoInfo.join(" · ")}</div>
+        </div>
+      `);
+    }
+
+    // Tipo de sangre - DESTACADO
+    const bloodType = data.tipoSangre || "No registrado";
+    sections.push(`
+      <div style="margin-bottom: 16px; padding: 12px; background: #f0f3ff; border-left: 4px solid #2463ea; border-radius: 6px;">
+        <div class="section-title">🩸 TIPO DE SANGRE</div>
+        <div style="font-size: 18px; font-weight: 700; color: #173f95; margin-top: 4px;">${escapeHtml(bloodType)}</div>
+      </div>
+    `);
+
+    // Alergias - CRÍTICO
+    if (data.alergias) {
+      sections.push(`
+        <div style="margin-bottom: 16px; padding: 12px; background: #fef3e6; border-left: 4px solid #f5a623; border-radius: 6px;">
+          <div class="section-title">⚠️ ALERGIAS</div>
+          <div class="section-value">${escapeHtml(data.alergias)}</div>
+        </div>
+      `);
+    }
+
+    // Padecimientos
+    if (data.padecimientos) {
+      sections.push(`
+        <div style="margin-bottom: 16px; padding: 12px; background: #f5f5f5; border-left: 4px solid #666; border-radius: 6px;">
+          <div class="section-title">🏥 PADECIMIENTOS CRÓNICOS</div>
+          <div class="section-value">${escapeHtml(data.padecimientos)}</div>
+        </div>
+      `);
+    }
+
+    // Medicamentos
+    if (data.medicamentos) {
+      sections.push(`
+        <div style="margin-bottom: 16px; padding: 12px; background: #f0f8f0; border-left: 4px solid #2ea876; border-radius: 6px;">
+          <div class="section-title">💊 MEDICAMENTOS ACTUALES</div>
+          <div class="section-value">${escapeHtml(data.medicamentos)}</div>
+        </div>
+      `);
+    }
+
+    // Evento de emergencia
+    if (data.anomalyType || data.heartRateAtAlert) {
+      const event = data.anomalyType ? `${escapeHtml(data.anomalyType)}` : "Evento de emergencia";
+      const hr = data.heartRateAtAlert ? ` · BPM: ${escapeHtml(data.heartRateAtAlert)}` : "";
+      sections.push(`
+        <div style="margin-bottom: 16px; padding: 12px; background: #ffe6e6; border-left: 4px solid #cf2f48; border-radius: 6px;">
+          <div class="section-title">🚨 EVENTO DETECTADO</div>
+          <div style="font-size: 14px; color: #a01f31; font-weight: 600; margin-top: 4px;">${event}${hr}</div>
+        </div>
+      `);
+    }
+
+    // Contacto de emergencia
+    if (data.contactoEmergencia || data.telefonoEmergencia) {
+      const name = data.contactoEmergencia ? `${escapeHtml(data.contactoEmergencia)}` : "Contacto registrado";
+      const phone = data.telefonoEmergencia ? `<a class="call-btn" href="tel:${encodeURIComponent(data.telefonoEmergencia)}">📞 Llamar: ${escapeHtml(data.telefonoEmergencia)}</a>` : "";
+      sections.push(`
+        <div style="margin-bottom: 12px;">
+          <div class="section-title">📱 CONTACTO DE EMERGENCIA</div>
+          <div class="section-value">${name}</div>
+          ${phone}
+        </div>
+      `);
+    }
+
+    summary.innerHTML = sections.join("");
+  }
+
+  function renderDocs(docs) {
+    const card = document.getElementById("docs-card");
+    const list = document.getElementById("docs-list");
+
+    if (!docs.length) {
+      card.style.display = "none";
+      list.innerHTML = "";
+      return;
+    }
+
+    card.style.display = "block";
+    list.innerHTML = docs.map(doc => {
+      if (doc.tipo === "imagen") {
+        return `
+          <div class="doc">
+            <img src="${escapeHtml(doc.url)}" alt="${escapeHtml(doc.nombre)}" class="img-preview" onerror="this.style.display='none'">
+            <a class="doc-link" href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">
+              <span class="badge img">IMG</span>
+              <span>${escapeHtml(doc.nombre)}</span>
+            </a>
+          </div>
+        `;
+      }
+      return `
+        <div class="doc">
+          <a class="doc-link" href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">
+            <span class="badge pdf">PDF</span>
+            <span>${escapeHtml(doc.nombre)}</span>
+          </a>
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function unlockProfile() {
+    renderSummary(tokenData);
+
+    const tokenDocs = normalizeDocs(tokenData.documentos);
+    const latestDocs = await loadLatestDocuments(tokenData.userId).catch(() => []);
+    renderDocs(mergeDocs(tokenDocs, latestDocs));
+
+    document.getElementById("pin-card").style.display = "none";
+    document.getElementById("unlocked").style.display = "block";
+  }
+
+  async function loadSosFallback() {
+    if (!sosUserId || !sosId) {
+      showError("URL invalida", "No se encontro token o datos SOS en el enlace.");
+      return;
+    }
 
     try {
-      const res  = await fetch(VERIFY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tokenId, pin: pin() }),
-      });
-      const data = await res.json();
+      const [profile, alert, heartRate, spo2, glucose] = await Promise.all([
+        loadPublicProfile(sosUserId),
+        safeGet(`alerts/${sosUserId}/${sosId}`),
+        safeGet(`patients/${sosUserId}/heartRate`),
+        safeGet(`patients/${sosUserId}/spo2`),
+        safeGet(`patients/${sosUserId}/glucose`),
+      ]);
 
-      if (data.ok) {
-        btn.textContent      = 'Acceso concedido';
-        btn.style.background = '#34A853';
-        setTimeout(() => {
-          renderFull(data.profile);
-          document.getElementById('full-record').style.display = 'block';
-          document.getElementById('pin-card').style.display    = 'none';
-          document.getElementById('full-record').scrollIntoView({ behavior: 'smooth' });
-        }, 350);
+      tokenData = {
+        userId: sosUserId,
+        nombre: toText(profile.nombre),
+        apellidos: toText(profile.apellidos),
+        nacimiento: toText(profile.nacimiento || profile.fechaNacimiento),
+        fechaNacimiento: toText(profile.fechaNacimiento || profile.nacimiento),
+        genero: toText(profile.genero),
+        tipoSangre: toText(profile.tipoSangre),
+        alergias: toText(profile.alergias),
+        padecimientos: toText(profile.padecimientos),
+        medicamentos: toText(profile.medicamentos),
+        contactoEmergencia: toText(profile.contactoEmergencia),
+        telefonoEmergencia: toText(profile.telefonoEmergencia),
+        anomalyType: toText((alert && alert.type) || "SOS Activo"),
+        heartRateAtAlert: toNumber(alert && alert.heartRate) ?? toNumber(heartRate) ?? 0,
+        spo2: toNumber(spo2),
+        glucose: toNumber(glucose),
+        documentos: [],
+      };
+
+      const hasMeaningfulData =
+        !!tokenData.nombre ||
+        !!tokenData.apellidos ||
+        !!tokenData.tipoSangre ||
+        !!tokenData.alergias ||
+        !!tokenData.padecimientos ||
+        !!tokenData.medicamentos ||
+        !!tokenData.contactoEmergencia ||
+        !!tokenData.telefonoEmergencia ||
+        !!tokenData.heartRateAtAlert ||
+        tokenData.spo2 !== undefined ||
+        tokenData.glucose !== undefined;
+
+      if (!hasMeaningfulData) {
+        showError("Acceso restringido", "No hay permisos para leer la ficha SOS publica en este momento.");
         return;
       }
 
-      btn.disabled    = false;
-      btn.textContent = 'Desbloquear expediente';
-      shake(); clear();
+      fillHero(tokenData);
+      showPage();
+      document.getElementById("pin-card").style.display = "none";
+      document.getElementById("unlocked").style.display = "block";
 
-      const msgs = {
-        wrong_pin: 'PIN incorrecto. Revisa el mensaje de WhatsApp.',
-        expired:   'Sesión expirada. Genera un nuevo enlace desde la app.',
-        revoked:   'Esta emergencia ya fue resuelta.',
-        not_found: 'Token inválido.',
-      };
-      errEl.textContent = msgs[data.reason] || 'Error. Intenta de nuevo.';
-      errEl.classList.add('visible');
-      setTimeout(() => errEl.classList.remove('visible'), 3500);
-
-      if (data.reason === 'wrong_pin') {
-        const left = 5 - ++attempts;
-        if (left <= 0) {
-          btn.disabled    = true;
-          btn.textContent = 'Bloqueado';
-          attEl.textContent = 'Demasiados intentos incorrectos.';
-        } else {
-          attEl.textContent = `${left} intento${left !== 1 ? 's' : ''} restante${left !== 1 ? 's' : ''}`;
-        }
-      }
-    } catch {
-      btn.disabled    = false;
-      btn.textContent = 'Desbloquear expediente';
-      errEl.textContent = 'Sin conexión.';
-      errEl.classList.add('visible');
-      setTimeout(() => errEl.classList.remove('visible'), 3500);
-    }
-  };
-
-  /* ── render full record ───────────────────────────── */
-  function renderFull(d) {
-    const sec = document.getElementById('full-sections');
-    const add = (iconKey, label, val, isAlert) => {
-      if (!val) return;
-      sec.innerHTML += `
-        <div class="card${isAlert ? ' alert-card' : ''}">
-          <div class="card-label">${ICONS[iconKey]} ${label}</div>
-          <div class="card-value">${val}</div>
-        </div>`;
-    };
-    add('allergy',   'Alergias',               d.alergias,           true);
-    add('condition', 'Padecimientos',           d.padecimientos,      false);
-    add('medicine',  'Medicamentos actuales',   d.medicamentos,       false);
-    add('contact',   'Contacto de emergencia',  d.contactoEmergencia, false);
-
-    if (d.lat && d.lng) {
-      sec.innerHTML += `
-        <a href="https://maps.google.com/?q=${d.lat},${d.lng}" target="_blank" class="action-btn blue">
-          ${ICONS.location} Ver ubicación del paciente
-        </a>`;
-    }
-    if (d.telefonoEmergencia) {
-      document.getElementById('call-wrap').innerHTML = `
-        <a href="tel:${d.telefonoEmergencia}" class="action-btn green">
-          ${ICONS.phone} Llamar contacto de emergencia
-        </a>`;
+      renderSummary(tokenData);
+      const latestDocs = await loadLatestDocuments(sosUserId).catch(() => []);
+      renderDocs(latestDocs);
+    } catch (error) {
+      showError("Error de conexion", "No se pudo cargar la ficha SOS. Verifica internet e intenta de nuevo.");
     }
   }
 
-  init();
+  window.verifyPin = async function() {
+    const entered = pinInput.value.trim();
+    if (entered.length !== 4 || !tokenData) return;
+
+    attempts++;
+    document.getElementById("pin-attempts").textContent = `Intento ${attempts} de ${MAX_ATTEMPTS}`;
+
+    if (entered === String(tokenData.pin || "")) {
+      document.getElementById("pin-error").style.display = "none";
+      await unlockProfile();
+      return;
+    }
+
+    document.getElementById("pin-error").style.display = "block";
+    pinInput.value = "";
+    updatePinBoxes();
+
+    if (attempts >= MAX_ATTEMPTS) {
+      const pinBtn = document.getElementById("pin-btn");
+      pinBtn.disabled = true;
+      pinBtn.textContent = "Demasiados intentos";
+    }
+  };
+
+  async function loadToken() {
+    if (!tokenId && sosUserId && sosId) {
+      await loadSosFallback();
+      return;
+    }
+
+    if (!tokenId) {
+      showError("URL invalida", "No se encontro el token de emergencia en el enlace.");
+      return;
+    }
+
+    try {
+      const snap = await get(ref(db, `emergency_tokens/${tokenId}`));
+      if (!snap.exists()) {
+        showError("Token no encontrado", "Este acceso ya expiro o fue revocado.");
+        return;
+      }
+
+      const data = snap.val();
+      if (!data.active) {
+        showError("Token revocado", "La emergencia ya fue atendida.");
+        return;
+      }
+
+      if (Date.now() > Number(data.expiresAt || 0)) {
+        showError("QR expirado", "El tiempo de acceso de emergencia ha finalizado.");
+        return;
+      }
+
+      tokenData = data;
+      fillHero(data);
+      showPage();
+      pinInput.focus();
+      updatePinBoxes();
+    } catch (error) {
+      showError("Error de conexion", "No se pudo cargar la ficha. Verifica internet e intenta de nuevo.");
+    }
+  }
+
+  pinInput.addEventListener("input", updatePinBoxes);
+  pinInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") verifyPin();
+  });
+
+  loadToken();
 </script>
 </body>
 </html>
