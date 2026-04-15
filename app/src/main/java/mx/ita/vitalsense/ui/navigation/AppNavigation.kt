@@ -159,20 +159,20 @@ fun AppNavigation() {
         mainActivity.consumePendingMedicationOpen()
     }
 
-    val bottomBarRoutes = listOf(
+    val bottomBarBasePaths = setOf(
         Route.DASHBOARD,
         Route.DAILY_REPORT,
         Route.REPORTE_DIARIO,
         Route.DETAILED_REPORT,
         Route.REPORTE_DETALLADO,
         Route.NOTIFICACIONES,
-        "${Route.NOTIFICACIONES}?alertId={alertId}&lat={lat}&lng={lng}",
         Route.NOTIFICATIONS,
         Route.PROFILE,
         Route.EDITAR_PERFIL,
         Route.CHAT,
     )
-    val showBottomBar = currentRoute in bottomBarRoutes
+    // currentRoute puede incluir query params (ej. "notificaciones?alertId=…"), comparar solo la ruta base
+    val showBottomBar = currentRoute?.substringBefore('?') in bottomBarBasePaths
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -450,105 +450,7 @@ fun AppNavigation() {
                     )
                 }
 
-                composable(Route.DEVICE) {
-                    DeviceScanScreen(onBack = { navController.popBackStack() })
-                }
 
-                composable("${Route.PATIENT_DETAIL}/{patientId}") { backStackEntry ->
-                    val patientId = backStackEntry.arguments?.getString("patientId") ?: return@composable
-                    PatientDetailScreen(
-                        patientId = patientId,
-                        onBack = { navController.popBackStack() },
-                    )
-                }
-
-                composable(Route.PROFILE) {
-                    ProfileScreen(
-                        onDeviceClick = { navController.navigate(Route.DEVICE) },
-                        onBack = { navController.navigateUp() },
-                        onSignOut = {
-                            FirebaseAuth.getInstance().signOut()
-                            navController.navigate(Route.LOGIN) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
-                        onDatosImportantes = { navController.navigate(Route.DATOS_IMPORTANTES) },
-                        onHomeClick = {
-                            navController.navigate(Route.DASHBOARD) {
-                                popUpTo(Route.DASHBOARD) { inclusive = false }
-                            }
-                        },
-                        onHealthClick  = { navController.navigate(Route.REPORTE_DIARIO) },
-                        onNotifClick   = { navController.navigate(Route.NOTIFICACIONES) },
-                    )
-                }
-
-                composable(Route.EDITAR_PERFIL) {
-                    ProfileScreen(
-                        onDeviceClick = { navController.navigate(Route.DEVICE) },
-                        onBack = { navController.popBackStack() },
-                        onSignOut = {
-                            FirebaseAuth.getInstance().signOut()
-                            navController.navigate(Route.ONBOARDING) {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
-                        onDatosImportantes = { navController.navigate(Route.DATOS_IMPORTANTES) },
-                        onHomeClick = {
-                            navController.navigate(Route.DASHBOARD) {
-                                popUpTo(Route.DASHBOARD) { inclusive = false }
-                            }
-                        },
-                        onHealthClick = { navController.navigate(Route.REPORTE_DIARIO) },
-                        onNotifClick  = { navController.navigate(Route.NOTIFICACIONES) },
-                    )
-                }
-
-                composable(Route.REPORTE_DIARIO) {
-                    DailyReportScreen(
-                        onBack = { navController.popBackStack() },
-                        onNavigateToDetailed = { navController.navigate(Route.DETAILED_REPORT) },
-                        onNavigateToSleepDetail = { score, minutos, start, end, estado ->
-                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$start&end=$end&estado=$estado")
-                        }
-                    )
-                }
-
-                composable(Route.DAILY_REPORT) {
-                    DailyReportScreen(
-                        onBack = { navController.popBackStack() },
-                        onNavigateToDetailed = { navController.navigate(Route.REPORTE_DIARIO) },
-                        onNavigateToSleepDetail = { score, minutos, start, end, estado ->
-                            navController.navigate("${Route.SLEEP_DETAIL}?score=$score&minutos=$minutos&start=$start&end=$end&estado=$estado")
-                        }
-                    )
-                }
-
-                composable(
-                    route = "${Route.SLEEP_DETAIL}?score={score}&minutos={minutos}&start={start}&end={end}&estado={estado}",
-                    arguments = listOf(
-                        androidx.navigation.navArgument("score") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
-                        androidx.navigation.navArgument("minutos") { defaultValue = 0; type = androidx.navigation.NavType.IntType },
-                        androidx.navigation.navArgument("start") { defaultValue = 0L; type = androidx.navigation.NavType.LongType },
-                        androidx.navigation.navArgument("end") { defaultValue = 0L; type = androidx.navigation.NavType.LongType },
-                        androidx.navigation.navArgument("estado") { defaultValue = "Sin Datos"; type = androidx.navigation.NavType.StringType }
-                    )
-                ) { backStackEntry ->
-                    val score = backStackEntry.arguments?.getInt("score") ?: 0
-                    val minutos = backStackEntry.arguments?.getInt("minutos") ?: 0
-                    val start = backStackEntry.arguments?.getLong("start") ?: 0L
-                    val end = backStackEntry.arguments?.getLong("end") ?: 0L
-                    val estado = backStackEntry.arguments?.getString("estado") ?: "Sin Datos"
-                    mx.ita.vitalsense.ui.reports.SleepDetailScreen(
-                        score = score,
-                        minutos = minutos,
-                        sleepStartMillis = start,
-                        sleepEndMillis = end,
-                        estado = estado,
-                        onBack = { navController.navigateUp() }
-
-                    )
-                }
 
                 composable(
                     route = "${Route.NOTIFICACIONES}?alertId={alertId}&lat={lat}&lng={lng}",

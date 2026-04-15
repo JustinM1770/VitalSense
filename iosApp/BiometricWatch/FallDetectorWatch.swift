@@ -4,6 +4,9 @@
 
 import Foundation
 import CoreMotion
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "FallDetector")
 
 class FallDetectorWatch {
 
@@ -28,7 +31,7 @@ class FallDetectorWatch {
 
     func start() {
         guard motionManager.isAccelerometerAvailable else {
-            print("[FallDetector] Accelerometer not available")
+            logger.warning("Accelerometer not available")
             return
         }
 
@@ -47,7 +50,7 @@ class FallDetectorWatch {
             // Fase 1: detectar caída libre
             if g < self.freeFallThreshold && self.freeFallTime == nil {
                 self.freeFallTime = now
-                print("[FallDetector] Free fall detected, g=\(String(format: "%.2f", g))")
+                logger.debug("Free fall detected, g=\(String(format: "%.2f", g))")
                 return
             }
 
@@ -65,7 +68,7 @@ class FallDetectorWatch {
                     self.freeFallTime = nil
                     self.detectionCooldown = true
 
-                    print("[FallDetector] FALL DETECTED — g=\(String(format: "%.2f", g)) elapsed=\(String(format: "%.2f", elapsed))s")
+                    logger.warning("FALL DETECTED — g=\(String(format: "%.2f", g)) elapsed=\(String(format: "%.2f", elapsed))s")
 
                     DispatchQueue.main.async { self.onFall() }
 
@@ -77,12 +80,12 @@ class FallDetectorWatch {
             }
         }
 
-        print("[FallDetector] Started")
+        logger.info("Started")
     }
 
     func stop() {
         motionManager.stopAccelerometerUpdates()
         freeFallTime = nil
-        print("[FallDetector] Stopped")
+        logger.info("Stopped")
     }
 }

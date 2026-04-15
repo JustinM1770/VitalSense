@@ -34,43 +34,66 @@ struct ProfileView: View {
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color(hex: "#F0F4FF").ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer().frame(height: 52)
+                    // ── Blue header zone ──────────────────────────────────
+                    ZStack {
+                        LinearGradient(
+                            colors: [Color.primaryBlue, Color(hex: "#1A4DB5")],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        )
+                        .ignoresSafeArea(edges: .top)
 
-                    Spacer().frame(height: Spacing.xl)
+                        VStack(spacing: 10) {
+                            Spacer().frame(height: Spacing.xxl)
 
-                    // Avatar with edit button
-                    ZStack(alignment: .bottomTrailing) {
-                        Circle()
-                            .fill(Color.dashBlue)
-                            .frame(width: 100, height: 100)
-                            .overlay(
-                                Text(initials)
-                                    .font(.manropeBold(size: 32))
+                            // Avatar
+                            ZStack(alignment: .bottomTrailing) {
+                                Circle()
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(width: 88, height: 88)
+                                    .overlay(
+                                        Text(initials)
+                                            .font(.manropeBold(size: 30))
+                                            .foregroundColor(.white)
+                                    )
+                                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+
+                                ZStack {
+                                    Circle().fill(Color.white).frame(width: 26, height: 26)
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(Color.primaryBlue)
+                                }
+                                .offset(x: 2, y: 2)
+                            }
+
+                            // Name & email
+                            VStack(spacing: 3) {
+                                let fullName = "\(nombre) \(apellidos)".trimmingCharacters(in: .whitespaces)
+                                Text(fullName.isEmpty ? "Mi Perfil" : fullName)
+                                    .font(.manropeBold(size: 18))
                                     .foregroundColor(.white)
-                            )
+                                if !email.isEmpty {
+                                    Text(email)
+                                        .font(.manrope(size: 12))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
 
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 30, height: 30)
-                            .overlay(
-                                Image(systemName: "pencil")
-                                    .font(.manrope(size: 12))
-                                    .foregroundColor(.dashBlue)
-                            )
+                            Spacer().frame(height: Spacing.xl)
+                        }
                     }
+                    .frame(height: 230)
 
-                    Spacer().frame(height: Spacing.xl)
-
-                    // White form card
+                    // ── White form card ──────────────────────────────────
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Información de tu perfil")
                             .font(.manropeSemiBold(size: 18))
                             .foregroundColor(Color.textNavy)
-                            .padding(.top, 24)
+                            .padding(.top, 28)
                             .padding(.horizontal, Spacing.xxl)
 
                         Spacer().frame(height: Spacing.xxl)
@@ -263,6 +286,8 @@ struct ProfileView: View {
                     .frame(maxWidth: .infinity)
                     .background(Color.white)
                     .cornerRadius(24, corners: [.topLeft, .topRight])
+                    .offset(y: -20)
+                    .padding(.bottom, -20)
                 }
             }
         }

@@ -32,4 +32,5 @@ struct MedicationiOS: Identifiable {
     let dosis: String
     let horario: String
     let activo: Bool
+    var takenToday: Bool = false
 }

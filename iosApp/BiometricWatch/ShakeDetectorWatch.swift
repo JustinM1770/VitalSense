@@ -3,6 +3,9 @@
 
 import Foundation
 import CoreMotion
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "ShakeDetector")
 
 class ShakeDetectorWatch {
     
@@ -25,7 +28,7 @@ class ShakeDetectorWatch {
     
     func start() {
         guard motionManager.isAccelerometerAvailable else {
-            print("[ShakeDetector] Accelerometer not available")
+            logger.warning("Accelerometer not available")
             return
         }
         
@@ -72,11 +75,11 @@ class ShakeDetectorWatch {
             }
         }
         
-        print("[ShakeDetector] Started")
+        logger.info("Started")
     }
-    
+
     func stop() {
         motionManager.stopAccelerometerUpdates()
-        print("[ShakeDetector] Stopped")
+        logger.info("Stopped")
     }
 }

@@ -5,6 +5,9 @@
 
 import Foundation
 import HealthKit
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "HealthKit")
 
 class HealthKitWatchManager: NSObject {
 
@@ -27,7 +30,7 @@ class HealthKitWatchManager: NSObject {
         super.init()
         // Detectar si el watch tiene sensor SpO2
         hasSpo2Sensor = spo2Manager.isSupported()
-        print("[HealthKit] SpO2 sensor available: \(hasSpo2Sensor)")
+        logger.info("SpO2 sensor available: \(self.hasSpo2Sensor)")
     }
 
     // MARK: - Public entry point
@@ -47,7 +50,7 @@ class HealthKitWatchManager: NSObject {
         store.requestAuthorization(toShare: [], read: readTypes) { [weak self] granted, error in
             guard granted else {
                 if let error = error {
-                    print("[HealthKit] Auth denied: \(error.localizedDescription)")
+                    logger.error("Auth denied: \(error.localizedDescription)")
                 }
                 return
             }
@@ -83,13 +86,13 @@ class HealthKitWatchManager: NSObject {
             workoutSession?.startActivity(with: Date())
             builder?.beginCollection(withStart: Date()) { success, error in
                 if let error = error {
-                    print("[HealthKit] beginCollection error: \(error.localizedDescription)")
+                    logger.error("beginCollection error: \(error.localizedDescription)")
                 } else {
-                    print("[HealthKit] Live HR collection started")
+                    logger.info("Live HR collection started")
                 }
             }
         } catch {
-            print("[HealthKit] Failed to start workout session: \(error.localizedDescription)")
+            logger.error("Failed to start workout session: \(error.localizedDescription)")
             startAnchoredQuery()
         }
     }
@@ -105,7 +108,7 @@ class HealthKitWatchManager: NSObject {
                 userInfo: ["spo2": spo2Value]
             )
         }
-        print("[HealthKit] SpO2 monitoring started")
+        logger.info("SpO2 monitoring started")
     }
     
     func stopSpO2Monitoring() {
@@ -175,7 +178,7 @@ extension HealthKitWatchManager: HKWorkoutSessionDelegate {
     ) {}
 
     func workoutSession(_ session: HKWorkoutSession, didFailWithError error: Error) {
-        print("[HealthKit] WorkoutSession error: \(error.localizedDescription). Falling back.")
+        logger.error("WorkoutSession error: \(error.localizedDescription). Falling back to anchored query.")
         startAnchoredQuery()
     }
 }

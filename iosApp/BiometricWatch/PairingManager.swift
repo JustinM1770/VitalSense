@@ -3,6 +3,9 @@
 
 import Foundation
 import WatchKit
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "Pairing")
 
 class PairingManager {
 
@@ -38,7 +41,7 @@ class PairingManager {
         let code = String((0..<8).map { _ in characters.randomElement()! })
         prefs.set(code,                          forKey: keyPairingCode)
         prefs.set(Date().timeIntervalSince1970,  forKey: keyLastCodeTime)
-        print("[PairingManager] Generated code: \(code)")
+        logger.debug("Generated code: \(code)")
         return code
     }
 
@@ -71,14 +74,14 @@ class PairingManager {
             guard let self, let data, error == nil,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let token = json["idToken"] as? String else {
-                print("[PairingManager] Anonymous auth failed: \(error?.localizedDescription ?? "unknown")")
+                logger.error("Anonymous auth failed: \(error?.localizedDescription ?? "unknown")")
                 completion(nil)
                 return
             }
 
             self.cachedToken = token
             self.tokenExpiry = Date().addingTimeInterval(55 * 60) // 55 min
-            print("[PairingManager] Anonymous auth OK")
+            logger.info("Anonymous auth OK")
             completion(token)
         }.resume()
     }
@@ -114,24 +117,24 @@ class PairingManager {
             do {
                 request.httpBody = try JSONSerialization.data(withJSONObject: data)
             } catch {
-                print("[PairingManager] Serialization error: \(error)")
+                logger.error("Serialization error: \(error)")
                 completion(false)
                 return
             }
 
             URLSession.shared.dataTask(with: request) { _, response, error in
                 if let error = error {
-                    print("[PairingManager] Network error: \(error.localizedDescription)")
+                    logger.error("Network error: \(error.localizedDescription)")
                     completion(false)
                     return
                 }
 
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 if status == 200 {
-                    print("[PairingManager] Code \(code) registered in Firebase ✓")
+                    logger.info("Code \(code) registered in Firebase")
                     completion(true)
                 } else {
-                    print("[PairingManager] Firebase rejected write: HTTP \(status)")
+                    logger.error("Firebase rejected write: HTTP \(status)")
                     completion(false)
                 }
             }.resume()
@@ -167,7 +170,7 @@ class PairingManager {
                         self.prefs.set(true,   forKey: self.keyPaired)
                         self.prefs.set(userId, forKey: self.keyUserId)
 
-                        print("[PairingManager] Paired successfully with userId: \(userId)")
+                        logger.info("Paired successfully with userId: \(userId)")
                         DispatchQueue.main.async { callback(userId) }
                     }
                 }.resume()
@@ -181,6 +184,6 @@ class PairingManager {
         prefs.set(false, forKey: keyPaired)
         prefs.removeObject(forKey: keyUserId)
         prefs.removeObject(forKey: keyPairingCode)
-        print("[PairingManager] Unpaired")
+        logger.info("Unpaired")
     }
 }

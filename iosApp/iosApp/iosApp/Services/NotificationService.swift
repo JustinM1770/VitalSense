@@ -4,9 +4,12 @@
 import Foundation
 import Combine
 import UserNotifications
+import OSLog
 #if os(iOS)
 import UIKit
 #endif
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios", category: "Notifications")
 
 // MARK: - Notification Types
 
@@ -61,7 +64,7 @@ class NotificationService: NSObject, ObservableObject {
             await MainActor.run { isAuthorized = granted }
             if granted { registerCategories() }
         } catch {
-            print("[Notifications] Auth error: \(error.localizedDescription)")
+            logger.error("Auth error: \(error.localizedDescription)")
         }
     }
 
@@ -159,9 +162,9 @@ class NotificationService: NSObject, ObservableObject {
 
         do {
             try await center.add(request)
-            print("[Notifications] Programada: \(title) en \(delay)s")
+            logger.debug("Programada: \(title) en \(delay)s")
         } catch {
-            print("[Notifications] Error al programar: \(error.localizedDescription)")
+            logger.error("Error al programar: \(error.localizedDescription)")
         }
     }
 
@@ -171,7 +174,7 @@ class NotificationService: NSObject, ObservableObject {
     func simulateAllNotifications() async {
         await scheduleNotification(
             type: .healthAlert,
-            title: "🚨 Alerta Crítica — VitalSense",
+            title: "🚨 Alerta Crítica — BioMetric AI",
             body: "SpO₂ bajo detectado: 88%. Consulta a tu médico de inmediato.",
             delay: 1
         )
@@ -189,7 +192,7 @@ class NotificationService: NSObject, ObservableObject {
         )
         await scheduleNotification(
             type: .dailyInsight,
-            title: "💡 Resumen de salud — VitalSense",
+            title: "💡 Resumen de salud — BioMetric AI",
             body: "Buen día. Tus vitales de hoy están estables. Sueño: 78%. FC: 72 bpm. SpO₂: 97%.",
             delay: 10
         )
@@ -205,7 +208,7 @@ class NotificationService: NSObject, ObservableObject {
     #if os(iOS)
     func simulateFromAnalysis(_ analysis: HealthAnalysis) async {
         if analysis.immediateAlert, let msg = analysis.alertMessage {
-            await scheduleNotification(type: .healthAlert, title: "🚨 Alerta Médica — VitalSense", body: msg, delay: 1)
+            await scheduleNotification(type: .healthAlert, title: "🚨 Alerta Médica — BioMetric AI", body: msg, delay: 1)
         }
 
         for (i, pred) in analysis.predictions.prefix(3).enumerated() {
@@ -286,7 +289,7 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         switch actionId {
         case "TAKEN":
             let medName = userInfo["medName"] as? String ?? ""
-            print("[Notifications] Medicamento tomado: \(medName)")
+            logger.info("Medicamento tomado: \(medName)")
         case "SNOOZE":
             if let type = userInfo["notifType"] as? String,
                let vType = VitalNotificationType(rawValue: type) {

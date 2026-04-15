@@ -17,30 +17,34 @@ struct DashboardView: View {
     @State private var currentMetricPage = 0
     @State private var showDemoSheet = false
 
-    private let metricPages: [MetricCardType] = [.sleep, .spo2, .heartRate, .kcal]
-
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .top) {
-                Color.white.ignoresSafeArea()
+        ZStack(alignment: .top) {
+            Color.white.ignoresSafeArea()                           // status bar → blanco
+            Color.dashBgAlt
+                .padding(.top, 280)                                 // no empieza hasta después del header
+                .ignoresSafeArea(edges: .bottom)                    // se extiende detrás del home indicator
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
-                        Spacer().frame(height: Spacing.xxl)
+                        // Sección blanca: avatar, nombre, barra de búsqueda
+                        VStack(spacing: 0) {
+                            Spacer().frame(height: Spacing.xxl)
 
-                        UserHeaderView(
-                            name: vm.userName,
-                            initial: vm.userInitial,
-                            onDemoTap: { showDemoSheet = true }
-                        )
-                        .padding(.horizontal, Spacing.xxl)
-
-                        Spacer().frame(height: Spacing.xxl)
-
-                        DashboardSearchBarView()
+                            UserHeaderView(
+                                name: vm.userName,
+                                initial: vm.userInitial,
+                                onDemoTap: { showDemoSheet = true }
+                            )
                             .padding(.horizontal, Spacing.xxl)
 
-                        Spacer().frame(height: Spacing.xxl)
+                            Spacer().frame(height: Spacing.xxl)
+
+                            DashboardSearchBarView()
+                                .padding(.horizontal, Spacing.xxl)
+
+                            Spacer().frame(height: Spacing.xxl)
+                        }
+                        .background(Color.white)
 
                         // ── Blue rounded container ───────────────────────
                         VStack(alignment: .leading, spacing: 0) {
@@ -49,15 +53,22 @@ struct DashboardView: View {
                             HStack {
                                 DashboardSectionHeader(title: "Esta semana")
                                 Spacer()
-                                Button(action: {}) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.white)
-                                            .frame(width: 30, height: 30)
-                                            .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
-                                        Text("+")
-                                            .font(.manropeBold(size: 18))
-                                            .foregroundColor(Color.primaryBlue)
+                                if vm.visibleMetrics.count < 4 {
+                                    Button(action: {
+                                        withAnimation {
+                                            vm.addNextMetric()
+                                            currentMetricPage = vm.visibleMetrics.count - 1
+                                        }
+                                    }) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color.white)
+                                                .frame(width: 30, height: 30)
+                                                .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
+                                            Text("+")
+                                                .font(.manropeBold(size: 18))
+                                                .foregroundColor(Color.primaryBlue)
+                                        }
                                     }
                                 }
                             }
@@ -67,8 +78,8 @@ struct DashboardView: View {
                             Spacer().frame(height: Spacing.lg)
 
                             TabView(selection: $currentMetricPage) {
-                                ForEach(metricPages.indices, id: \.self) { i in
-                                    metricCard(for: metricPages[i])
+                                ForEach(vm.visibleMetrics.indices, id: \.self) { i in
+                                    metricCard(for: vm.visibleMetrics[i])
                                         .padding(.horizontal, Spacing.xxl)
                                         .tag(i)
                                 }
@@ -77,7 +88,7 @@ struct DashboardView: View {
                             .frame(height: 155)
 
                             HStack(spacing: 6) {
-                                ForEach(metricPages.indices, id: \.self) { i in
+                                ForEach(vm.visibleMetrics.indices, id: \.self) { i in
                                     Circle()
                                         .fill(i == currentMetricPage ? Color.primaryBlue : Color.white.opacity(0.5))
                                         .frame(width: 6, height: 6)
@@ -117,7 +128,7 @@ struct DashboardView: View {
 
                             Spacer().frame(height: Spacing.xxl)
 
-                            MedicationsCardView(medications: vm.medications)
+                            MedicationsCardView(medications: vm.medications, onMarkTaken: { vm.markMedicationTaken($0) })
                                 .padding(.horizontal, Spacing.xxl)
 
                             Spacer().frame(height: Spacing.xxl)
@@ -157,10 +168,10 @@ struct DashboardView: View {
                         .background(Color.dashBgAlt)
                         .clipShape(
                             UnevenRoundedRectangle(
-                                topLeadingRadius: 36,
+                                topLeadingRadius: 44,
                                 bottomLeadingRadius: 0,
                                 bottomTrailingRadius: 0,
-                                topTrailingRadius: 35
+                                topTrailingRadius: 44
                             )
                         )
                     }
@@ -175,7 +186,6 @@ struct DashboardView: View {
                 }
             }
             .navigationBarHidden(true)
-        }
         .onAppear {
             vm.startObserving()
             // Restore demo mode if it was active before
@@ -192,22 +202,44 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func metricCard(for type: MetricCardType) -> some View {
-        switch type {
-        case .sleep:
-            SleepMetricPagerCard(sleepData: vm.sleepData)
-        case .spo2:
-            Spo2MiniCard(patients: vm.patients)
-        case .heartRate:
-            HrMiniCard(patients: vm.patients)
-        case .kcal:
-            KcalMiniCard(patients: vm.patients)
+        ZStack(alignment: .topTrailing) {
+            Group {
+                switch type {
+                case .sleep:
+                    SleepMetricPagerCard(sleepData: vm.sleepData)
+                case .spo2:
+                    Spo2MiniCard(patients: vm.patients)
+                case .heartRate:
+                    HrMiniCard(patients: vm.patients)
+                case .glucose:
+                    GlucoseMiniCard(glucose: vm.libreLastGlucose)
+                case .kcal:
+                    KcalMiniCard(patients: vm.patients)
+                }
+            }
+            
+            // Botón tachita (X) para eliminar de la vista
+            if vm.visibleMetrics.count > 1 {
+                Button {
+                    withAnimation {
+                        vm.removeMetric(type)
+                        // Ajustar página actual si fuera necesario
+                        if currentMetricPage >= vm.visibleMetrics.count {
+                            currentMetricPage = max(0, vm.visibleMetrics.count - 1)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Color.textSecondary.opacity(0.5))
+                        .font(.system(size: 22))
+                        .padding(10)
+                }
+            }
         }
     }
 }
 
-private enum MetricCardType {
-    case sleep, spo2, heartRate, kcal
-}
+/// Enum se movió a DashboardViewModel
 
 // MARK: - Demo Mode Sheet
 struct DemoModeSheet: View {
@@ -613,6 +645,58 @@ struct HrMiniCard: View {
     }
 }
 
+// MARK: - Glucose Mini Card
+struct GlucoseMiniCard: View {
+    let glucose: Double
+    
+    private var glucoseColor: Color {
+        if glucose <= 0 { return Color(hex: "#6B7A8D") }
+        if glucose < 70 { return Color.errorRed }
+        if glucose <= 140 { return Color.successGreen }
+        return Color.warningAmber
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .stroke(glucoseColor.opacity(0.2), lineWidth: 6)
+                    .frame(width: 70, height: 70)
+                Circle()
+                    .trim(from: 0, to: CGFloat(min(max(glucose / 200.0, 0), 1)))
+                    .stroke(glucoseColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: 70, height: 70)
+                VStack(spacing: 0) {
+                    Text("\(Int(glucose))")
+                        .font(.manropeBold(size: 14))
+                        .foregroundColor(Color.textDark)
+                    Text("mg/dL")
+                        .font(.manrope(size: 8))
+                        .foregroundColor(Color.textSecondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Glucosa")
+                    .font(.manropeBold(size: 18))
+                    .foregroundColor(glucoseColor)
+                Text(glucose > 140 ? "Elevada" : glucose > 70 ? "Normal" : glucose > 0 ? "Baja" : "Sin datos")
+                    .font(.manropeSemiBold(size: 13))
+                    .foregroundColor(glucoseColor)
+                Text("Última lectura Libre")
+                    .font(.manrope(size: 12))
+                    .foregroundColor(Color.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(20)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .vsShadow(.medium)
+    }
+}
+
 // MARK: - Kcal Mini Card
 struct KcalMiniCard: View {
     let patients: [VitalsDataiOS]
@@ -827,6 +911,7 @@ struct HealthMetricsGraphCard: View {
 // MARK: - Medications Card
 struct MedicationsCardView: View {
     let medications: [MedicationiOS]
+    var onMarkTaken: ((MedicationiOS) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -857,12 +942,12 @@ struct MedicationsCardView: View {
                 ForEach(medications) { med in
                     HStack(spacing: 12) {
                         Circle()
-                            .fill(Color.primaryBlue.opacity(0.12))
+                            .fill(med.takenToday ? Color.successGreen.opacity(0.12) : Color.primaryBlue.opacity(0.12))
                             .frame(width: 36, height: 36)
                             .overlay(
-                                Image(systemName: "pill.fill")
+                                Image(systemName: med.takenToday ? "checkmark" : "pill.fill")
                                     .font(.manrope(size: 14))
-                                    .foregroundColor(Color.primaryBlue)
+                                    .foregroundColor(med.takenToday ? Color.successGreen : Color.primaryBlue)
                             )
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -874,6 +959,21 @@ struct MedicationsCardView: View {
                                 .foregroundColor(Color.textSecondary)
                         }
                         Spacer()
+                        if med.takenToday {
+                            Text("Tomado")
+                                .font(.manropeSemiBold(size: 11))
+                                .foregroundColor(Color.successGreen)
+                        } else {
+                            Button("Tomar") {
+                                onMarkTaken?(med)
+                            }
+                            .font(.manropeSemiBold(size: 12))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.primaryBlue)
+                            .clipShape(Capsule())
+                        }
                     }
                 }
             }

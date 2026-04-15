@@ -50,6 +50,7 @@ class WatchViewModel: ObservableObject {
         nc.addObserver(self, selector: #selector(onSosResolved),      name: .sosResolved,           object: nil)
         nc.addObserver(self, selector: #selector(onUserIdReceived),   name: .userIdReceived,        object: nil)
         nc.addObserver(self, selector: #selector(onPairingSuccess),   name: .pairingSuccessful,     object: nil)
+        nc.addObserver(self, selector: #selector(onUnpaired),         name: .unpaired,              object: nil)
     }
 
     @objc private func onHeartRate(_ n: Notification) {
@@ -84,7 +85,8 @@ class WatchViewModel: ObservableObject {
 
     @objc private func onUserIdReceived() {
         DispatchQueue.main.async {
-            self.isPaired = PairingManager.shared.isPaired
+            // userId llegó via WatchConnectivity desde el iPhone → emparejamiento exitoso
+            self.isPaired = true
             self.startServices()
         }
     }
@@ -93,6 +95,15 @@ class WatchViewModel: ObservableObject {
         DispatchQueue.main.async {
             self.isPaired = true
             self.startServices()
+        }
+    }
+
+    @objc private func onUnpaired() {
+        DispatchQueue.main.async {
+            self.isPaired = false
+            self.heartRate = 0
+            self.vitalService.stopMonitoring()
+            self.firebase.stopPolling()
         }
     }
 }

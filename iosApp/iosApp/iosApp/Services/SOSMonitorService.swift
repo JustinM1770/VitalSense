@@ -8,6 +8,9 @@ import Combine
 import FirebaseAuth
 import FirebaseDatabase
 import UserNotifications
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios", category: "SOSMonitor")
 
 struct SOSAlert: Identifiable {
     let id:        String
@@ -106,7 +109,7 @@ class SOSMonitorService: ObservableObject {
         let request = UNNotificationRequest(identifier: "sos-\(alert.id)", content: content, trigger: trigger)
 
         UNUserNotificationCenter.current().add(request) { error in
-            if let error { print("[SOSMonitor] Notification error: \(error)") }
+            if let error { logger.error("Notification error: \(error)") }
         }
     }
 

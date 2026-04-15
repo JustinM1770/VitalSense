@@ -68,6 +68,7 @@
 		D079078D2F7ED28000DB5B1C /* biometricwatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "biometricwatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D5BD041D67E542E8A4905B93 /* InterfaceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InterfaceController.swift; path = ../BiometricWatch/InterfaceController.swift; sourceTree = "<group>"; };
 		F8A72DA75F0E41ECA8497B84 /* WatchConnectivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WatchConnectivityManager.swift; path = ../BiometricWatch/WatchConnectivityManager.swift; sourceTree = "<group>"; };
+		AABB00110011AABB00110011 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -126,6 +127,7 @@
 				D050919B2F6C625C00B5DB2F /* Frameworks */,
 				D05091392F6C5AC200B5DB2F /* Products */,
 				D07D982C2F7F044600574EF8 /* Recovered References */,
+				AABB00110011AABB00110011 /* Secrets.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -439,6 +441,7 @@
 		};
 		D05091442F6C5ACC00B5DB2F /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AABB00110011AABB00110011 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -474,6 +477,7 @@
 		};
 		D05091452F6C5ACC00B5DB2F /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AABB00110011AABB00110011 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

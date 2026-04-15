@@ -132,20 +132,20 @@ fun List<VitalsSnapshot>.detectRapidDegradation(): RapidDegradationEvent? {
         latest.spo2 > 0 && spo2Drop >= 5 ->
             RapidDegradationEvent(
                 type    = DegradationType.SPO2_RAPID_DROP,
-                message = "SpO₂ cayó ${spo2Drop} % en ${"%.0f".format(dtMin)} min " +
+                message = "SpO₂ cayó ${spo2Drop} % en ${dtMin.toInt()} min " +
                           "(${reference.spo2} % → ${latest.spo2} %)",
             )
         latest.heartRate > 0 && hrRise >= 30 ->
             RapidDegradationEvent(
                 type    = DegradationType.HR_RAPID_RISE,
-                message = "FC subió $hrRise BPM en ${"%.0f".format(dtMin)} min " +
+                message = "FC subió $hrRise BPM en ${dtMin.toInt()} min " +
                           "(${reference.heartRate} → ${latest.heartRate} BPM)",
             )
         latest.glucose > 0 && glucDrop >= 30.0 ->
             RapidDegradationEvent(
                 type    = DegradationType.GLUCOSE_RAPID_DROP,
-                message = "Glucosa cayó ${"%.0f".format(glucDrop)} mg/dL en " +
-                          "${"%.0f".format(dtMin)} min",
+                message = "Glucosa cayó ${glucDrop.toInt()} mg/dL en " +
+                          "${dtMin.toInt()} min",
             )
         else -> null
     }

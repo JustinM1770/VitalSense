@@ -28,23 +28,23 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>GEMINI_API_KEY</key>
-	<string>AIzaSyBBGay1JhANrk5jh2fNbKa84fwjvki5S_E</string>
+	<string>$(GEMINI_API_KEY)</string>
 	<key>GIDClientID</key>
-	<string>576196499899-64b9179g789khvjv8q1idqvet829bpvj.apps.googleusercontent.com</string>
+	<string>$(GID_CLIENT_ID)</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>VitalSense usa Bluetooth para conectarse con el sensor wearable VitalSense y recibir signos vitales en tiempo real.</string>
+	<string>BioMetric AI usa Bluetooth para conectarse con el sensor wearable BioMetric AI y recibir signos vitales en tiempo real.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>VitalSense usa Bluetooth para conectarse con el sensor wearable VitalSense y recibir signos vitales en tiempo real.</string>
+	<string>BioMetric AI usa Bluetooth para conectarse con el sensor wearable BioMetric AI y recibir signos vitales en tiempo real.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>VitalSense usa Face ID para proteger tu información de salud</string>
+	<string>BioMetric AI usa Face ID para proteger tu información de salud</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>VitalSense necesita acceso a tus datos de salud para mostrar frecuencia cardíaca, SpO₂, sueño y calorías de tu Apple Watch en tiempo real.</string>
+	<string>BioMetric AI necesita acceso a tus datos de salud para mostrar frecuencia cardíaca, SpO₂, sueño y calorías de tu Apple Watch en tiempo real.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>VitalSense guarda registros de tus signos vitales para generar reportes y alertas de emergencia.</string>
+	<string>BioMetric AI guarda registros de tus signos vitales para generar reportes y alertas de emergencia.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>VitalSense incluye tu ubicación en las alertas SOS para que tus contactos de emergencia puedan localizarte.</string>
+	<string>BioMetric AI incluye tu ubicación en las alertas SOS para que tus contactos de emergencia puedan localizarte.</string>
 	<key>NSUserNotificationsUsageDescription</key>
-	<string>VitalSense envía alertas de salud críticas, predicciones de enfermedades crónicas y recordatorios de medicamentos basados en tus signos vitales.</string>
+	<string>BioMetric AI envía alertas de salud críticas, predicciones de enfermedades crónicas y recordatorios de medicamentos basados en tus signos vitales.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>manrope_medium.ttf</string>

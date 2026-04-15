@@ -15,10 +15,33 @@ class DailyReportViewModel: ObservableObject {
     @Published var sleepScore: Int = 0
     @Published var sleepEstado: String = "Sin datos"
     @Published var sleepHoras: Double = 0
-    @Published var selectedFilter: String = "Hoy"
+    @Published var selectedFilter: String = "Hoy" {
+        didSet { loadFromFirebase() }
+    }
 
     private var ref: DatabaseReference?
     private let filters = ["Hoy", "Ayer", "7 días", "Mes"]
+
+    /// Rango de timestamps en milisegundos para el filtro activo.
+    /// Firebase almacena timestamp = Date().timeIntervalSince1970 * 1000
+    private var filterRange: (start: Double, end: Double) {
+        let cal = Calendar.current
+        let now = Date()
+        func ms(_ date: Date) -> Double { date.timeIntervalSince1970 * 1000 }
+        switch selectedFilter {
+        case "Ayer":
+            let yesterday = cal.date(byAdding: .day, value: -1, to: now)!
+            return (ms(cal.startOfDay(for: yesterday)), ms(cal.startOfDay(for: now)))
+        case "7 días":
+            let start = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: now))!
+            return (ms(start), ms(now))
+        case "Mes":
+            let start = cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: now))!
+            return (ms(start), ms(now))
+        default: // "Hoy"
+            return (ms(cal.startOfDay(for: now)), ms(now))
+        }
+    }
 
     func load() {
         loadFromFirebase()
@@ -27,14 +50,17 @@ class DailyReportViewModel: ObservableObject {
 
     private func loadFromFirebase() {
         guard let uid = Auth.auth().currentUser?.uid else { return }
+        let range = filterRange
         ref = Database.database().reference().child("patients/\(uid)/history")
-        ref?.queryOrdered(byChild: "timestamp").queryLimited(toLast: 50)
+        ref?.queryOrdered(byChild: "timestamp")
+            .queryStarting(atValue: range.start)
+            .queryEnding(atValue: range.end)
             .observeSingleEvent(of: .value) { [weak self] snap in
                 guard let self else { return }
                 var hrs: [Double] = []; var spo2s: [Double] = []; var gls: [Double] = []
                 for child in snap.children {
-                    let s = child as! DataSnapshot
-                    let d = s.value as? [String: Any] ?? [:]
+                    guard let s = child as? DataSnapshot,
+                          let d = s.value as? [String: Any] else { continue }
                     if let hr = d["heartRate"] as? Double, hr > 0 { hrs.append(hr) }
                     else if let hr = d["heartRate"] as? Int, hr > 0 { hrs.append(Double(hr)) }
                     if let sp = d["spo2"] as? Double, sp > 0 { spo2s.append(sp) }
@@ -42,9 +68,9 @@ class DailyReportViewModel: ObservableObject {
                     if let gl = d["glucose"] as? Double, gl > 0 { gls.append(gl) }
                 }
                 DispatchQueue.main.async {
-                    self.heartRates    = Array(hrs.suffix(14))
-                    self.spo2Values    = Array(spo2s.suffix(14))
-                    self.glucoseValues = Array(gls.suffix(14))
+                    self.heartRates    = hrs
+                    self.spo2Values    = spo2s
+                    self.glucoseValues = gls
                     self.avgHR      = hrs.isEmpty ? 0 : hrs.reduce(0, +) / Double(hrs.count)
                     self.avgSpo2    = spo2s.isEmpty ? 0 : spo2s.reduce(0, +) / Double(spo2s.count)
                     self.avgGlucose = gls.isEmpty ? 0 : gls.reduce(0, +) / Double(gls.count)
@@ -88,6 +114,29 @@ struct DailyReportView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
+                    // ── In-content header ────────────────────────────────
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(Color.primaryBlue)
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .foregroundColor(.white)
+                                .font(.system(size: 16))
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Reporte Diario")
+                                .font(.manropeBold(size: 22))
+                                .foregroundColor(Color.textPrimary)
+                            Text(Date(), style: .date)
+                                .font(.manrope(size: 13))
+                                .foregroundColor(Color.textSecondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, Spacing.xl)
+                    .padding(.top, 8)
+
                     // Filter chips
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -179,19 +228,7 @@ struct DailyReportView: View {
                 .padding(.top, 16)
         }
         .background(Color.white.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(Date(), style: .date)
-                        .font(Font.custom("MavenPro-Medium", size: 14))
-                        .foregroundColor(Color(hex: "#7E7E7E"))
-                    Text("Reporte Diario")
-                        .font(.manropeBold(size: 22))
-                        .foregroundColor(Color.textPrimary)
-                }
-            }
-        }
+        .navigationBarHidden(true)
         .onAppear { vm.load() }
     }
 }
@@ -201,13 +238,41 @@ struct HealthRadarCard: View {
     @ObservedObject var vm: DailyReportViewModel
 
     private var sleepPct:   CGFloat { CGFloat(vm.sleepScore) / 100 }
-    private var glucosePct: CGFloat { vm.avgGlucose > 0 ? CGFloat(min(vm.avgGlucose / 140, 1)) : 0.6 }
-    private var spo2Pct:    CGFloat { vm.avgSpo2 > 0 ? CGFloat(min(vm.avgSpo2 / 100, 1)) : 0.9 }
-    private var hrPct:      CGFloat { vm.avgHR > 0 ? CGFloat(min(vm.avgHR / 160, 1)) : 0.5 }
-    private var actPct:     CGFloat { 0.7 }
+    private var glucosePct: CGFloat { vm.avgGlucose > 0 ? CGFloat(min(vm.avgGlucose / 140, 1)) : 0 }
+    private var spo2Pct:    CGFloat { vm.avgSpo2 > 0 ? CGFloat(min(vm.avgSpo2 / 100, 1)) : 0 }
+    private var hrPct:      CGFloat { vm.avgHR > 0 ? CGFloat(min(vm.avgHR / 160, 1)) : 0 }
+    private var actPct:     CGFloat { 0 }
+
+    /// Composite health score from available vitals data.
+    private var compositeScore: Int {
+        var scores: [Int] = []
+        if vm.sleepScore > 0 { scores.append(vm.sleepScore) }
+        if vm.avgHR > 0 {
+            // HR 60-100 normal range → 100 pts; penalize deviation
+            let hrScore = max(0, 100 - Int(abs(vm.avgHR - 75) * 2))
+            scores.append(min(100, hrScore))
+        }
+        if vm.avgSpo2 > 0 {
+            let spo2Score = vm.avgSpo2 >= 95 ? 100 : max(0, Int((vm.avgSpo2 - 85) * 10))
+            scores.append(min(100, spo2Score))
+        }
+        if vm.avgGlucose > 0 {
+            let glScore = (vm.avgGlucose >= 70 && vm.avgGlucose <= 140) ? 100
+                          : max(0, 100 - Int(abs(vm.avgGlucose - 105) / 1.5))
+            scores.append(min(100, glScore))
+        }
+        guard !scores.isEmpty else { return 0 }
+        return scores.reduce(0, +) / scores.count
+    }
+
+    private var scoreLabel: String {
+        compositeScore >= 85 ? "Excelente" : compositeScore >= 70 ? "Bueno"
+            : compositeScore >= 50 ? "Regular" : compositeScore > 0 ? "Bajo" : "Sin datos"
+    }
 
     private var scoreColor: Color {
-        vm.sleepScore >= 85 ? Color.successGreen : vm.sleepScore >= 60 ? Color.warningAmber : Color.heartRateRed
+        compositeScore >= 85 ? Color.successGreen : compositeScore >= 60 ? Color.warningAmber
+            : compositeScore > 0 ? Color.heartRateRed : Color.textHint
     }
 
     var body: some View {
@@ -223,10 +288,10 @@ struct HealthRadarCard: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(vm.sleepScore)")
+                    Text("\(compositeScore)")
                         .font(.system(size: 32, weight: .black))
                         .foregroundColor(scoreColor)
-                    Text(vm.sleepEstado)
+                    Text(scoreLabel)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(scoreColor)
                 }

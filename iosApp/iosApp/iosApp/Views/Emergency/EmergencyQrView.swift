@@ -262,17 +262,17 @@ struct LoadingContent: View {
     @State private var scale: CGFloat = 1.0
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "shield.lefthalf.filled")
+            Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 56))
                 .foregroundColor(onEmergency)
                 .scaleEffect(scale)
                 .onAppear {
                     withAnimation(.easeInOut(duration: 0.6).repeatForever()) { scale = 1.25 }
                 }
-            Text("Activando Protocolo IDENTIMEX...")
+            Text("Activando alerta de emergencia...")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundColor(onEmergency)
-            Text("Generando Ficha Clínica de Emergencia")
+            Text("Notificando contactos de confianza")
                 .font(.system(size: 13))
                 .foregroundColor(onEmergency.opacity(0.75))
             ProgressView().tint(onEmergency)
@@ -280,11 +280,11 @@ struct LoadingContent: View {
     }
 }
 
-// MARK: - Active
+// MARK: - Active (simplified iPhone view — QR is on Apple Watch)
 
 struct ActiveContent: View {
     let pin:           String
-    let publicQR:      UIImage?
+    let publicQR:      UIImage?      // retained by VM, not used on iPhone
     let anomalyType:   String
     let tokenId:       String
     let profile:       PublicPatientProfile
@@ -293,7 +293,7 @@ struct ActiveContent: View {
     let onResolve:     () -> Void
     let onResendWhatsApp: () -> Void
 
-    @State private var scale: CGFloat = 1.0
+    @State private var pulse: CGFloat = 1.0
 
     private var timeString: String {
         let m = remainingSecs / 60; let s = remainingSecs % 60
@@ -303,141 +303,128 @@ struct ActiveContent: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
+            VStack(spacing: 24) {
                 Spacer().frame(height: Spacing.xxl)
 
-                // Header
+                // Pulsing emergency icon
                 ZStack {
-                    Circle().fill(Color.white.opacity(0.18)).frame(width: 84, height: 84)
-                    Image(systemName: "shield.lefthalf.filled")
+                    Circle()
+                        .fill(Color.white.opacity(0.12))
+                        .frame(width: 120, height: 120)
+                        .scaleEffect(pulse)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                                pulse = 1.15
+                            }
+                        }
+                    Circle()
+                        .fill(Color.white.opacity(0.18))
+                        .frame(width: 90, height: 90)
+                    Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 44))
                         .foregroundColor(onEmergency)
-                        .scaleEffect(scale)
-                        .onAppear { withAnimation(.easeInOut(duration: 0.7).repeatForever()) { scale = 1.18 } }
                 }
 
-                VStack(spacing: 4) {
-                    Text("PROTOCOLO IDENTIMEX")
-                        .font(.system(size: 18, weight: .black))
+                // Title
+                VStack(spacing: 6) {
+                    Text("EMERGENCIA ACTIVA")
+                        .font(.system(size: 20, weight: .black))
                         .foregroundColor(onEmergency)
-                        .tracking(1.5)
-                    Text("BioMetric AI — Activado")
-                        .font(.system(size: 12, weight: .semibold))
+                        .tracking(2)
+                    Text("BioMetric AI — Protocolo iniciado")
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(onEmergency.opacity(0.75))
                 }
 
+                // Anomaly type
                 Text(anomalyType)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 14).padding(.vertical, 6)
+                    .padding(.horizontal, 20).padding(.vertical, 10)
                     .background(Color.white.opacity(0.2))
                     .clipShape(Capsule())
 
-                // ── QR PÚBLICO ─────────────────────────────────────────────
-                // Contiene solo datos no sensibles: tipo de sangre, alergias,
-                // padecimientos conocidos. Sin PIN. Sin historial clínico.
-                // Cualquier paramédico puede escanearlo sin autenticación.
-                VStack(spacing: 10) {
-                    Text("Datos de emergencia — Sin PIN requerido")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(onEmergency.opacity(0.7))
-                        .tracking(0.5)
-
-                    if let img = publicQR {
-                        Image(uiImage: img)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 180, height: 180)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else {
-                        RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.3))
-                            .frame(width: 180, height: 180)
-                            .overlay(ProgressView().tint(.white))
-                    }
-
-                    // Datos públicos visibles al lado del QR
-                    HStack(spacing: 16) {
-                        PublicDataPill(icon: "drop.fill",     label: "Sangre",    value: profile.tipoSangre)
-                        PublicDataPill(icon: "allergens",     label: "Alergias",  value: profile.alergias.isEmpty ? "—" : "Ver QR")
-                        PublicDataPill(icon: "stethoscope",   label: "Condición", value: "Ver QR")
-                    }
-
-                    Text("Muestra este QR al paramédico — acceso inmediato sin contraseña")
-                        .font(.system(size: 11))
-                        .foregroundColor(onEmergency.opacity(0.75))
-                        .multilineTextAlignment(.center)
+                // Patient info pills
+                HStack(spacing: 12) {
+                    EmergencyInfoPill(icon: "person.fill",    label: profile.nombre.isEmpty ? "Paciente" : profile.nombre)
+                    EmergencyInfoPill(icon: "drop.fill",      label: profile.tipoSangre)
                 }
-                .padding(20)
+                .padding(.horizontal, Spacing.xl)
+
+                // Watch QR notice
+                HStack(spacing: 10) {
+                    Image(systemName: "applewatch")
+                        .font(.system(size: 18))
+                        .foregroundColor(onEmergency)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("QR disponible en tu Apple Watch")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(onEmergency)
+                        Text("Muestra la pantalla del reloj al paramédico para acceso inmediato")
+                            .font(.system(size: 11))
+                            .foregroundColor(onEmergency.opacity(0.75))
+                    }
+                }
+                .padding(16)
                 .background(Color.white.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(.horizontal, Spacing.xl)
 
-                // ── WHATSAPP (cifrado E2E) ──────────────────────────────────
-                // El expediente completo + PIN viajan solo por canal E2E cifrado.
-                // Cumple NOM-024-SSA3: el PIN nunca se expone en pantalla pública
-                // ni se transmite en texto plano.
+                // WhatsApp status
                 WhatsAppStatusPanel(status: whatsappStatus, onResend: onResendWhatsApp)
+                    .padding(.horizontal, Spacing.xl)
 
-                // Timer
+                // Countdown timer
                 VStack(spacing: 4) {
                     Text(timeString)
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .font(.system(size: 36, weight: .black, design: .monospaced))
                         .foregroundColor(timerColor)
                     Text("Sesión de emergencia activa")
-                        .font(.system(size: 12)).foregroundColor(onEmergency.opacity(0.7))
+                        .font(.system(size: 12))
+                        .foregroundColor(onEmergency.opacity(0.7))
                 }
+                .padding(.vertical, 8)
 
-                // Resolve
+                // Resolve button
                 Button(action: onResolve) {
-                    Text("Resolver — Protocolo IDENTIMEX")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(emergencyRed)
-                        .frame(maxWidth: .infinity).frame(height: 52)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18))
+                        Text("Estoy bien — Resolver emergencia")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(emergencyRed)
+                    .frame(maxWidth: .infinity).frame(height: 56)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
                 }
-                .padding(.horizontal, Spacing.xxl)
-
-                // Compliance footer
-                HStack(spacing: 5) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(onEmergency.opacity(0.45))
-                    Text("NOM-024-SSA3 • PIN exclusivamente por WhatsApp E2E • QR público sin datos sensibles")
-                        .font(.system(size: 9))
-                        .foregroundColor(onEmergency.opacity(0.45))
-                        .multilineTextAlignment(.center)
-                }
+                .padding(.horizontal, Spacing.xl)
 
                 Spacer().frame(height: 32)
             }
-            .padding(.horizontal, Spacing.xxl)
         }
     }
 }
 
-// MARK: - Public Data Pill
+// MARK: - Emergency Info Pill
 
-private struct PublicDataPill: View {
-    let icon: String; let label: String; let value: String
+private struct EmergencyInfoPill: View {
+    let icon: String; let label: String
     var body: some View {
-        VStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundColor(onEmergency)
             Text(label)
-                .font(.system(size: 9))
-                .foregroundColor(onEmergency.opacity(0.65))
-            Text(value)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.12))
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.15))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }

@@ -32,6 +32,9 @@ iosApp/iosApp/DerivedData/
 # Mover a ~/.gradle/gradle.properties para mayor seguridad
 # GEMINI_API_KEY está en gradle.properties — no commitear si el repo es público
 
+# iOS API Keys (xcconfig con secrets reales)
+iosApp/iosApp/Secrets.xcconfig
+
 # Keystore files
 *.jks
 *.keystore

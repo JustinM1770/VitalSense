@@ -12,7 +12,7 @@ struct ChatBotView: View {
     var initialContext: String = ""
 
     @State private var messages: [ChatMessage] = [
-        ChatMessage(text: "Hola, soy tu asistente de salud VitalSense. ¿En qué puedo ayudarte hoy? Puedo analizar tus signos vitales, explicar predicciones de riesgo o responder preguntas de salud.", isUser: false)
+        ChatMessage(text: "Hola, soy tu asistente de salud BioMetric AI. ¿En qué puedo ayudarte hoy? Puedo analizar tus signos vitales, explicar predicciones de riesgo o responder preguntas de salud.", isUser: false)
     ]
     @State private var inputText = ""
     @State private var isLoading = false
@@ -65,34 +65,39 @@ struct ChatBotView: View {
                     }
                 }
 
-                // Input bar
-                HStack(spacing: 12) {
-                    TextField("Escribe tu pregunta...", text: $inputText)
-                        .font(.manrope(size: 14))
-                        .foregroundColor(Color.textPrimary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color.surfaceGray)
-                        .cornerRadius(24)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24)
-                                .stroke(Color.borderGray, lineWidth: 1)
-                        )
-                        .submitLabel(.send)
-                        .onSubmit { sendMessage() }
+                // Input bar — padded to clear the floating BiometricBottomNav (~90pt)
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
+                        TextField("Escribe tu pregunta...", text: $inputText)
+                            .font(.manrope(size: 14))
+                            .foregroundColor(Color.textPrimary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color.surfaceGray)
+                            .cornerRadius(24)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 24)
+                                    .stroke(Color.borderGray, lineWidth: 1)
+                            )
+                            .submitLabel(.send)
+                            .onSubmit { sendMessage() }
 
-                    Button(action: sendMessage) {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isLoading
-                                        ? Color.textHint : Color.primaryBlue)
-                            .clipShape(Circle())
+                        Button(action: sendMessage) {
+                            Image(systemName: "paperplane.fill")
+                                .foregroundColor(.white)
+                                .padding(12)
+                                .background(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isLoading
+                                            ? Color.textHint : Color.primaryBlue)
+                                .clipShape(Circle())
+                        }
+                        .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
                     }
-                    .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+
+                    // Spacer so floating nav doesn't cover the input bar
+                    Color.clear.frame(height: 80)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
                 .background(Color.white)
                 .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: -2)
             }
@@ -136,7 +141,7 @@ struct ChatBotView: View {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let systemText = "Eres VitalSense IA, asistente médico especializado en análisis de signos vitales y predicción de enfermedades crónicas. Responde en español de forma empática, concisa y profesional. Máximo 100 palabras. Cuando el usuario comparte resultados de análisis IA (FC, SpO2, glucosa, predicciones de riesgo), interprétalos con profundidad clínica. Estructura: hallazgo principal, significado clínico, acción recomendada, cuándo buscar atención urgente. Siempre añade: 'No sustituye consulta médica presencial'."
+        let systemText = "Eres BioMetric AI, asistente médico especializado en análisis de signos vitales y predicción de enfermedades crónicas. Responde en español de forma empática, concisa y profesional. Máximo 100 palabras. Cuando el usuario comparte resultados de análisis IA (FC, SpO2, glucosa, predicciones de riesgo), interprétalos con profundidad clínica. Estructura: hallazgo principal, significado clínico, acción recomendada, cuándo buscar atención urgente. Siempre añade: 'No sustituye consulta médica presencial'."
 
         // Construir historial de mensajes para Gemini (excluye el primer saludo del bot)
         var contents: [[String: Any]] = []

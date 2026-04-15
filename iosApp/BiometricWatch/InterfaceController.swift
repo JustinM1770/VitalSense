@@ -123,6 +123,12 @@ class InterfaceController: WKInterfaceController {
             name: .pairingSuccessful,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleUnpaired),
+            name: .unpaired,
+            object: nil
+        )
     }
 
     private func startServices() {
@@ -258,6 +264,17 @@ class InterfaceController: WKInterfaceController {
         DispatchQueue.main.async { [weak self] in
             self?.startServices()
             self?.refreshUI()
+        }
+    }
+
+    @objc private func handleUnpaired() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.vitalSignsService.stopMonitoring()
+            self.firebase.stopPolling()
+            self.countdownTimer?.invalidate()
+            self.emergencyTimer?.invalidate()
+            self.presentController(withName: "PairingInterface", context: nil)
         }
     }
 

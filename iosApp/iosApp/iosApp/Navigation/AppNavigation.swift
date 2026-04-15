@@ -166,21 +166,28 @@ struct MainTabView: View {
             // Full-screen background — covers status bar + home indicator
             Color.dashBg.ignoresSafeArea()
 
-            NavigationStack {
-                Group {
-                    switch selectedTab {
-                    case .home:   DashboardView(onEmergency: { type, hr in
-                        emergencyVm.onAnomalyDetected(type, hr)
-                        showEmergency = true
-                    })
-                    case .salud:  DailyReportView()
-                    case .ia:     AIInsightsView()
-                    case .chat:   ChatBotView()
-                    case .perfil: ProfileView()
+            // Cada tab tiene su propio NavigationStack independiente para que
+            // la pila de navegación de un tab no afecte a los demás.
+            ZStack {
+                if selectedTab == .home {
+                    NavigationStack {
+                        DashboardView(onEmergency: { type, hr in
+                            emergencyVm.onAnomalyDetected(type, hr)
+                            showEmergency = true
+                        })
                     }
                 }
-                .navigationDestination(isPresented: $showEmergency) {
-                    EmergencyQrView(vm: emergencyVm, onResolve: { showEmergency = false })
+                if selectedTab == .salud {
+                    NavigationStack { DailyReportView() }
+                }
+                if selectedTab == .ia {
+                    NavigationStack { AIInsightsView() }
+                }
+                if selectedTab == .chat {
+                    NavigationStack { ChatBotView() }
+                }
+                if selectedTab == .perfil {
+                    NavigationStack { ProfileView() }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -190,6 +197,9 @@ struct MainTabView: View {
                 .padding(.bottom, max((UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.safeAreaInsets.bottom ?? 0, 8))
         }
         .ignoresSafeArea(edges: .bottom)
+        .fullScreenCover(isPresented: $showEmergency) {
+            EmergencyQrView(vm: emergencyVm, onResolve: { showEmergency = false })
+        }
         .onReceive(NotificationCenter.default.publisher(for: .AuthStateChanged)) { _ in
             if Auth.auth().currentUser == nil { onSignOut() }
         }

@@ -79,26 +79,37 @@ struct PairingView: View {
     private func startPairingFlow() {
         countdownTimer?.invalidate()
         secondsLeft   = 300
-        isRegistering = true
 
+        // Mostrar código inmediatamente, sin esperar a Firebase
         let newCode = PairingManager.shared.generatePairingCode()
         code = newCode
+        isRegistering = false
 
-        PairingManager.shared.registerCodeInFirebase(code: newCode) { success in
-            DispatchQueue.main.async {
-                isRegistering = false
-                if !success {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { startPairingFlow() }
-                    return
-                }
-                listenForPairing(code: newCode)
-            }
-        }
+        // Registrar en Firebase en background — si falla, reintenta sin tocar el countdown
+        registerInBackground(code: newCode, attempt: 1)
 
+        // Countdown: solo regenera cuando llega a 0
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
             DispatchQueue.main.async {
                 secondsLeft -= 1
                 if secondsLeft <= 0 { t.invalidate(); startPairingFlow() }
+            }
+        }
+    }
+
+    private func registerInBackground(code: String, attempt: Int) {
+        PairingManager.shared.registerCodeInFirebase(code: code) { success in
+            DispatchQueue.main.async {
+                if success {
+                    listenForPairing(code: code)
+                } else if attempt < 5 && self.code == code {
+                    // Reintento silencioso con backoff, sin regenerar código
+                    let delay = Double(attempt) * 4.0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                        guard self.code == code else { return }
+                        self.registerInBackground(code: code, attempt: attempt + 1)
+                    }
+                }
             }
         }
     }

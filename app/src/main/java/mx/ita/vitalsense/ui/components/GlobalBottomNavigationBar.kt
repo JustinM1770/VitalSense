@@ -37,15 +37,28 @@ fun GlobalBottomNavigationBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val icons = listOf(
-                Route.DASHBOARD to Icons.Rounded.Home,
-                Route.DAILY_REPORT to Icons.Rounded.FavoriteBorder,
-                Route.CHAT to Icons.Rounded.ChatBubbleOutline,
-                Route.PROFILE to Icons.Rounded.PersonOutline
+            // Rutas agrupadas por tab para determinar cuál está activo
+            val healthRoutes = setOf(
+                Route.REPORTE_DIARIO, Route.DAILY_REPORT,
+                Route.DETAILED_REPORT, Route.REPORTE_DETALLADO,
+                Route.HEALTH_SUMMARY, Route.SLEEP_DETAIL,
             )
-            
-            icons.forEach { (route, icon) ->
-                val isSelected = currentRoute == route
+
+            val tabs = listOf(
+                Route.DASHBOARD        to Icons.Rounded.Home,
+                Route.REPORTE_DIARIO   to Icons.Rounded.FavoriteBorder,
+                Route.CHAT             to Icons.Rounded.ChatBubbleOutline,
+                Route.PROFILE          to Icons.Rounded.PersonOutline,
+            )
+
+            // Comparar solo la ruta base (sin query params)
+            val currentBase = currentRoute?.substringBefore('?')
+
+            tabs.forEach { (route, icon) ->
+                val isSelected = when (route) {
+                    Route.REPORTE_DIARIO -> currentBase in healthRoutes
+                    else                 -> currentBase == route
+                }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
@@ -55,9 +68,9 @@ fun GlobalBottomNavigationBar(
                         .clickable { onNavigate(route) }
                 ) {
                     Icon(
-                        icon, 
-                        contentDescription = null, 
-                        tint = Color.White, 
+                        icon,
+                        contentDescription = null,
+                        tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
                     if (isSelected) {

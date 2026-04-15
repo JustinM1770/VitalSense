@@ -35,13 +35,13 @@ struct SplashView: View {
                         .foregroundColor(Color.primaryBlue)
                 }
 
-                // "VitalSense" branding
-                HStack(spacing: 0) {
-                    Text("Vital")
-                        .font(.manropeBold(size: 36))
+                // "BioMetric AI" branding
+                HStack(spacing: 8) {
+                    Text("BioMetric")
+                        .font(.manropeBold(size: 34))
                         .foregroundColor(Color(hex: "#0F172A"))
-                    Text("Sense")
-                        .font(.manropeBold(size: 36))
+                    Text("AI")
+                        .font(.manropeBold(size: 34))
                         .foregroundColor(Color.primaryBlue)
                 }
 
@@ -116,7 +116,7 @@ struct SplashView: View {
 
         ctx.evaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics,
-            localizedReason: "Verifica tu identidad para acceder a VitalSense"
+            localizedReason: "Verifica tu identidad para acceder a BioMetric AI"
         ) { success, evalError in
             DispatchQueue.main.async {
                 if success {

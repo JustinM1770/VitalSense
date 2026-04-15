@@ -4,6 +4,9 @@
 
 import Foundation
 import HealthKit
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "SpO2Manager")
 
 class SpO2ManagerWatch {
     
@@ -47,7 +50,7 @@ class SpO2ManagerWatch {
     /// - Parameter callback: Retorna valor de SpO2 (0-100%)
     func observeSpO2(callback: @escaping (Int) -> Void) {
         guard let spo2Type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation) else {
-            print("[SpO2Manager] SpO2 type not available")
+            logger.warning("SpO2 type not available")
             return
         }
         
@@ -66,17 +69,17 @@ class SpO2ManagerWatch {
         ) { [weak self] query, samples, deletedObjects, anchor, error in
             
             if let error = error {
-                print("[SpO2Manager] Query error: \(error.localizedDescription)")
+                logger.error("Query error: \(error.localizedDescription)")
                 return
             }
-            
+
             self?.processSamples(samples, callback: callback)
         }
-        
+
         // Handler para actualizaciones continuas
         anchoredQuery?.updateHandler = { [weak self] query, samples, deletedObjects, anchor, error in
             if let error = error {
-                print("[SpO2Manager] Update error: \(error.localizedDescription)")
+                logger.error("Update error: \(error.localizedDescription)")
                 return
             }
             
@@ -84,15 +87,15 @@ class SpO2ManagerWatch {
         }
         
         healthStore.execute(anchoredQuery!)
-        print("[SpO2Manager] Started observing SpO2")
+        logger.info("Started observing SpO2")
     }
-    
+
     func stopObserving() {
         if let query = anchoredQuery {
             healthStore.stop(query)
             anchoredQuery = nil
         }
-        print("[SpO2Manager] Stopped observing SpO2")
+        logger.info("Stopped observing SpO2")
     }
     
     // MARK: - Private
@@ -119,7 +122,7 @@ class SpO2ManagerWatch {
         // Validar rango 1-100%
         let finalValue = max(1, min(100, normalizedValue))
         
-        print("[SpO2Manager] SpO2 received: \(finalValue)%")
+        logger.debug("SpO2 received: \(finalValue)%")
         
         DispatchQueue.main.async {
             callback(finalValue)

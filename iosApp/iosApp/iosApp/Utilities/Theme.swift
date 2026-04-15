@@ -1,7 +1,7 @@
 #if os(iOS)
 import SwiftUI
 
-// MARK: - VitalSense Theme
+// MARK: - BioMetric AI Theme
 // Unified color tokens matching Android Color.kt
 // UI/UX principles applied:
 //   • Consistency & Standards — single source of truth for all visual tokens

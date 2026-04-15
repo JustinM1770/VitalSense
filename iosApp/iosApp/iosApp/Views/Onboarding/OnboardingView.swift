@@ -21,7 +21,7 @@ struct OnboardingView: View {
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
-            title: "Bienvenido a VitalSense",
+            title: "Bienvenido a BioMetric AI",
             body: "Conectamos tecnología y cuidado médico para proteger a quienes más quieres. No solo medimos, predecimos para actuar a tiempo.",
             imageName: "illus_stethoscope",
             systemImage: "stethoscope",

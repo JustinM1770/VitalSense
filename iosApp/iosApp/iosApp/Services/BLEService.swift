@@ -4,7 +4,7 @@ import Combine
 
 // MARK: - UUIDs idénticos al Android BleUUIDs object
 enum BLEUUIDs {
-    static let vitalsenseService = CBUUID(string: "4fafc201-1fb5-459e-8fcc-c5c9c331914b")
+    static let biometricAIService = CBUUID(string: "4fafc201-1fb5-459e-8fcc-c5c9c331914b")
     static let heartRateChar     = CBUUID(string: "beb5483e-36e1-4688-b7f5-ea07361b26a8")
     static let glucoseChar       = CBUUID(string: "beb5483e-36e1-4688-b7f5-ea07361b26a9")
     static let spo2Char          = CBUUID(string: "beb5483e-36e1-4688-b7f5-ea07361b26aa")
@@ -184,12 +184,12 @@ extension BLEService: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard error == nil, let services = peripheral.services else { return }
 
-        let deviceName = peripheral.name ?? "VitalSense"
+        let deviceName = peripheral.name ?? "BioMetric AI"
         connectionState = .connected(deviceName: deviceName)
 
-        // Descubrir characteristics en servicio VitalSense y servicio estándar HR
+        // Descubrir characteristics en servicio BioMetric AI y servicio estándar HR
         for service in services {
-            if service.uuid == BLEUUIDs.vitalsenseService ||
+            if service.uuid == BLEUUIDs.biometricAIService ||
                service.uuid == BLEUUIDs.stdHRService {
                 peripheral.discoverCharacteristics(nil, for: service)
             }

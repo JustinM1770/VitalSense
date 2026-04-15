@@ -83,7 +83,7 @@ class EmergencyContactsService: ObservableObject {
     /// Devuelve la URL para abrir SMS pre-llenado al contacto con el mensaje de emergencia
     func smsURL(for contact: EmergencyContact, sosId: String, lat: Double, lng: Double) -> URL? {
         let location = lat != 0 ? "Ubicación: https://maps.google.com/?q=\(lat),\(lng)" : ""
-        let body = "🚨 ALERTA VitalSense — \(contact.name), se detectó una CAÍDA o emergencia. \(location) ID: \(sosId)"
+        let body = "🚨 ALERTA BioMetric AI — \(contact.name), se detectó una CAÍDA o emergencia. \(location) ID: \(sosId)"
         let encoded = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         return URL(string: "sms:\(contact.phone)&body=\(encoded)")
     }

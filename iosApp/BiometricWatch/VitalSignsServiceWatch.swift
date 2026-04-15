@@ -5,6 +5,9 @@
 import Foundation
 import WatchKit
 import CoreLocation
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "VitalSigns")
 
 class VitalSignsServiceWatch: NSObject {
     
@@ -38,7 +41,7 @@ class VitalSignsServiceWatch: NSObject {
     // MARK: - Public API
     
     func startMonitoring() {
-        print("[VitalSignsService] Starting monitoring for user: \(userId)")
+        logger.info("Starting monitoring for user: \(self.userId)")
         
         // Setup observers and location (idempotent)
         setupNotificationObservers()
@@ -66,20 +69,20 @@ class VitalSignsServiceWatch: NSObject {
         // Solicitar permisos de ubicación
         requestLocationPermissions()
         
-        print("[VitalSignsService] Monitoring started")
+        logger.info("Monitoring started")
     }
     
     func stopMonitoring() {
         shakeDetector?.stop()
         fallDetector?.stop()
         healthKitManager.stopSpO2Monitoring()
-        print("[VitalSignsService] Monitoring stopped")
+        logger.info("Monitoring stopped")
     }
     
     // MARK: - SOS Alert (equivalente a triggerSosAlert en Android)
     
     func triggerSosAlert(source: String = "manual") {
-        print("[VitalSignsService] SOS triggered — source: \(source)")
+        logger.warning("SOS triggered — source: \(source)")
 
         let sosId = "sos_\(Int(Date().timeIntervalSince1970 * 1000))"
         activeSosId = sosId
@@ -142,7 +145,7 @@ class VitalSignsServiceWatch: NSObject {
         
         firebaseService.pushSosAlert(userId: remoteUid, sosId: sosId, data: alertData)
         
-        print("[VitalSignsService] SOS alert pushed: \(sosId)")
+        logger.info("SOS alert pushed: \(sosId)")
     }
     
     // MARK: - Resolve SOS (equivalente a resolveSosFromNotification)
@@ -164,7 +167,7 @@ class VitalSignsServiceWatch: NSObject {
             NotificationCenter.default.post(name: .sosResolved, object: nil)
         }
         
-        print("[VitalSignsService] SOS resolved: \(sosId)")
+        logger.info("SOS resolved: \(sosId)")
     }
     
     // MARK: - Notification Observers
@@ -211,7 +214,7 @@ class VitalSignsServiceWatch: NSObject {
     }
     
     @objc private func handleUserIdReceived() {
-        print("[VitalSignsService] UserId received, restarting monitoring")
+        logger.info("UserId received, restarting monitoring")
         startMonitoring()
     }
     
@@ -242,16 +245,17 @@ class VitalSignsServiceWatch: NSObject {
 extension VitalSignsServiceWatch: CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        // La ubicación se obtiene automáticamente cuando se llama requestLocation()
-        print("[VitalSignsService] Location updated: \(locations.last?.coordinate ?? CLLocationCoordinate2D())")
+        if let coord = locations.last?.coordinate {
+            logger.debug("Location updated: \(coord.latitude), \(coord.longitude)")
+        }
     }
-    
+
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("[VitalSignsService] Location error: \(error.localizedDescription)")
+        logger.error("Location error: \(error.localizedDescription)")
     }
-    
+
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        print("[VitalSignsService] Location authorization: \(status.rawValue)")
+        logger.info("Location authorization: \(status.rawValue)")
     }
 }
 

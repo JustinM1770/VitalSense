@@ -4,6 +4,9 @@
 import Foundation
 import WatchConnectivity
 import WatchKit
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "WatchConnectivity")
 
 // MARK: - Notification Names
 
@@ -12,6 +15,8 @@ extension Notification.Name {
     static let heartRateUpdated      = Notification.Name("biometric.heartRateUpdated")
     static let spo2Updated           = Notification.Name("biometric.spo2Updated")
     static let emergencyStateUpdated = Notification.Name("biometric.emergencyStateUpdated")
+    static let unpaired              = Notification.Name("biometric.unpaired")
+    // pairingSuccessful is defined in PairingInterfaceController.swift
 }
 
 // MARK: - WatchConnectivityManager
@@ -37,19 +42,33 @@ class WatchConnectivityManager: NSObject {
     // MARK: - Internal helpers
 
     private func handleIncomingData(_ data: [String: Any], replyHandler: (([String: Any]) -> Void)? = nil) {
+        logger.debug("📥 Datos recibidos del iPhone: \(data.keys.joined(separator: ", "))")
+        
         // [TEST] Connection Ping
         if let pingTime = data["testPing"] as? Double {
             let latency = Date().timeIntervalSince1970 - pingTime
-            print("[WatchConnectivity] PING recibido con latencia: \(String(format: "%.3f", latency))s")
+            logger.debug("PING recibido con latencia: \(String(format: "%.3f", latency))s")
             WKInterfaceDevice.current().play(.success)
             replyHandler?(["pong": Date().timeIntervalSince1970])
             return
         }
 
+        if let unpair = data["unpair"] as? Bool, unpair {
+            logger.info("🚫 Recibida señal de desvinculación (unpair)")
+            PairingManager.shared.unpair()
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .unpaired, object: nil)
+            }
+            return
+        }
+
         if let uid = data["userId"] as? String, !uid.isEmpty {
             let existing = UserDefaults.standard.string(forKey: "biometric_user_id") ?? ""
+            logger.info("👤 Recibido userId: \(uid)")
+            
             UserDefaults.standard.set(uid, forKey: "biometric_user_id")
-            // Only broadcast if the userId actually changed
+            // Marcar como emparejado para que PairingManager.isPaired devuelva true
+            UserDefaults.standard.set(true, forKey: "is_paired")
             if uid != existing {
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .userIdReceived, object: nil)
@@ -73,7 +92,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
             handleIncomingData(session.receivedApplicationContext)
         }
         if let error = error {
-            print("[WatchConnectivity] Activation error: \(error.localizedDescription)")
+            logger.error("Activation error: \(error.localizedDescription)")
         }
     }
 

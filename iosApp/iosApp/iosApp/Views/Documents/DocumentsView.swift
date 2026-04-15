@@ -113,16 +113,34 @@ class DocumentsViewModel: ObservableObject {
 // MARK: - Main View
 struct DocumentsView: View {
     @StateObject private var vm = DocumentsViewModel()
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
             Color.white.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                // Back button row
+                HStack {
+                    Button(action: { dismiss() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 16))
+                        }
+                        .foregroundColor(Color.primaryBlue)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, Spacing.xxl)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+
                 // Header
                 HStack {
                     Text("Archivos")
-                        .font(.manropeBold(size: 22))
+                        .font(.manropeBold(size: 28))
                         .foregroundColor(Color.textPrimary)
                     Spacer()
                     Button(action: { vm.showAddSheet = true }) {
@@ -137,7 +155,7 @@ struct DocumentsView: View {
                     }
                 }
                 .padding(.horizontal, Spacing.xxl)
-                .padding(.top, 20)
+                .padding(.top, 4)
                 .padding(.bottom, 16)
 
                 // Category filter chips

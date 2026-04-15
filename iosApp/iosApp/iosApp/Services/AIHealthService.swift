@@ -277,7 +277,7 @@ class AIHealthService: ObservableObject {
 
     private var systemPrompt: String {
         """
-        Eres BioMetric AI, plataforma de fenotipado digital y medicina predictiva de VitalSense. \
+        Eres BioMetric AI, plataforma de fenotipado digital y medicina predictiva. \
         Transformas datos de wearables comerciales en diagnóstico no invasivo de alta precisión. \
         Tus algoritmos están entrenados con datasets del MIT y Harvard (PhysioNet: MIT-BIH Arrhythmia, \
         MIMIC-III ICU, PhysioNet Challenge).
@@ -516,7 +516,7 @@ struct ClinicalScoringEngine {
         if score > 0.35 {
             return ["Evaluación cardiológica urgente", "ECG y ecocardiograma", "Control estricto de PA y colesterol", "Actividad física supervisada"]
         } else if score > 0.20 {
-            return ["Control médico cada 6 meses", "Reducir sal y grasas saturadas", "30 min caminata diaria", "Monitoreo continuo con VitalSense"]
+            return ["Control médico cada 6 meses", "Reducir sal y grasas saturadas", "30 min caminata diaria", "Monitoreo continuo con BioMetric AI"]
         } else {
             return ["Mantener actividad física regular", "Dieta mediterránea preventiva", "Monitoreo mensual de signos vitales"]
         }
@@ -642,7 +642,7 @@ struct ClinicalScoringEngine {
         } else if score >= 2 {
             return ["Consulta con neumólogo o somnólogo", "Oximetría nocturna de seguimiento", "Evitar privación de sueño", "Mantener horario de sueño regular"]
         } else {
-            return ["Mantener higiene del sueño", "7-9 horas de sueño diarias", "Continuar monitoreo nocturno con VitalSense"]
+            return ["Mantener higiene del sueño", "7-9 horas de sueño diarias", "Continuar monitoreo nocturno con BioMetric AI"]
         }
     }
 
@@ -716,7 +716,7 @@ struct ClinicalScoringEngine {
             recommendations: score > 0.45
                 ? ["Medición de PA inmediata", "Consulta con cardiólogo", "Reducir ingesta de sodio (<2g/día)", "Técnicas de relajación y manejo de estrés"]
                 : score > 0.25
-                ? ["Control de PA semanal", "Dieta DASH", "30 min ejercicio aeróbico diario", "Monitoreo continuo con VitalSense"]
+                ? ["Control de PA semanal", "Dieta DASH", "30 min ejercicio aeróbico diario", "Monitoreo continuo con BioMetric AI"]
                 : ["Mantener estilo de vida activo", "Dieta baja en sodio preventiva", "Control anual de PA"],
             detectedPatterns: patterns
         )
@@ -772,7 +772,7 @@ struct ClinicalScoringEngine {
             recommendations: score > 0.50
                 ? ["ECG de 12 derivaciones urgente", "Holter de ritmo cardíaco 24-72h", "Evaluación anticoagulación (CHADS-VASc)", "Ecocardiograma transtorácico"]
                 : score > 0.25
-                ? ["ECG de control", "Monitoreo de FC continuo con VitalSense", "Evitar cafeína y alcohol", "Control de factores de riesgo CV"]
+                ? ["ECG de control", "Monitoreo de FC continuo con BioMetric AI", "Evitar cafeína y alcohol", "Control de factores de riesgo CV"]
                 : ["Monitoreo periódico de FC", "Estilo de vida cardioprotector"],
             detectedPatterns: patterns
         )
@@ -1009,7 +1009,7 @@ struct ClinicalScoringEngine {
             recommendations: score > 0.45
                 ? ["Estudio de variabilidad de FC (HRV) especializado", "Evaluación neuropatía autonómica cardíaca (CAN)", "Control glucémico estricto", "Técnicas de biofeedback cardíaco"]
                 : score > 0.25
-                ? ["Técnicas de respiración profunda (mejoran HRV)", "Yoga o meditación mindfulness", "Reducir estrés crónico", "Monitoreo continuo con VitalSense"]
+                ? ["Técnicas de respiración profunda (mejoran HRV)", "Yoga o meditación mindfulness", "Reducir estrés crónico", "Monitoreo continuo con BioMetric AI"]
                 : ["Actividad física aeróbica regular", "Buena higiene del sueño", "Manejo de estrés preventivo"],
             detectedPatterns: patterns
         )
@@ -1070,7 +1070,7 @@ struct ClinicalScoringEngine {
                 ? ["Biometría hemática completa urgente (Hb, Hto, VCM)", "Hierro sérico, ferritina y TIBC", "Vitamina B12 y ácido fólico", "Evaluación de sangrado crónico oculto"]
                 : score > 0.22
                 ? ["Hemoglobina en próxima consulta", "Aumentar alimentos ricos en hierro (carnes rojas, legumbres)", "Vitamina C para mejorar absorción de hierro", "Evitar antiinflamatorios sin protección gástrica"]
-                : ["Dieta rica en hierro y vitaminas B", "Control hematológico anual", "Monitoreo de FC en reposo con VitalSense"],
+                : ["Dieta rica en hierro y vitaminas B", "Control hematológico anual", "Monitoreo de FC en reposo con BioMetric AI"],
             detectedPatterns: patterns
         )
     }
@@ -1272,7 +1272,7 @@ struct ClinicalScoringEngine {
             recommendations: score > 0.45
                 ? ["ECG de 12 derivaciones urgente", "Holter de ritmo 24-72 horas", "Ecocardiograma para fracción de eyección", "Evitar cafeína, alcohol y estimulantes"]
                 : score > 0.20
-                ? ["Control electrocardiográfico en próxima consulta", "Monitoreo continuo FC con VitalSense", "Evitar privación de sueño y estrés intenso", "Potasio y magnesio en rango normal"]
+                ? ["Control electrocardiográfico en próxima consulta", "Monitoreo continuo FC con BioMetric AI", "Evitar privación de sueño y estrés intenso", "Potasio y magnesio en rango normal"]
                 : ["Monitoreo de FC periódico", "Estilo de vida cardioprotector", "Control anual con ECG"],
             detectedPatterns: patterns
         )
@@ -1331,7 +1331,7 @@ struct ClinicalScoringEngine {
             recommendations: score > 0.45
                 ? ["Espirometría con prueba broncodilatadora urgente", "Fracción de óxido nítrico exhalado (FeNO)", "Evaluación por neumólogo/alergólogo", "Evitar alérgenos y desencadenantes conocidos"]
                 : score > 0.22
-                ? ["Pico flujo espiratorio (peak flow) diario", "Identificar y evitar desencadenantes (polvo, fríos, ejercicio)", "Control médico para valorar tratamiento preventivo", "Monitoreo nocturno de SpO₂ con VitalSense"]
+                ? ["Pico flujo espiratorio (peak flow) diario", "Identificar y evitar desencadenantes (polvo, fríos, ejercicio)", "Control médico para valorar tratamiento preventivo", "Monitoreo nocturno de SpO₂ con BioMetric AI"]
                 : ["Mantener ambientes ventilados", "Evitar humo de tabaco y contaminantes", "Control respiratorio anual"],
             detectedPatterns: patterns
         )
@@ -1396,7 +1396,7 @@ struct ClinicalScoringEngine {
             recommendations: score > 0.50
                 ? ["Hidratación intravenosa urgente (evaluación médica inmediata)", "Sales de rehidratación oral si consciente", "Monitoreo de PA y FC cada 15 minutos", "Evitar actividad física hasta normalización de FC"]
                 : score > 0.28
-                ? ["Aumentar ingesta hídrica: 2-3 L/día", "Sales de rehidratación oral", "Evitar alcohol, cafeína y calor extremo", "Monitoreo horario de FC con VitalSense"]
+                ? ["Aumentar ingesta hídrica: 2-3 L/día", "Sales de rehidratación oral", "Evitar alcohol, cafeína y calor extremo", "Monitoreo horario de FC con BioMetric AI"]
                 : ["Mantener hidratación adecuada (8 vasos/día)", "Hidratarse antes, durante y después del ejercicio", "Monitorear FC en reposo como indicador hídrico"],
             detectedPatterns: patterns
         )
@@ -1496,7 +1496,7 @@ extension AIHealthService {
     private func scheduleAnalysisNotifications(analysis: HealthAnalysis) async {
         let ns = NotificationService.shared
         if analysis.immediateAlert, let msg = analysis.alertMessage {
-            await ns.scheduleNotification(type: .healthAlert, title: "🚨 Alerta Crítica — VitalSense", body: msg, delay: 1)
+            await ns.scheduleNotification(type: .healthAlert, title: "🚨 Alerta Crítica — BioMetric AI", body: msg, delay: 1)
         }
         let highRisk = analysis.predictions.filter { $0.riskLevel == .alto || $0.riskLevel == .critico }
         for (i, risk) in highRisk.prefix(2).enumerated() {

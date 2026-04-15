@@ -108,7 +108,7 @@ class AIInsightsViewModel: ObservableObject {
 
     var chatContext: String {
         guard let a = analysis else { return "" }
-        var lines = ["[Análisis IA VitalSense - \(formattedDate(a.timestamp))]"]
+        var lines = ["[Análisis IA BioMetric AI - \(formattedDate(a.timestamp))]"]
         lines.append("Riesgo general: \(a.overallRisk.label)")
         lines.append("Resumen: \(a.summary)")
         for p in a.predictions.prefix(3) {

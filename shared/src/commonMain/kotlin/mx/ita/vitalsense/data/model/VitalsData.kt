@@ -158,7 +158,7 @@ fun VitalsData.computeAlerts(
 
     // ── Glucosa ───────────────────────────────────────────────────────────────
     if (glucose > 0.0) {
-        val glucStr = "${"%.0f".format(glucose)} mg/dL"
+        val glucStr = "${glucose.toInt()} mg/dL"
         when {
             // Hipoglucemia (de mayor a menor severidad)
             glucose < thresholds.glucoseHypoL2 ->

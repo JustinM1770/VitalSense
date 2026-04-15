@@ -71,32 +71,37 @@ class WearableViewModel: ObservableObject {
         bleService.setConnecting()
 
         let upperCode = code.uppercased().trimmingCharacters(in: .whitespaces)
-
-        db.child("patients/pairing_codes").child(upperCode).getData { [weak self] error, snapshot in
-            guard let self else { return }
-
-            Task { @MainActor in
-                if let error {
-                    // Firebase error → emparejar de todas formas (igual que Android catch)
-                    self.pairSuccessfully(code: upperCode, deviceName: "Wearable")
-                    return
-                }
-
-                guard let snapshot, snapshot.exists() else {
-                    self.codeError = "Código inválido. Verifica el código en tu reloj e inténtalo de nuevo."
-                    self.bleService.setDisconnected()
-                    return
-                }
-
-                let deviceName = snapshot.childSnapshot(forPath: "deviceName").value as? String ?? "Wearable"
-                let userId = Auth.auth().currentUser?.uid ?? "global"
-
-                self.db.child("patients/pairing_codes").child(upperCode)
-                    .updateChildValues(["paired": true, "userId": userId])
-
-                self.pairSuccessfully(code: upperCode, deviceName: deviceName)
-            }
+        guard upperCode.count == 8 else {
+            codeError = "El código debe tener 8 caracteres."
+            bleService.setDisconnected()
+            return
         }
+
+        let userId = Auth.auth().currentUser?.uid ?? "global"
+
+        // Escribir directamente el userId en el path del código.
+        // El Watch hace polling en este mismo path cada 2s y detecta el emparejamiento
+        // aunque no haya podido registrar el código previamente en Firebase.
+        db.child("patients/pairing_codes").child(upperCode)
+            .getData { [weak self] error, snapshot in
+                guard let self else { return }
+
+                Task { @MainActor in
+                    let deviceName = snapshot?.childSnapshot(forPath: "deviceName").value as? String ?? "Apple Watch"
+
+                    self.db.child("patients/pairing_codes").child(upperCode)
+                        .updateChildValues(["paired": true, "userId": userId]) { dbError, _ in
+                            Task { @MainActor in
+                                if let dbError {
+                                    self.codeError = "Error al conectar: \(dbError.localizedDescription)"
+                                    self.bleService.setDisconnected()
+                                } else {
+                                    self.pairSuccessfully(code: upperCode, deviceName: deviceName)
+                                }
+                            }
+                        }
+                }
+            }
     }
 
     // MARK: - Desconectar reloj (idéntico a disconnectWatch)
@@ -120,6 +125,9 @@ class WearableViewModel: ObservableObject {
             isCodePaired = false
             pairedDeviceName = "Wearable"
             bleService.disconnect()
+            
+            // Notificar al reloj que se desvinculó para que regrese a la pantalla de código
+            WatchConnectivitySender.shared.sendUnpair()
         }
     }
 
@@ -134,6 +142,12 @@ class WearableViewModel: ObservableObject {
         pairedDeviceName = deviceName
         bleService.setConnected(deviceName: deviceName)
         startWatchDataReading()
+
+        // Notificar al Watch directamente via WatchConnectivity
+        // Esto hace que el Watch salga de la pantalla de código inmediatamente
+        if let uid = Auth.auth().currentUser?.uid {
+            WatchConnectivitySender.shared.sendUserId(uid)
+        }
     }
 
     // startWatchDataReading — equivalente a startWatchDataReading() en Android

@@ -3,6 +3,9 @@
 // Posts emergency state changes via NotificationCenter (.emergencyStateUpdated).
 
 import Foundation
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios.watchkitapp", category: "Firebase")
 
 class WatchFirebaseService: NSObject {
 
@@ -40,6 +43,11 @@ class WatchFirebaseService: NSObject {
             userInfo: nil,
             repeats: true
         )
+    }
+
+    func stopPolling() {
+        pollTimer?.invalidate()
+        pollTimer = nil
     }
 
     // MARK: - Emergency Polling
@@ -168,16 +176,16 @@ class WatchFirebaseService: NSObject {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: data)
         } catch {
-            print("[Firebase] Failed to serialize SOS data: \(error)")
+            logger.error("Failed to serialize SOS data: \(error)")
             return
         }
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
-                print("[Firebase] SOS push error: \(error.localizedDescription)")
+                logger.error("SOS push error: \(error.localizedDescription)")
                 return
             }
-            print("[Firebase] SOS alert pushed: \(sosId)")
+            logger.info("SOS alert pushed: \(sosId)")
         }.resume()
     }
     
@@ -192,16 +200,16 @@ class WatchFirebaseService: NSObject {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: updates)
         } catch {
-            print("[Firebase] Failed to serialize SOS updates: \(error)")
+            logger.error("Failed to serialize SOS updates: \(error)")
             return
         }
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
-                print("[Firebase] SOS update error: \(error.localizedDescription)")
+                logger.error("SOS update error: \(error.localizedDescription)")
                 return
             }
-            print("[Firebase] SOS alert updated: \(sosId)")
+            logger.info("SOS alert updated: \(sosId)")
         }.resume()
     }
 
@@ -216,11 +224,11 @@ class WatchFirebaseService: NSObject {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: alertData)
         } catch {
-            print("[Firebase] Failed to serialize health alert: \(error)")
+            logger.error("Failed to serialize health alert: \(error)")
             return
         }
         URLSession.shared.dataTask(with: request) { _, _, error in
-            if let error = error { print("[Firebase] Health alert error: \(error.localizedDescription)") }
+            if let error = error { logger.error("Health alert error: \(error.localizedDescription)") }
         }.resume()
     }
 }

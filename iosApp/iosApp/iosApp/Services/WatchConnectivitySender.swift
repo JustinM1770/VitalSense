@@ -2,6 +2,9 @@
 import Foundation
 import WatchConnectivity
 import FirebaseAuth
+import OSLog
+
+private let logger = Logger(subsystem: "mx.ita.vitalsense.ios", category: "WatchConnectivity")
 
 /// Envía el userId de Firebase al Apple Watch via WatchConnectivity.
 /// Llamar `setup()` una vez al arrancar la app.
@@ -21,8 +24,17 @@ class WatchConnectivitySender: NSObject, WCSessionDelegate {
     func setup() {
         Auth.auth().addStateDidChangeListener { [weak self] _, user in
             guard let self else { return }
+            let isPaired = UserDefaults.standard.bool(forKey: "code_paired")
             let uid = user?.uid ?? ""
-            self.sendUserId(uid)
+            
+            logger.debug("Auth state changed. User: \(uid), Paired: \(isPaired)")
+            
+            if !uid.isEmpty && isPaired {
+                self.sendUserId(uid)
+            } else {
+                // Si no hay usuario o no está emparejado, asegurar que el reloj lo sepa
+                self.sendUnpair()
+            }
         }
     }
 
@@ -34,16 +46,24 @@ class WatchConnectivitySender: NSObject, WCSessionDelegate {
         }
     }
 
+    func sendUnpair() {
+        guard WCSession.default.activationState == .activated else { return }
+        try? WCSession.default.updateApplicationContext(["unpair": true])
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(["unpair": true], replyHandler: nil)
+        }
+    }
+
     func sendTestPing() {
         guard WCSession.default.isReachable else {
-            print("[WatchConnectivity] El reloj no está accesible en este momento.")
+            logger.warning("El reloj no está accesible en este momento.")
             return
         }
-        print("[WatchConnectivity] Enviando PING de prueba al reloj...")
+        logger.debug("Enviando PING de prueba al reloj...")
         WCSession.default.sendMessage(["testPing": Date().timeIntervalSince1970], replyHandler: { reply in
-            print("[WatchConnectivity] PONG recibido del reloj: \(reply)")
+            logger.debug("PONG recibido del reloj: \(reply)")
         }) { error in
-            print("[WatchConnectivity] Error al enviar PING: \(error.localizedDescription)")
+            logger.error("Error al enviar PING: \(error.localizedDescription)")
         }
     }
 
@@ -52,15 +72,22 @@ class WatchConnectivitySender: NSObject, WCSessionDelegate {
                  activationDidCompleteWith activationState: WCSessionActivationState,
                  error: Error?) {
         if let error = error {
-            print("[WatchConnectivity] Error de activación en iPhone: \(error.localizedDescription)")
+            logger.error("Error de activación en iPhone: \(error.localizedDescription)")
             return
         }
+
+        logger.info("Sesión activada en iPhone. Estado: \(activationState.rawValue)")
         
-        print("[WatchConnectivity] Sesión activada en iPhone. Estado: \(activationState.rawValue)")
-        
-        if activationState == .activated, let uid = Auth.auth().currentUser?.uid {
-            print("[WatchConnectivity] Enviando userId actual: \(uid)")
-            sendUserId(uid)
+        let isPaired = UserDefaults.standard.bool(forKey: "code_paired")
+
+        if activationState == .activated {
+            if let uid = Auth.auth().currentUser?.uid, isPaired {
+                logger.debug("Enviando userId actual: \(uid)")
+                sendUserId(uid)
+            } else {
+                logger.debug("No emparejado o sin sesión. Enviando señal de desvinculación preventiva.")
+                sendUnpair()
+            }
         }
     }
 

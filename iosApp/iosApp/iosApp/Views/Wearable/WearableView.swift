@@ -7,6 +7,7 @@ import SwiftUI
 // y PairedWatchPanel cuando ya está vinculado.
 
 struct WearableView: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var vm = WearableViewModel()
 
     var body: some View {
@@ -15,13 +16,32 @@ struct WearableView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    // ── Header (equivalente al Box header de DeviceScanScreen)
-                    Text("Conectar Wearable")
-                        .font(.custom("Manrope-Bold", size: 18))
-                        .foregroundColor(.textDark)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 20)
-                        .padding(.bottom, 24)
+                    // ── Header
+                    ZStack {
+                        HStack {
+                            Button(action: { dismiss() }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 40, height: 40)
+                                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                    
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.textDark)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            
+                            Spacer()
+                        }
+
+                        Text("Conectar Wearable")
+                            .font(.custom("Manrope-Bold", size: 18))
+                            .foregroundColor(.textDark)
+                    }
+                    .padding(.top, 20)
+                    .padding(.bottom, 24)
 
                     if vm.isCodePaired {
                         PairedWatchPanel(
@@ -68,7 +88,7 @@ private struct CodePanel: View {
 
             Spacer().frame(height: Spacing.lg)
 
-            Text("Para ver datos en tiempo real, abre VitalSense en tu reloj e ingresa el código de 8 caracteres que aparecerá allí.")
+            Text("Para ver datos en tiempo real, abre BioMetric AI en tu reloj e ingresa el código de 8 caracteres que aparecerá allí.")
                 .font(.custom("Manrope-Medium", size: 14))
                 .foregroundColor(.textSecondary)
                 .multilineTextAlignment(.center)
