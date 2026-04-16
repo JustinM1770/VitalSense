@@ -7,7 +7,7 @@ import androidx.wear.compose.material.MaterialTheme
 
 // Map mobile colors to Wear Material Colors
 // Wear OS is dark theme by default, so we adapt the Palette for dark background
-private val VitalSenseWearColors = Colors(
+private val BioMetricAIWearColors = Colors(
     primary = PrimaryBlue,
     primaryVariant = PrimaryBlueDark,
     secondary = SleepGreen,
@@ -23,9 +23,9 @@ private val VitalSenseWearColors = Colors(
 )
 
 @Composable
-fun VitalSenseWearTheme(content: @Composable () -> Unit) {
+fun BioMetricAIWearTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colors = VitalSenseWearColors,
+        colors = BioMetricAIWearColors,
         content = content,
     )
 }

@@ -23,7 +23,7 @@ import mx.ita.vitalsense.ui.theme.DashBlue
  *  2. Desplegar Cloud Function que observe "patients/{id}" y envíe FCM
  *     cuando se detecten valores fuera de rango.
  */
-class VitalSenseMessagingService : FirebaseMessagingService() {
+class BioMetricAIMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
@@ -39,7 +39,7 @@ class VitalSenseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val title = message.notification?.title
             ?: message.data["title"]
-            ?: "⚠️ Alerta HealthSensor"
+            ?: "⚠️ Alerta BioMetric AI"
 
         val body = message.notification?.body
             ?: message.data["body"]

@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
 
-private val VitalSenseColorScheme = lightColorScheme(
+private val BioMetricAIColorScheme = lightColorScheme(
     primary            = PrimaryBlue,
     onPrimary          = Color.White,
     primaryContainer   = PrimaryBlueLight,
@@ -24,7 +24,7 @@ private val VitalSenseColorScheme = lightColorScheme(
     onError            = Color.White,
 )
 
-private val VitalSenseDarkColorScheme = darkColorScheme(
+private val BioMetricAIDarkColorScheme = darkColorScheme(
     primary = PrimaryBlue,
     onPrimary = Color.White,
     secondary = SleepGreen,
@@ -40,7 +40,7 @@ private val VitalSenseDarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun VitalSenseTheme(
+fun BioMetricAITheme(
     themeMode: String = "system",
     content: @Composable () -> Unit,
 ) {
@@ -50,7 +50,7 @@ fun VitalSenseTheme(
         else -> isSystemInDarkTheme()
     }
     MaterialTheme(
-        colorScheme = if (isDark) VitalSenseDarkColorScheme else VitalSenseColorScheme,
+        colorScheme = if (isDark) BioMetricAIDarkColorScheme else BioMetricAIColorScheme,
         typography  = Typography,
         content     = content,
     )

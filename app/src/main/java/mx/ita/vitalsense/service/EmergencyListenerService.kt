@@ -128,7 +128,7 @@ class EmergencyListenerService : Service() {
 
     private fun buildMonitoringNotification() = NotificationCompat.Builder(this, CHANNEL_MONITORING)
         .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle("VitalSense activo")
+        .setContentTitle("BioMetric AI activo")
         .setContentText("Monitoreando alertas SOS del paciente")
         .setPriority(NotificationCompat.PRIORITY_LOW)
         .setOngoing(true)

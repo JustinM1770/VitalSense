@@ -39,11 +39,12 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import mx.ita.vitalsense.wear.VitalSignsService
-import mx.ita.vitalsense.wear.ui.theme.VitalSenseWearTheme
+import mx.ita.vitalsense.wear.ui.theme.BioMetricAIWearTheme
 import mx.ita.vitalsense.wear.ui.theme.*
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val TAG = "WearApp"
 private const val DB_URL = "https://vitalsenseai-1cb9f-default-rtdb.firebaseio.com"
@@ -51,6 +52,7 @@ private const val PREFS_NAME = "vitalsense_wear_prefs"
 private const val KEY_PAIRED = "is_paired"
 private const val KEY_PAIRING_CODE = "pairing_code"
 private const val KEY_USER_ID = "user_id"
+private const val KEY_LAST_CODE_TIME = "last_code_time"
 private val HEALTH_SENSOR_PERMISSIONS = listOf(
     "android.permission.health.READ_HEART_RATE",
     "android.permission.health.READ_OXYGEN_SATURATION",
@@ -166,16 +168,56 @@ fun WearApp(
     // --- 2. Estado ---
     var isPaired by remember { mutableStateOf(prefs.getBoolean(KEY_PAIRED, false)) }
     var pairingCode by remember { mutableStateOf(prefs.getString(KEY_PAIRING_CODE, "") ?: "") }
+    var pairedUserId by remember { mutableStateOf(prefs.getString(KEY_USER_ID, null)) }
     var isAuthenticated by remember { mutableStateOf(auth.currentUser != null) }
     var showSuccessScreen by remember { mutableStateOf(false) }
     var forcedSosId by remember { mutableStateOf<String?>(null) }
     var forcedSosUserId by remember { mutableStateOf<String?>(null) }
+    var hasSeenRemoteWatchRecord by remember { mutableStateOf(false) }
 
     // Estado de emergencia activa (viene de patients/{userId}/activeEmergency en Firebase)
     var activeEmergencyTokenId  by remember { mutableStateOf<String?>(null) }
     var activeEmergencyPin      by remember { mutableStateOf("") }
     var activeEmergencyType     by remember { mutableStateOf("") }
     var activeEmergencyExpires  by remember { mutableStateOf(0L) }
+
+    fun generateNewPairingCode(clearOldRemoteCode: Boolean = true) {
+        val currentTime = System.currentTimeMillis()
+        val oldCode = pairingCode
+        val chars = ('A'..'Z') + ('0'..'9')
+        pairingCode = (1..8).map { chars.random() }.joinToString("")
+        prefs.edit()
+            .putString(KEY_PAIRING_CODE, pairingCode)
+            .putLong(KEY_LAST_CODE_TIME, currentTime)
+            .apply()
+
+        if (clearOldRemoteCode && oldCode.isNotEmpty() && isAuthenticated) {
+            database.getReference("patients/pairing_codes").child(oldCode).removeValue()
+        }
+    }
+
+    fun resetPairingState(clearRemoteWatch: Boolean = true) {
+        val userId = prefs.getString(KEY_USER_ID, null)
+        prefs.edit()
+            .putBoolean(KEY_PAIRED, false)
+            .remove(KEY_USER_ID)
+            .remove(KEY_PAIRING_CODE)
+            .apply()
+        isPaired = false
+        pairedUserId = null
+        pairingCode = ""
+        hasSeenRemoteWatchRecord = false
+        showSuccessScreen = false
+        activeEmergencyTokenId = null
+        activeEmergencyPin = ""
+        activeEmergencyType = ""
+        activeEmergencyExpires = 0L
+        if (clearRemoteWatch && !userId.isNullOrBlank()) {
+            database.getReference("patients/$userId/watch").removeValue()
+        }
+        val intent = Intent(context, VitalSignsService::class.java)
+        context.stopService(intent)
+    }
     
     // Auth Anónima
     LaunchedEffect(Unit) {
@@ -189,19 +231,9 @@ fun WearApp(
     // Código Aleatorio
     if (!isPaired) {
         val currentTime = System.currentTimeMillis()
-        val lastCodeTime = prefs.getLong("last_code_time", 0L)
+        val lastCodeTime = prefs.getLong(KEY_LAST_CODE_TIME, 0L)
         if (pairingCode.isEmpty() || currentTime - lastCodeTime > 5 * 60 * 1000L) {
-            val oldCode = pairingCode
-            val chars = ('A'..'Z') + ('0'..'9')
-            pairingCode = (1..8).map { chars.random() }.joinToString("")
-            prefs.edit()
-                .putString("pairing_code", pairingCode)
-                .putLong("last_code_time", currentTime)
-                .apply()
-            
-            if (oldCode.isNotEmpty() && isAuthenticated) {
-                database.getReference("patients/pairing_codes").child(oldCode).removeValue()
-            }
+            generateNewPairingCode()
         }
     }
 
@@ -210,20 +242,61 @@ fun WearApp(
             while (true) {
                 kotlinx.coroutines.delay(60_000L) // Verificar cada minuto
                 val currentTime = System.currentTimeMillis()
-                val lastCodeTime = prefs.getLong("last_code_time", 0L)
+                val lastCodeTime = prefs.getLong(KEY_LAST_CODE_TIME, 0L)
                 if (currentTime - lastCodeTime > 5 * 60 * 1000L) {
-                    val oldCode = pairingCode
-                    val chars = ('A'..'Z') + ('0'..'9')
-                    pairingCode = (1..8).map { chars.random() }.joinToString("")
-                    prefs.edit()
-                        .putString("pairing_code", pairingCode)
-                        .putLong("last_code_time", currentTime)
-                        .apply()
-                    if (oldCode.isNotEmpty() && isAuthenticated) {
-                        database.getReference("patients/pairing_codes").child(oldCode).removeValue()
-                    }
+                    generateNewPairingCode()
                 }
             }
+        }
+    }
+
+    DisposableEffect(isAuthenticated, pairedUserId) {
+        val userId = pairedUserId
+        if (isAuthenticated && !userId.isNullOrBlank()) {
+            val watchRef = database.getReference("patients/$userId/watch")
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val paired = snapshot.child("paired").getValue(Boolean::class.java) ?: false
+
+                    if (snapshot.exists() && paired) {
+                        hasSeenRemoteWatchRecord = true
+                        return
+                    }
+
+                    // Avoid false unpairing during initial propagation after a successful pair.
+                    if ((snapshot.exists() && !paired) || (!snapshot.exists() && hasSeenRemoteWatchRecord)) {
+                        resetPairingState(clearRemoteWatch = false)
+                        generateNewPairingCode(clearOldRemoteCode = false)
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e(TAG, "WatchListener Cancelled: ${error.message}")
+                }
+            }
+
+            watchRef.addValueEventListener(listener)
+            
+            // Si después de 10 segundos no ha visto el registro y no existe, se asume desvinculación o falla:
+            val timeoutJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                delay(10000)
+                if (!hasSeenRemoteWatchRecord) {
+                   watchRef.get().addOnSuccessListener { snap ->
+                       if (!snap.exists()) {
+                           Log.w(TAG, "Timeout: No se encontro patients/$userId/watch, desvinculando por seguridad.")
+                           resetPairingState(clearRemoteWatch = false)
+                           generateNewPairingCode(clearOldRemoteCode = false)
+                       }
+                   }
+                }
+            }
+
+            onDispose { 
+                timeoutJob.cancel()
+                watchRef.removeEventListener(listener) 
+            }
+        } else {
+            onDispose { }
         }
     }
 
@@ -375,30 +448,23 @@ fun WearApp(
 
     // --- 5. Unpairing logic helper ---
     val unpairWatch = {
-        prefs.edit()
-            .putBoolean(KEY_PAIRED, false)
-            .remove(KEY_USER_ID)
-            .remove(KEY_PAIRING_CODE)
-            .apply()
-        isPaired = false
-        pairingCode = ""
-        val intent = Intent(context, VitalSignsService::class.java)
-        context.stopService(intent)
+        resetPairingState(clearRemoteWatch = true)
+        generateNewPairingCode(clearOldRemoteCode = false)
     }
 
     val currentSosDisplayId = activeSosId ?: forcedSosId
     val shouldShowSosQr = currentSosDisplayId != null && currentSosDisplayId != dismissedSosId
 
     // UI
-    VitalSenseWearTheme {
+    BioMetricAIWearTheme {
         Box(
             modifier = Modifier.fillMaxSize().background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            if (!isPaired) {
-                CodeScreen(pairingCode)
-            } else if (showSuccessScreen) {
+            if (showSuccessScreen) {
                 SuccessScreen()
+            } else if (!isPaired) {
+                CodeScreen(pairingCode)
             } else if (!hasPermission) {
                 PermissionScreen {
                     val missing = criticalPermissions.filter {
@@ -438,7 +504,8 @@ fun WearApp(
                     spo2 = currentSpO2,
                     isSpO2Supported = isSpO2Supported,
                     sosSent = sosSent,
-                    onSosTriggered = { triggerSosUI() }
+                    onSosTriggered = { triggerSosUI() },
+                    onUnpair = { unpairWatch() }
                 )
             }
         }
@@ -484,14 +551,18 @@ fun WearApp(
         }
     }
 
-    // Escuchar cambios de emparejamiento
-    DisposableEffect(pairingCode, isPaired) {
-        if (pairingCode.isNotEmpty() && !isPaired) {
+    // Escuchar cambios de emparejamiento usando pairingCode para siempre estar alerta del cambio en el teléfono
+    DisposableEffect(pairingCode) {
+        if (pairingCode.isNotEmpty()) {
             val ref = database.getReference("patients/pairing_codes").child(pairingCode)
             var listener: ValueEventListener? = null
             listener = object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (!snapshot.exists()) {
+                        // El celular posiblemente ha borrado el código de emparejamiento.
+                        if (isPaired) {
+                            unpairWatch()
+                        }
                         return
                     }
                     
@@ -504,8 +575,14 @@ fun WearApp(
                             .putBoolean(KEY_PAIRED, true)
                             .putString(KEY_USER_ID, remoteUid)
                             .apply()
+                        hasSeenRemoteWatchRecord = false
                         isPaired = true
+                        pairedUserId = remoteUid
                         showSuccessScreen = true
+                    } else if (!paired && isPaired) {
+                        // El celular marcó intencionalmente como desvinculado
+                        Log.d(TAG, "¡Desvinculación local detectada!")
+                        unpairWatch()
                     }
                 }
                 override fun onCancelled(error: DatabaseError) {
@@ -560,11 +637,11 @@ fun CodeScreen(code: String) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.align(Alignment.Center)
         ) {
-            // Logo Biometric
+            // Logo BioMetric AI
             Text(
-                text = "Biometric",
+                text = "BioMetric AI",
                 color = Color(0xFF3B82F6),
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
 
@@ -627,11 +704,11 @@ fun SuccessScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.align(Alignment.Center)
         ) {
-            // Logo Biometric
+            // Logo BioMetric AI
             Text(
-                text = "Biometric",
+                text = "BioMetric AI",
                 color = Color(0xFF3B82F6),
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
 
@@ -655,7 +732,7 @@ fun SuccessScreen() {
             Spacer(Modifier.height(16.dp))
             
             Text(
-                text = "Verificación Exitosa", 
+                text = "Vinculación Exitosa", 
                 textAlign = TextAlign.Center, 
                 color = Color(0xFF475569), // Slate 600
                 fontSize = 12.sp,
@@ -687,6 +764,7 @@ fun MonitoringScreen(
     isSpO2Supported: Boolean,
     sosSent: Boolean,
     onSosTriggered: () -> Unit,
+    onUnpair: () -> Unit = {},
 ) {
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     var sosConfirming by remember { mutableStateOf(false) }
@@ -712,15 +790,27 @@ fun MonitoringScreen(
             .background(Color.Black)
             .padding(16.dp)
     ) {
+        // Opción Desvincular en la esquina superior izquierda
+        Text(
+            text = "Desvincular",
+            color = Color(0xFFEF4444),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 10.dp)
+                .clickable { onUnpair() }
+        )
+
         // Hora en la esquina superior derecha
         Text(
             text = currentTime.format(timeFormatter),
             color = Color.White,
-            fontSize = 16.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 12.dp, end = 12.dp)
+                .align(Alignment.CenterEnd)
+                .offset(y = (-50).dp)
         )
 
         // Círculo verde y BPM en el centro

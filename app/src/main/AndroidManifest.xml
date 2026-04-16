@@ -51,13 +51,13 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.VitalSense">
+        android:theme="@style/Theme.BioMetricAI">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.VitalSense"
+            android:theme="@style/Theme.BioMetricAI"
             android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -151,7 +151,7 @@
 
         <!-- FCM: recibe notificaciones push de Firebase Cloud Messaging -->
         <service
-            android:name=".service.VitalSenseMessagingService"
+            android:name=".service.BioMetricAIMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

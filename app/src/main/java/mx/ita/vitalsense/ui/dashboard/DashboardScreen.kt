@@ -90,6 +90,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -1340,26 +1341,34 @@ private fun LibreQuickCard(
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = DashBlue)
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.dashboard_glucose_sensor), fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                }
-                Spacer(Modifier.weight(1f))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = DashBlue,
-                    modifier = Modifier.clickable { onScanClick() },
-                ) {
                     Text(
-                        stringResource(R.string.dashboard_scan),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        color = Color.White,
+                        stringResource(R.string.dashboard_glucose_sensor),
                         fontFamily = Manrope,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = DashBlue,
+                modifier = Modifier
+                    .clickable { onScanClick() }
+                    .align(Alignment.End),
+            ) {
+                Text(
+                    stringResource(R.string.dashboard_scan),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = Color.White,
+                    fontFamily = Manrope,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1530,32 +1539,58 @@ private fun QuickActionsCard(
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Surface(
-                    modifier = Modifier.weight(1f).clickable { onLibreScanClick() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 56.dp)
+                        .clickable { onLibreScanClick() },
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFFE8F1FF),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Rounded.MonitorHeart, null, tint = DashBlue)
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.dashboard_scan_glucose), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = DashBlue)
+                        Text(
+                            stringResource(R.string.dashboard_scan_glucose),
+                            fontFamily = Manrope,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                            color = DashBlue,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
 
                 Surface(
-                    modifier = Modifier.weight(1f).clickable { onMedicationClick() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 56.dp)
+                        .clickable { onMedicationClick() },
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFFFFF4E5),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Rounded.Medication, null, tint = Color(0xFFB45309))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.dashboard_view_medications), fontFamily = Manrope, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFFB45309))
+                        Text(
+                            stringResource(R.string.dashboard_view_medications),
+                            fontFamily = Manrope,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                            color = Color(0xFFB45309),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
@@ -30,7 +31,8 @@ import mx.ita.vitalsense.settings.AppSettings
 import mx.ita.vitalsense.service.EmergencyListenerService
 import mx.ita.vitalsense.ui.health.HealthConnectViewModel
 import mx.ita.vitalsense.ui.navigation.AppNavigation
-import mx.ita.vitalsense.ui.theme.VitalSenseTheme
+import mx.ita.vitalsense.ui.theme.BioMetricAITheme
+import mx.ita.vitalsense.ui.theme.DashBg
 
 data class NotificationOpenRequest(
     val alertId: String,
@@ -68,7 +70,7 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             val themeMode by AppSettings.themeFlow.collectAsState()
-            VitalSenseTheme(themeMode = themeMode) {
+            BioMetricAITheme(themeMode = themeMode) {
                 val isDarkTheme = when (themeMode) {
                     "dark" -> true
                     "light" -> false
@@ -78,11 +80,19 @@ class MainActivity : AppCompatActivity() {
                 val view = LocalView.current
                 SideEffect {
                     val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
-                    window.statusBarColor = colorScheme.background.toArgb()
-                    window.navigationBarColor = colorScheme.background.toArgb()
+                    val appBackgroundColor = if (isDarkTheme) {
+                        colorScheme.background.toArgb()
+                    } else {
+                        DashBg.toArgb()
+                    }
+                    val useDarkStatusIcons = androidx.compose.ui.graphics.Color(appBackgroundColor).luminance() > 0.5f
+                    window.statusBarColor = appBackgroundColor
+                    window.navigationBarColor = appBackgroundColor
+                    window.isStatusBarContrastEnforced = false
+                    window.isNavigationBarContrastEnforced = false
                     WindowCompat.getInsetsController(window, view).apply {
-                        isAppearanceLightStatusBars = !isDarkTheme
-                        isAppearanceLightNavigationBars = !isDarkTheme
+                        isAppearanceLightStatusBars = useDarkStatusIcons
+                        isAppearanceLightNavigationBars = useDarkStatusIcons
                     }
                 }
                 AppNavigation()

@@ -1,4 +1,4 @@
-# VitalSense — Instrucciones de Justin (Lead)
+# BioMetric AI — Instrucciones de Justin (Lead)
 ## Deadline personal: Viernes 20 de Marzo + integración fin de semana
 
 ---

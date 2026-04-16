@@ -1,5 +1,5 @@
 // PairingView — fiel al Figma "Código Reloj"
-// Tarjeta blanca full-screen: VitalSense (negro, ultrabold) → spinner → código azul → expiry
+// Tarjeta blanca full-screen: BioMetric AI (negro, ultrabold) → spinner → código azul → expiry
 
 import SwiftUI
 import Combine
@@ -21,8 +21,8 @@ struct PairingView: View {
             Color.white.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // "VitalSense" — negro, size=18, weight=900
-                Text("VitalSense")
+                // "BioMetric AI" — negro, size=18, weight=900
+                Text("BioMetric AI")
                     .font(.system(size: 18, weight: .black))
                     .foregroundColor(Color(red: 34/255, green: 31/255, blue: 31/255))
                     .padding(.top, 12)

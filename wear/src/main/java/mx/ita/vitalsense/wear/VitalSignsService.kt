@@ -101,7 +101,7 @@ class VitalSignsService : Service() {
         createNotificationChannel()
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VitalSense:BackgroundSyncWakeLock")
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BioMetricAI:BackgroundSyncWakeLock")
         wakeLock?.acquire()
 
         shakeDetector = ShakeDetector(this) {
@@ -112,7 +112,7 @@ class VitalSignsService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_CANCEL_SOS) {
-            Log.w("VitalSense", "Cancelacion SOS desde reloj bloqueada: solo telefono puede resolver la alerta")
+            Log.w("BioMetricAI", "Cancelacion SOS desde reloj bloqueada: solo telefono puede resolver la alerta")
             return START_STICKY
         }
 
@@ -233,7 +233,7 @@ class VitalSignsService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel("vitals_channel", "Monitoreo VitalSense", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel("vitals_channel", "Monitoreo BioMetric AI", NotificationManager.IMPORTANCE_LOW)
             val sosChannel = NotificationChannel(
                 "sos_channel",
                 "Alertas SOS",
@@ -257,7 +257,7 @@ class VitalSignsService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, "vitals_channel")
-            .setContentTitle("VitalSense")
+            .setContentTitle("BioMetric AI")
             .setContentText("Monitoreando salud en tiempo real...")
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setOngoing(true)
@@ -291,7 +291,7 @@ class VitalSignsService : Service() {
 
     fun triggerSosAlert() {
         if (_activeSosId.value != null) {
-            Log.d("VitalSense", "Ignorando SOS: ya hay una alerta activa (${_activeSosId.value})")
+            Log.d("BioMetricAI", "Ignorando SOS: ya hay una alerta activa (${_activeSosId.value})")
             return
         }
 
@@ -300,11 +300,11 @@ class VitalSignsService : Service() {
             val remoteUid = resolveTargetUserId(prefs)
 
             if (remoteUid == "global") {
-                Log.w("VitalSense", "SOS enviado con user_id global (revisa emparejamiento)")
+                Log.w("BioMetricAI", "SOS enviado con user_id global (revisa emparejamiento)")
             }
 
             if (hasBlockingEmergency(remoteUid)) {
-                Log.d("VitalSense", "SOS bloqueado: ya existe una alerta activa para $remoteUid")
+                Log.d("BioMetricAI", "SOS bloqueado: ya existe una alerta activa para $remoteUid")
                 return@launch
             }
 
@@ -737,7 +737,7 @@ class VitalSignsService : Service() {
                     nm.cancel(sosId.hashCode())
                 }
             }.onFailure {
-                Log.e("VitalSense", "No se pudo cancelar SOS desde notificacion", it)
+                Log.e("BioMetricAI", "No se pudo cancelar SOS desde notificacion", it)
             }
         }
     }

@@ -1,4 +1,4 @@
-# VitalSense iOS App — Setup Instructions
+# BioMetric AI iOS App — Setup Instructions
 
 ## Prerequisites
 - Xcode 15.4 or later
@@ -23,7 +23,7 @@ Open Xcode and create a new project:
    - **Interface**: SwiftUI
    - **Language**: Swift
    - **Minimum Deployments**: iOS 16.0
-4. Save in: `VitalSense/iosApp/`
+4. Save in: `BioMetricAI/iosApp/`
 
 ---
 
@@ -33,7 +33,7 @@ After creating the project, add all the Swift files already created in this dire
 
 ```
 iosApp/
-├── VitalSenseApp.swift
+├── BioMetricAIApp.swift
 ├── ContentView.swift
 ├── Navigation/
 │   ├── AppNavigation.swift
@@ -76,9 +76,9 @@ In Xcode: drag all folders into the project navigator, checking "Copy items if n
 ## 4. Add google-services plist
 
 1. Go to [Firebase Console](https://console.firebase.google.com) → your project → iOS app
-2. Register app with bundle ID: `mx.ita.vitalsense`
-3. Download `GoogleService-Info.plist`
-4. Drag it into the Xcode project root (next to `VitalSenseApp.swift`)
+3. Register app with bundle ID: `mx.ita.vitalsense`
+4. Download `GoogleService-Info.plist`
+5. Make sure "Copy items if needed" is checked
 5. Make sure "Copy items if needed" is checked
 
 ---
@@ -94,19 +94,19 @@ Open `Info.plist` and add:
 
 <!-- NFC usage description -->
 <key>NFCReaderUsageDescription</key>
-<string>VitalSense usa NFC para leer el sensor Freestyle Libre</string>
+   <string>BioMetric AI usa NFC para leer el sensor Freestyle Libre</string>
 
 <!-- Bluetooth usage descriptions -->
 <key>NSBluetoothAlwaysUsageDescription</key>
-<string>VitalSense usa Bluetooth para conectarse a sensores de salud</string>
+   <string>BioMetric AI usa Bluetooth para conectarse a sensores de salud</string>
 <key>NSBluetoothPeripheralUsageDescription</key>
-<string>VitalSense usa Bluetooth para conectarse a sensores de salud</string>
+   <string>BioMetric AI usa Bluetooth para conectarse a sensores de salud</string>
 
 <!-- HealthKit usage descriptions -->
 <key>NSHealthShareUsageDescription</key>
-<string>VitalSense lee tus datos de salud para monitoreo</string>
+   <string>BioMetric AI lee tus datos de salud para monitoreo</string>
 <key>NSHealthUpdateUsageDescription</key>
-<string>VitalSense actualiza tus datos de salud</string>
+   <string>BioMetric AI actualiza tus datos de salud</string>
 ```
 
 ---
@@ -159,7 +159,7 @@ To use the Kotlin shared module from iOS:
 
 1. Build the shared framework from the root project:
    ```bash
-   cd VitalSense
+   cd BioMetricAI
    ./gradlew :shared:assembleReleaseXCFramework
    ```
    This generates: `shared/build/XCFrameworks/release/shared.xcframework`
@@ -174,7 +174,7 @@ To use the Kotlin shared module from iOS:
    import shared
 
    // Use KMP models directly
-   let ai = VitalSenseAI(apiKey: "your-key")
+   let ai = BioMetricAI(apiKey: "your-key")
    ```
 
 ---

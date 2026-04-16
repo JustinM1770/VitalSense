@@ -175,14 +175,28 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
 
                     val deviceName = snapshot.child("deviceName").getValue(String::class.java) ?: "Wearable"
                     val resolvedRef = pairingCodesRef.child(snapshot.key ?: upperCode)
-                    resolvedRef.updateChildren(
-                        mapOf(
-                            "paired" to true,
-                            "active" to true,
-                            "userId" to userId,
-                            "pairedAt" to System.currentTimeMillis(),
-                        ),
-                    ).await()
+                    val pairingUpdate = mapOf(
+                        "paired" to true,
+                        "active" to true,
+                        "userId" to userId,
+                        "pairedAt" to System.currentTimeMillis(),
+                    )
+
+                    // Update the resolved record first.
+                    resolvedRef.updateChildren(pairingUpdate).await()
+
+                    // Also enforce update on the exact code key the watch is observing.
+                    // This avoids phone/watch desync if an old fallback node was matched.
+                    if ((snapshot.key ?: "") != upperCode) {
+                        pairingCodesRef.child(upperCode)
+                            .updateChildren(
+                                pairingUpdate + mapOf(
+                                    "code" to upperCode,
+                                    "deviceName" to deviceName,
+                                ),
+                            )
+                            .await()
+                    }
                     pairSuccessfully(upperCode, deviceName)
                 } else {
                     _codeError.value = "Codigo no encontrado. Espera 2-3 segundos y vuelve a intentar con el codigo exacto del reloj."

@@ -1,4 +1,4 @@
-# VitalSense — ITA Aguascalientes 🏆
+# BioMetric AI — ITA Aguascalientes 🏆
 ## InnovaTecNM 2026 · Categoría: Servicios para la Salud Humana
 
 > Retomamos HEALTHSENSOR (ya avanzó a Regional desde el ITA en 2025).
@@ -8,7 +8,7 @@
 
 ## El proyecto en una oración
 
-**VitalSense** es una plataforma de monitoreo remoto para adultos mayores que viven solos:
+**BioMetric AI** es una plataforma de monitoreo remoto para adultos mayores que viven solos:
 el adulto usa un reloj y un sensor de glucosa (Freestyle Libre), los datos llegan automáticamente
 a Firebase, y el tutor/familiar ve las métricas en tiempo real con recomendaciones de IA
 para **prevenir enfermedades crónicas antes de que aparezcan**.
@@ -20,7 +20,7 @@ para **prevenir enfermedades crónicas antes de que aparezcan**.
 ```
 Adulto Mayor                          Tutor / Familiar
 ────────────                          ────────────────
-Freestyle Libre (glucosa en brazo)    App VitalSense (Android)
+Freestyle Libre (glucosa en brazo)    App BioMetric AI (Android)
       ↓ BLE                               ↑
 ESP32 en casa (hub WiFi enchufado)→ Firebase RT ← IA (Claude API)
       ↑ BLE                               ↓
@@ -97,7 +97,7 @@ vitals/current/         → JUSTIN (no tocar)
 ## Por qué podemos ganar el Nacional
 
 - El ITA ya avanzó con HEALTHSENSOR en 2025 — el jurado conoce la institución
-- VitalSense tiene hardware real (ESP32 + Freestyle Libre) + IA + app — la mayoría de proyectos de salud solo tienen app
+- BioMetric AI tiene hardware real (ESP32 + Freestyle Libre) + IA + app — la mayoría de proyectos de salud solo tienen app
 - El caso de uso (adulto mayor solo, prevención de diabetes) tiene el mayor impacto social de la categoría
 - El prototipo funciona en demo en vivo = 50% del puntaje nacional
 

@@ -151,12 +151,26 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     fun disconnectWatch() {
         viewModelScope.launch {
             try {
-                prefs.edit().putBoolean("code_paired", false).apply()
-                prefs.edit().remove("paired_device_name").apply()
                 val userId = auth.currentUser?.uid
+                val pairedCode = prefs.getString("paired_code", null)
+
+                prefs.edit()
+                    .putBoolean("code_paired", false)
+                    .remove("paired_code")
+                    .remove("paired_device_name")
+                    .apply()
+
                 if (userId != null) {
+                    db.getReference("patients/$userId/watch").removeValue().await()
                     db.getReference("vitals/current/$userId").removeValue()
                 }
+
+                if (!pairedCode.isNullOrBlank()) {
+                    db.getReference("patients/pairing_codes").child(pairedCode)
+                        .updateChildren(mapOf("paired" to false))
+                        .await()
+                }
+
                 val current = _uiState.value
                 if (current is DashboardUiState.Success) {
                     _uiState.value = current.copy(isWatchPaired = false, currentVitals = VitalsData())

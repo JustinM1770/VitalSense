@@ -17,7 +17,16 @@
           ".write": "auth != null && (auth.uid == $uid || (newData.child('type').val() == 'SOS' && newData.child('source').val() == 'wear_internet'))"
         },
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && (auth.uid == $uid || newData.child('type').val() == 'SOS')"
+      }
+    },
+
+    "vitals": {
+      "current": {
+        "$uid": {
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null"
+        }
       }
     },
 
@@ -32,6 +41,11 @@
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid",
+
+        "watch": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $uid"
+        },
 
         "heartRate": { ".read": true },
         "spo2": { ".read": true },
@@ -60,8 +74,8 @@
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
-        ,
+        ".write": "auth != null && auth.uid == $uid",
+        
         "datosMedicos": {
           ".read": "auth != null && auth.uid == $uid",
           ".write": "auth != null && auth.uid == $uid",

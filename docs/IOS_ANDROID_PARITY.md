@@ -1,4 +1,4 @@
-# Paridad iOS vs Android (VitalSense)
+# Paridad iOS vs Android (BioMetric AI)
 
 Fecha: 2026-04-06
 

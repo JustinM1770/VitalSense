@@ -29,7 +29,7 @@ class HealthSensorApp : Application() {
             // Canal principal de alertas críticas
             NotificationChannel(
                 CHANNEL_ALERTS,
-                "Alertas de Vitales",
+                "Alertas de BioMetric AI",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = "Notificaciones de alertas críticas de pacientes"

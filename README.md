@@ -1,6 +1,6 @@
-# VitalSense 🩺
+# BioMetric AI 🩺
 
-**VitalSense** es una plataforma de monitoreo de salud en tiempo real que integra una aplicación Android para teléfono, una aplicación Wear OS para reloj inteligente y un backend en Firebase. Permite monitorear signos vitales, enviar alertas SOS con ubicación, gestionar medicamentos y acceder a datos de salud históricos.
+**BioMetric AI** es una plataforma de monitoreo de salud en tiempo real que integra una aplicación Android para teléfono, una aplicación Wear OS para reloj inteligente y un backend en Firebase. Permite monitorear signos vitales, enviar alertas SOS con ubicación, gestionar medicamentos y acceder a datos de salud históricos.
 
 ---
 
@@ -123,8 +123,8 @@
 
 ## 🔗 Vinculación Teléfono ↔ Reloj
 
-1. Abre VitalSense en el **reloj** — aparece un código de 8 caracteres (válido 5 minutos).
-2. Abre VitalSense en el **teléfono** → Conectar wearable → ingresa el código.
+1. Abre BioMetric AI en el **reloj** — aparece un código de 8 caracteres (válido 5 minutos).
+2. Abre BioMetric AI en el **teléfono** → Conectar wearable → ingresa el código.
 3. Una vez emparejado, el reloj inicia automáticamente el monitoreo de signos vitales.
 
 ---
@@ -191,4 +191,4 @@ Este proyecto fue desarrollado como proyecto académico en el **Instituto Tecnol
 
 ---
 
-*VitalSense — Monitoreo de salud inteligente en tiempo real* 💙
+*BioMetric AI — Monitoreo de salud inteligente en tiempo real* 💙

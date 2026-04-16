@@ -11,7 +11,7 @@ struct EmergencyView: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 6) {
-                Text("VitalSense")
+                Text("BioMetric AI")
                     .font(.system(size: 14, weight: .black))
                     .foregroundColor(.white)
 
