@@ -253,6 +253,7 @@ fun DashboardScreen(
                 val sleepData = if (state is DashboardUiState.Success) state.sleepData else null
                 val vitalsHistory = if (state is DashboardUiState.Success) state.vitalsHistory else emptyList()
                 val medications = if (state is DashboardUiState.Success) state.medications else emptyList()
+                val currentVitals = if (state is DashboardUiState.Success) state.currentVitals else VitalsData()
                 val libreLastGlucose = if (uid.isNotEmpty()) profilePrefs.getFloat("libre_last_glucose_$uid", 0f).toDouble() else 0.0
                 val libreLastTime = if (uid.isNotEmpty()) profilePrefs.getLong("libre_last_time_$uid", 0L) else 0L
                 val libreLastSource = if (uid.isNotEmpty()) profilePrefs.getString("libre_last_source_$uid", "") ?: "" else ""
@@ -262,6 +263,7 @@ fun DashboardScreen(
                     userName = userName,
                     userAvatarUri = userAvatarUri,
                     patients = patients,
+                    currentVitals = currentVitals,
                     sleepData = sleepData,
                     vitalsHistory = vitalsHistory,
                     medications = medications,
@@ -458,6 +460,7 @@ private fun DashboardContent(
     userName: String,
     userAvatarUri: String?,
     patients: List<VitalsData>,
+    currentVitals: VitalsData,
     sleepData: SleepData?,
     vitalsHistory: List<VitalsData>,
     medications: List<Medication>,
@@ -562,8 +565,8 @@ private fun DashboardContent(
                 Box(modifier = Modifier.fillMaxWidth()) {
                     when (cardType) {
                         MetricCardType.SLEEP -> SleepMetricCard(sleepData = sleepData, onClick = onReportClick)
-                        MetricCardType.SPO2 -> Spo2MiniCard(patients)
-                        MetricCardType.HR -> HrMiniCard(patients)
+                        MetricCardType.SPO2 -> Spo2MiniCard(currentVitals = currentVitals, vitalsHistory = vitalsHistory)
+                        MetricCardType.HR -> HrMiniCard(currentVitals = currentVitals, vitalsHistory = vitalsHistory)
                         MetricCardType.KCAL -> KcalMiniCard(patients)
                     }
                     if (visibleCards.size > 1) {
@@ -613,7 +616,7 @@ private fun DashboardContent(
 
             // ── Métricas de Salud ─────────────────────────────────────────────
             HealthMetricsGraphCard(
-                patients = patients,
+                currentVitals = currentVitals,
                 vitalsHistory = vitalsHistory,
                 onSeeAllClick = onDetailedClick,
             )
@@ -973,8 +976,11 @@ private fun SleepMetricCard(sleepData: SleepData?, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HrMiniCard(patients: List<VitalsData>) {
-    val hr = patients.firstOrNull()?.heartRate?.takeIf { it > 0 }
+private fun HrMiniCard(currentVitals: VitalsData, vitalsHistory: List<VitalsData>) {
+    val hr = when {
+        currentVitals.heartRate > 0 -> currentVitals.heartRate
+        else -> vitalsHistory.lastOrNull { it.heartRate > 0 }?.heartRate
+    }
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Favorite, contentDescription = null, tint = HeartRateCurve, modifier = Modifier.size(28.dp))
@@ -998,15 +1004,18 @@ private fun KcalMiniCard(patients: List<VitalsData>) {
 }
 
 @Composable
-private fun Spo2MiniCard(patients: List<VitalsData>) {
-    val spo2 = patients.firstOrNull()?.spo2 ?: 98
+private fun Spo2MiniCard(currentVitals: VitalsData, vitalsHistory: List<VitalsData>) {
+    val spo2 = when {
+        currentVitals.spo2 > 0 -> currentVitals.spo2
+        else -> vitalsHistory.lastOrNull { it.spo2 > 0 }?.spo2 ?: 0
+    }
     WhiteCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.MonitorHeart, contentDescription = null, tint = mx.ita.vitalsense.ui.theme.SpO2Green, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("SpO₂", fontFamily = Manrope, fontSize = 13.sp, color = Color(0xFF8A8A8A))
-                Text("$spo2%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(if (spo2 > 0) "$spo2%" else "--%", fontFamily = Manrope, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -1016,63 +1025,53 @@ private fun Spo2MiniCard(patients: List<VitalsData>) {
 
 @Composable
 private fun HealthMetricsGraphCard(
-    patients: List<VitalsData>,
+    currentVitals: VitalsData,
     vitalsHistory: List<VitalsData>,
     onSeeAllClick: () -> Unit,
 ) {
-    val recentHrSamples = vitalsHistory
-        .asReversed()
-        .map { it.heartRate }
-        .filter { it > 0 }
-        .take(5)
+    val zone = ZoneId.systemDefault()
+    val today = LocalDate.now(zone)
+    val groupedHrByDay = vitalsHistory
+        .asSequence()
+        .filter { it.heartRate > 0 && it.timestamp > 0L }
+        .groupBy { java.time.Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+
+    val todayAvg = groupedHrByDay[today]?.map { it.heartRate }?.average()?.toInt() ?: 0
+
     val displayBpm = when {
-        recentHrSamples.isNotEmpty() -> recentHrSamples.average().toInt()
-        else -> patients.firstOrNull()?.heartRate ?: 0
+        todayAvg > 0 -> todayAvg
+        currentVitals.heartRate > 0 -> currentVitals.heartRate
+        else -> vitalsHistory.lastOrNull { it.heartRate > 0 }?.heartRate ?: 0
     }
 
     WhiteCard(modifier = Modifier.fillMaxWidth().clickable { onSeeAllClick() }) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = stringResource(R.string.dashboard_health_metrics),
-                    fontFamily = Manrope,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.dashboard_view_all),
-                        color = TextGray,
-                        fontSize = 12.sp,
-                        fontFamily = Manrope,
-                        modifier = Modifier.clickable { onSeeAllClick() }
-                    )
+                    Icon(Icons.Rounded.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    ArrowCircle(onClick = onSeeAllClick)
+                    Text(
+                        stringResource(R.string.dashboard_health_metrics),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
+                Text(
+                    text = if (displayBpm > 0) "$displayBpm BPM" else "-- BPM",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Chart using Canvas (bezier implementation)
             WeeklyHrChart(vitalsHistory = vitalsHistory)
-
-            // Tooltip overlay
-            if (displayBpm > 0) {
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Favorite, null, tint = HeartRateCurve, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("$displayBpm BPM", fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Manrope, color = MaterialTheme.colorScheme.onSurface)
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.dashboard_heart_rate_label), fontSize = 11.sp, color = TextGray, fontFamily = Manrope)
-                }
-            }
         }
     }
 }
@@ -1163,70 +1162,105 @@ private fun WeeklyHrChart(vitalsHistory: List<VitalsData>) {
             java.time.Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate()
         }
         .filterKeys { it in daySet }
+        
     val values = last7Dates.map { day ->
         grouped[day]?.map { it.heartRate }?.average()?.toInt() ?: 0
     }
-    val hasData = values.any { it > 0 }
-    val yLabels = listOf(100, 110, 120, 130, 140)
+    
+    val activeValues = values.filter { it > 0 }
+    val dataMin = activeValues.minOrNull()?.toFloat() ?: 60f
+    val dataMax = activeValues.maxOrNull()?.toFloat() ?: 120f
+    
+    var minBpm = (minOf(dataMin - 10f, 60f) / 10f).toInt() * 10f
+    var maxBpm = ((maxOf(dataMax + 10f, 130f) + 9f) / 10f).toInt() * 10f
+    while ((maxBpm - minBpm).toInt() % 40 != 0) {
+        maxBpm += 10f
+    }
+    
+    val step = (maxBpm - minBpm) / 4
+    val yLabels = listOf(maxBpm, maxBpm - step, maxBpm - step * 2, maxBpm - step * 3, minBpm).map { it.toInt() }
 
-    Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+    val color = MaterialTheme.colorScheme.primary
+
+    Row(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(end = 4.dp).height(100.dp),
+            modifier = Modifier.padding(end = 6.dp).height(120.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            yLabels.reversed().forEach { Text("$it", fontFamily = Manrope, fontSize = 9.sp, color = Color(0xFFB0B0B0)) }
+            yLabels.forEach { Text("$it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        Canvas(modifier = Modifier.weight(1f).height(100.dp)) {
-            val w = size.width; val h = size.height
-            val min = 50f; val max = 180f
-            fun xOf(i: Int) = i * w / (values.size - 1)
-            fun yOf(v: Int) = h - ((v - min) / (max - min) * h).coerceIn(0f, h)
 
-            // grid
-            yLabels.forEach { y -> drawLine(Color(0xFFEEEEEE), Offset(0f, yOf(y)), Offset(w, yOf(y)), 1.dp.toPx()) }
-            dayLabels.indices.forEach { i -> drawLine(Color(0xFFEEEEEE), Offset(xOf(i), 0f), Offset(xOf(i), h), 0.5.dp.toPx()) }
+        Column(modifier = Modifier.weight(1f)) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                val w = size.width
+                val h = size.height
 
-            if (!hasData) return@Canvas
+                if (activeValues.isEmpty()) {
+                    drawLine(
+                        color = color.copy(alpha = 0.3f),
+                        start = Offset(0f, h * 0.5f),
+                        end = Offset(w, h * 0.5f),
+                        strokeWidth = 2.dp.toPx(),
+                    )
+                    return@Canvas
+                }
 
-            val nonZeroIndices = values.indices.filter { values[it] > 0 }
-            if (nonZeroIndices.size == 1) {
-                val idx = nonZeroIndices.first()
-                val dotX = xOf(idx)
-                val dotY = yOf(values[idx])
-                drawCircle(ChartRed, 6.dp.toPx(), Offset(dotX, dotY))
-                drawCircle(Color.White, 3.dp.toPx(), Offset(dotX, dotY))
-                drawLine(ChartRed.copy(0.4f), Offset(dotX, dotY), Offset(dotX, h), 1.dp.toPx())
-                return@Canvas
-            }
-            if (nonZeroIndices.size < 2) return@Canvas
+                fun xOf(i: Int) = i * w / (values.size - 1)
+                fun yOf(v: Float): Float {
+                    val normalized = ((v - minBpm) / (maxBpm - minBpm)).coerceIn(0f, 1f)
+                    return h - (normalized * h)
+                }
 
-            val path = Path().apply {
+                // grids
+                yLabels.forEach { yL ->
+                    val y = yOf(yL.toFloat())
+                    drawLine(Color(0xFFEEEEEE), Offset(0f, y), Offset(w, y), 1.dp.toPx())
+                }
+                dayLabels.indices.forEach { i ->
+                    drawLine(Color(0xFFEEEEEE), Offset(xOf(i), 0f), Offset(xOf(i), h), 0.5.dp.toPx())
+                }
+
+                val nonZeroIndices = values.indices.filter { values[it] > 0 }
+                
+                if (nonZeroIndices.size == 1) {
+                    val idx = nonZeroIndices.first()
+                    drawCircle(color = color, radius = 4.dp.toPx(), center = Offset(xOf(idx), yOf(values[idx].toFloat())))
+                    return@Canvas
+                }
+
+                val path = Path()
                 var started = false
-                values.forEachIndexed { i, v ->
-                    if (v > 0) {
-                        if (!started) { moveTo(xOf(i), yOf(v)); started = true }
-                        else lineTo(xOf(i), yOf(v))
+                nonZeroIndices.forEach { i ->
+                    val v = values[i]
+                    if (!started) {
+                        path.moveTo(xOf(i), yOf(v.toFloat()))
+                        started = true
+                    } else {
+                        path.lineTo(xOf(i), yOf(v.toFloat()))
                     }
                 }
+
+                drawPath(
+                    path = path,
+                    color = color,
+                    style = Stroke(width = 3.dp.toPx())
+                )
+
+                val lastIdx = nonZeroIndices.last()
+                drawCircle(color = color, radius = 4.dp.toPx(), center = Offset(xOf(lastIdx), yOf(values[lastIdx].toFloat())))
             }
-            drawPath(Path().apply {
-                addPath(path)
-                lineTo(xOf(nonZeroIndices.last()), h); lineTo(xOf(nonZeroIndices.first()), h); close()
-            }, Brush.verticalGradient(listOf(ChartRed.copy(0.25f), Color.Transparent), 0f, h))
-            drawPath(path, ChartRed, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
-
-            // Dot en el último día con dato real
-            val lastIdx = nonZeroIndices.last()
-            val dotX = xOf(lastIdx); val dotY = yOf(values[lastIdx])
-            drawCircle(ChartRed, 6.dp.toPx(), Offset(dotX, dotY))
-            drawCircle(Color.White, 3.dp.toPx(), Offset(dotX, dotY))
-            drawLine(ChartRed.copy(0.4f), Offset(dotX, dotY), Offset(dotX, h), 1.dp.toPx())
+            
+            Spacer(Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                dayLabels.forEach { time ->
+                    Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
-    }
-
-    // Day labels
-    Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        dayLabels.forEach { Text(it, fontFamily = Manrope, fontSize = 9.sp, color = Color(0xFFB0B0B0)) }
     }
 }
 

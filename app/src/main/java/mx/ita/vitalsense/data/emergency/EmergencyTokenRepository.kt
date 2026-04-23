@@ -77,6 +77,20 @@ class EmergencyTokenRepository {
     /** Duración del token: 30 minutos */
     private val ttlMs = 30 * 60 * 1000L
 
+    private fun readInt(node: com.google.firebase.database.DataSnapshot): Int? {
+        val number = node.getValue(Number::class.java)?.toInt()
+        if (number != null) return number
+        val raw = node.getValue(String::class.java)?.trim()
+        return raw?.toIntOrNull()
+    }
+
+    private fun readDouble(node: com.google.firebase.database.DataSnapshot): Double? {
+        val number = node.getValue(Number::class.java)?.toDouble()
+        if (number != null) return number
+        val raw = node.getValue(String::class.java)?.trim()
+        return raw?.toDoubleOrNull()
+    }
+
     /**
      * Crea un token de emergencia en Firebase y devuelve la URL web + PIN.
      * El QR codifica la URL web — cualquier navegador la abre sin app.
@@ -88,6 +102,21 @@ class EmergencyTokenRepository {
         // 1. Leer perfil médico del paciente
         val profileSnap = db.getReference("users/$userId/datosMedicos").get().await()
         val profile = profileSnap.getValue(MedicalProfile::class.java) ?: MedicalProfile()
+
+        // 1a. Capturar últimos vitales reales para no depender de nodos legacy vacíos.
+        val currentVitalsSnap = db.getReference("vitals/current/$userId").get().await()
+        val patientNodeSnap = db.getReference("patients/$userId").get().await()
+
+        val resolvedHeartRate = when {
+            heartRate > 0 -> heartRate
+            else -> readInt(currentVitalsSnap.child("heartRate"))
+                ?: readInt(patientNodeSnap.child("heartRate"))
+                ?: 0
+        }
+        val resolvedSpo2 = readInt(currentVitalsSnap.child("spo2"))
+            ?: readInt(patientNodeSnap.child("spo2"))
+        val resolvedGlucose = readDouble(currentVitalsSnap.child("glucose"))
+            ?: readDouble(patientNodeSnap.child("glucose"))
 
         // 1b. Leer documentos de Firebase Storage
         val storageDocsSnap = db.getReference("patients/$userId/profile/storageDocuments").get().await()
@@ -106,8 +135,7 @@ class EmergencyTokenRepository {
         val pinHash = sha256(pin + tokenId)
 
         // 3. Escribir token en Firebase — pinHash en lugar de pin en texto plano
-        db.getReference("emergency_tokens/$tokenId").setValue(
-            mapOf(
+        val tokenPayload = mutableMapOf<String, Any>(
                 "tokenId"            to tokenId,
                 "userId"             to userId,
                 "nombre"             to profile.nombre,
@@ -121,24 +149,28 @@ class EmergencyTokenRepository {
                 "contactoEmergencia" to profile.contactoEmergencia,
                 "telefonoEmergencia" to profile.telefonoEmergencia,
                 "anomalyType"        to anomalyType,
-                "heartRateAtAlert"   to heartRate,
+                "heartRateAtAlert"   to resolvedHeartRate,
                 "createdAt"          to now,
                 "expiresAt"          to (now + ttlMs),
                 "active"             to true,
                 "documentos"         to storageDocsList,
                 "pinHash"            to pinHash,   // ← nunca el PIN en claro
             )
-        ).await()
+        if ((resolvedSpo2 ?: 0) > 0) tokenPayload["spo2"] = resolvedSpo2 as Int
+        if ((resolvedGlucose ?: 0.0) > 0.0) tokenPayload["glucose"] = resolvedGlucose as Double
+
+        db.getReference("emergency_tokens/$tokenId").setValue(tokenPayload).await()
 
         // 4. Escribir nodo activeEmergency para el reloj (sin PIN)
-        db.getReference("patients/$userId/activeEmergency").setValue(
-            mapOf(
+        val activeEmergencyPayload = mutableMapOf<String, Any>(
                 "tokenId"     to tokenId,
                 "expiresAt"   to (now + ttlMs),
                 "anomalyType" to anomalyType,
-                "heartRate"   to heartRate,
+                "heartRate"   to resolvedHeartRate,
             )
-        ).await()
+        if ((resolvedSpo2 ?: 0) > 0) activeEmergencyPayload["spo2"] = resolvedSpo2 as Int
+
+        db.getReference("patients/$userId/activeEmergency").setValue(activeEmergencyPayload).await()
 
         EmergencyCreated(
             tokenId = tokenId,

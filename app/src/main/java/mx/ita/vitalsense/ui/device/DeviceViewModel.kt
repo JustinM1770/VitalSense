@@ -322,7 +322,7 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
             launch {
                 while (isActive) {
                     readAndSyncSleepData()
-                    delay(30 * 60 * 1000)
+                    delay(5 * 60 * 1000)
                 }
             }
         }
@@ -378,7 +378,13 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         try {
             if (sleep.totalMinutes <= 0) return
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-            val dateKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            val zone = java.time.ZoneId.systemDefault()
+            val sleepDate = when {
+                sleep.sleepEndMillis > 0L -> Instant.ofEpochMilli(sleep.sleepEndMillis).atZone(zone).toLocalDate()
+                sleep.sleepStartMillis > 0L -> Instant.ofEpochMilli(sleep.sleepStartMillis).atZone(zone).toLocalDate()
+                else -> LocalDate.now(zone)
+            }
+            val dateKey = sleepDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
             val ref = db.getReference("sleep/$userId/$dateKey")
             ref.setValue(sleep)
         } catch (e: Exception) {
@@ -390,16 +396,17 @@ class DeviceViewModel(app: Application) : AndroidViewModel(app) {
         try {
             val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "global"
             val ref = db.getReference("vitals/current/$userId")
-            val data = mutableMapOf<String, Any>(
-                "heartRate" to (vitals.heartRate ?: 0),
-                "spo2" to (vitals.spo2 ?: 0),
-                "glucose" to (vitals.glucose ?: 0.0),
-                "timestamp" to System.currentTimeMillis()
-            )
+            val data = mutableMapOf<String, Any>("timestamp" to System.currentTimeMillis())
+            val hr = vitals.heartRate
+            val spo2 = vitals.spo2
+            val glucose = vitals.glucose
+            if (hr != null && hr > 0) data["heartRate"] = hr
+            if (spo2 != null && spo2 > 0) data["spo2"] = spo2
+            if (glucose != null && glucose > 0.0) data["glucose"] = glucose
             if (heartRateSampleTimestamp != null) {
                 data["heartRateSampleTimestamp"] = heartRateSampleTimestamp
             }
-            ref.setValue(data)
+            ref.updateChildren(data)
         } catch (e: Exception) {
             Log.e(TAG, "Error writing vitals to Firebase", e)
         }

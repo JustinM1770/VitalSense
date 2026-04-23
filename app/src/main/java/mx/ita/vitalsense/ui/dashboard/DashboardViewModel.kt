@@ -129,7 +129,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadPatientProfile(userId: String) {
         viewModelScope.launch {
             try {
-                val snap = db.getReference("users/$userId/datosMedicos").get().await()
+                val snap = withTimeoutOrNull(5000L) {
+                    db.getReference("users/$userId/datosMedicos").get().await()
+                } ?: return@launch
                 val profile = snap.getValue(MedicalProfile::class.java)
                 if (profile != null) {
                     patientThresholds = profile.computePersonalizedThresholds()
@@ -192,12 +194,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 // 1. Sleep data (hoy + ayer para evitar falsos "No durmió" por desfase de fecha)
-                val sleepSnapshot = db.getReference("sleep/$userId")
-                    .orderByKey()
-                    .startAt(yesterdayKey)
-                    .endAt(dateKey)
-                    .get()
-                    .await()
+                val sleepSnapshot = withTimeoutOrNull(8000L) {
+                    db.getReference("sleep/$userId")
+                        .orderByKey()
+                        .startAt(yesterdayKey)
+                        .endAt(dateKey)
+                        .get()
+                        .await()
+                } ?: return@launch
                 val sleepByDate = sleepSnapshot.children.associate { it.key.orEmpty() to it.getValue(SleepData::class.java) }
                 val sleep = selectLatestSleepData(sleepByDate)
 
@@ -209,12 +213,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val endMillis = endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
                 val historyList = mutableListOf<VitalsData>()
 
-                val historySnapshot = db.getReference("patients/$userId/history")
-                    .orderByChild("timestamp")
-                    .startAt(startMillis.toDouble())
-                    .endAt(endMillis.toDouble())
-                    .get()
-                    .await()
+                val historySnapshot = withTimeoutOrNull(8000L) {
+                    db.getReference("patients/$userId/history")
+                        .orderByChild("timestamp")
+                        .startAt(startMillis.toDouble())
+                        .endAt(endMillis.toDouble())
+                        .get()
+                        .await()
+                } ?: return@launch
 
                 historySnapshot.children.forEach { child ->
                     val vitals = child.getValue(VitalsData::class.java)
@@ -312,6 +318,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
                     try {
                         val vitals = snapshot.getValue(VitalsData::class.java) ?: return
+                        val current = _uiState.value
+                        if (current is DashboardUiState.Success) {
+                            _uiState.value = current.copy(
+                                currentVitals = vitals.copy(patientId = userId),
+                            )
+                        }
+
                         val hrSampleTs = snapshot.child("heartRateSampleTimestamp").getValue(Long::class.java)
                             ?: vitals.timestamp
                         val previousSampleTs = lastSavedHrSampleTsByUser[userId] ?: 0L
@@ -323,13 +336,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                             lastSavedHrSampleTsByUser[userId] = hrSampleTs
 
                             // Agregar al historial actual en memoria
-                            val current = _uiState.value
-                            if (current is DashboardUiState.Success) {
-                                val updated = current.vitalsHistory.toMutableList()
+                            val latestState = _uiState.value
+                            if (latestState is DashboardUiState.Success) {
+                                val updated = latestState.vitalsHistory.toMutableList()
                                 updated.add(vitals.copy(patientId = userId, timestamp = hrSampleTs))
                                 // Mantener solo últimas 100 entradas
                                 val trimmed = if (updated.size > 100) updated.drop(updated.size - 100) else updated
-                                _uiState.value = current.copy(vitalsHistory = trimmed)
+                                _uiState.value = latestState.copy(vitalsHistory = trimmed)
                             }
                         }
                     } catch (e: Exception) {

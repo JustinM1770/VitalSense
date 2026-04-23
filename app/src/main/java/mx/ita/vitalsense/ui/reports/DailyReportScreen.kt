@@ -155,7 +155,11 @@ fun DailyReportScreen(
             )
             Spacer(Modifier.height(16.dp))
             
-            HeartRateTrendCard(history = state.vitalsHistory)
+            HeartRateTrendCard(
+                history = state.vitalsHistory,
+                rangeStartMillis = state.rangeStartMillis,
+                rangeEndMillis = state.rangeEndMillis,
+            )
             
             Spacer(Modifier.height(16.dp))
 
@@ -522,10 +526,70 @@ private fun HealthRadarChart(
     }
 }
 
+private data class HrTimePoint(
+    val timestamp: Long,
+    val bpm: Int,
+)
+
 @Composable
-private fun HeartRateTrendCard(history: List<mx.ita.vitalsense.data.model.VitalsData>) {
-    val latestBpm = history.lastOrNull()?.heartRate ?: 0
+private fun HeartRateTrendCard(
+    history: List<mx.ita.vitalsense.data.model.VitalsData>,
+    rangeStartMillis: Long,
+    rangeEndMillis: Long,
+) {
+    val timePoints = remember(history) {
+        history
+            .asSequence()
+            .filter { it.heartRate > 0 && it.timestamp > 0L }
+            .map { HrTimePoint(timestamp = it.timestamp, bpm = it.heartRate) }
+            .sortedBy { it.timestamp }
+            .toList()
+    }
+    val latestBpm = timePoints.lastOrNull()?.bpm ?: 0
+    val nowMillis = System.currentTimeMillis()
+    val zone = ZoneId.systemDefault()
+    val chartStart = if (rangeStartMillis > 0L) {
+        rangeStartMillis
+    } else {
+        LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+    }
+    val queryEnd = when {
+        rangeEndMillis > chartStart -> rangeEndMillis
+        else -> maxOf(chartStart + 60_000L, nowMillis)
+    }
+    val startDate = Instant.ofEpochMilli(chartStart).atZone(zone).toLocalDate()
+    val endDate = Instant.ofEpochMilli(queryEnd).atZone(zone).toLocalDate()
+    val isSingleDay = startDate == endDate
+    val chartEnd = if (isSingleDay) {
+        startDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1L
+    } else {
+        queryEnd
+    }
+    val labels = remember(chartStart, chartEnd, isSingleDay) {
+        if (isSingleDay) {
+            listOf("00:00", "06:00", "12:00", "18:00", "23:59")
+        } else {
+            val span = (chartEnd - chartStart).coerceAtLeast(1L)
+            val formatter = DateTimeFormatter.ofPattern("dd/MM HH:mm")
+            (0..4).map { index ->
+                val ts = chartStart + (span * index) / 4
+                Instant.ofEpochMilli(ts).atZone(zone).format(formatter)
+            }
+        }
+    }
+    val bpmValues = timePoints.map { it.bpm }
+    val dataMin = bpmValues.minOrNull()?.toFloat() ?: 60f
+    val dataMax = bpmValues.maxOrNull()?.toFloat() ?: 120f
     
+    var minBpm = (minOf(dataMin - 10f, 60f) / 10f).toInt() * 10f
+    var maxBpm = ((maxOf(dataMax + 10f, 130f) + 9f) / 10f).toInt() * 10f
+    while ((maxBpm - minBpm).toInt() % 40 != 0) {
+        maxBpm += 10f
+    }
+    
+    val step = (maxBpm - minBpm) / 4
+    val yLabels = listOf(maxBpm, maxBpm - step, maxBpm - step * 2, maxBpm - step * 3, minBpm).map { it.toInt() }
+
     NeuCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -543,22 +607,36 @@ private fun HeartRateTrendCard(history: List<mx.ita.vitalsense.data.model.Vitals
             
             Spacer(Modifier.height(24.dp))
             
-            LineChart(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                color = MaterialTheme.colorScheme.primary,
-                points = history.takeLast(10).map { it.heartRate.toFloat() / 200f } // Normalized
-            )
-            
-            Spacer(Modifier.height(12.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                listOf("00:00", "06:00", "12:00", "18:00", "23:59").forEach { time ->
-                    Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(end = 6.dp).height(120.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    yLabels.forEach { yL ->
+                        Text("$yL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    LineChart(
+                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        points = timePoints,
+                        rangeStartMillis = chartStart,
+                        rangeEndMillis = chartEnd,
+                        yLabels = yLabels
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        labels.forEach { time ->
+                            Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
@@ -566,26 +644,73 @@ private fun HeartRateTrendCard(history: List<mx.ita.vitalsense.data.model.Vitals
 }
 
 @Composable
-fun LineChart(modifier: Modifier = Modifier, color: Color, points: List<Float>) {
-    val displayPoints = if (points.isEmpty()) listOf(0.5f, 0.5f) else points
+private fun LineChart(
+    modifier: Modifier = Modifier,
+    color: Color,
+    points: List<HrTimePoint>,
+    rangeStartMillis: Long,
+    rangeEndMillis: Long,
+    yLabels: List<Int>
+) {
+    val safeEnd = maxOf(rangeEndMillis, rangeStartMillis + 60_000L)
+    val span = (safeEnd - rangeStartMillis).toFloat().coerceAtLeast(1f)
     
     Canvas(modifier = modifier) {
-        val path = Path()
         val width = size.width
         val height = size.height
-        val stepX = width / (displayPoints.size - 1)
-        
-        displayPoints.forEachIndexed { index, value ->
-            val x = index * stepX
-            val y = height - (value * height).coerceIn(0f, height)
+
+        val minBpm = yLabels.lastOrNull()?.toFloat() ?: 40f
+        val maxBpm = yLabels.firstOrNull()?.toFloat() ?: 180f
+
+        if (points.isEmpty()) {
+            drawLine(
+                color = color.copy(alpha = 0.3f),
+                start = Offset(0f, height * 0.5f),
+                end = Offset(width, height * 0.5f),
+                strokeWidth = 2.dp.toPx(),
+            )
+            return@Canvas
+        }
+
+        fun xOf(ts: Long): Float {
+            val ratio = ((ts - rangeStartMillis).toFloat() / span).coerceIn(0f, 1f)
+            return ratio * width
+        }
+        fun yOf(bpm: Float): Float {
+            val normalized = ((bpm - minBpm) / (maxBpm - minBpm)).coerceIn(0f, 1f)
+            return height - (normalized * height)
+        }
+
+        yLabels.forEach { yL ->
+            val yP = yOf(yL.toFloat())
+            drawLine(Color(0xFFEEEEEE), Offset(0f, yP), Offset(width, yP), 1.dp.toPx())
+        }
+        (0..4).forEach { i ->
+            val xP = (i.toFloat() / 4f) * width
+            drawLine(Color(0xFFEEEEEE), Offset(xP, 0f), Offset(xP, height), 0.5.dp.toPx())
+        }
+
+        if (points.size == 1) {
+            val only = points.first()
+            drawCircle(color = color, radius = 4.dp.toPx(), center = Offset(xOf(only.timestamp), yOf(only.bpm.toFloat())))
+            return@Canvas
+        }
+
+        val path = Path()
+        points.forEachIndexed { index, point ->
+            val x = xOf(point.timestamp)
+            val y = yOf(point.bpm.toFloat())
             if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        
+
         drawPath(
             path = path,
             color = color,
             style = Stroke(width = 3.dp.toPx())
         )
+
+        val last = points.last()
+        drawCircle(color = color, radius = 4.dp.toPx(), center = Offset(xOf(last.timestamp), yOf(last.bpm.toFloat())))
     }
 }
 

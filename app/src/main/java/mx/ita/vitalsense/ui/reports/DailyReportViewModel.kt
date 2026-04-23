@@ -31,7 +31,9 @@ data class DailyReportUiState(
     val selectedFilter: ReportRangeFilter = ReportRangeFilter.TODAY,
     val sleepData: SleepData? = null,
     val vitalsHistory: List<VitalsData> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val rangeStartMillis: Long = 0L,
+    val rangeEndMillis: Long = 0L,
 )
 
 class DailyReportViewModel(application: Application) : AndroidViewModel(application) {
@@ -142,8 +144,19 @@ class DailyReportViewModel(application: Application) : AndroidViewModel(applicat
         sleepRef?.addValueEventListener(sleepListener!!)
 
         val zone = ZoneId.systemDefault()
+        val nowMillis = System.currentTimeMillis()
         val startMillis = startDate.atStartOfDay(zone).toInstant().toEpochMilli()
-        val endMillis = endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+        val nominalEndMillis = endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+        val endMillis = if (endDate == LocalDate.now(zone)) {
+            minOf(nominalEndMillis, nowMillis)
+        } else {
+            nominalEndMillis
+        }
+
+        _uiState.value = _uiState.value.copy(
+            rangeStartMillis = startMillis,
+            rangeEndMillis = endMillis,
+        )
 
         historyRef = db.getReference("patients/$userId/history")
             .orderByChild("timestamp")
@@ -164,7 +177,9 @@ class DailyReportViewModel(application: Application) : AndroidViewModel(applicat
                         if (ts <= 0L) return@mapNotNull null
                         VitalsData(patientId = userId, heartRate = hr, glucose = glucose, spo2 = spo2, timestamp = ts)
                     }
-                }.sortedBy { it.timestamp }
+                }
+                    .filter { sample -> sample.timestamp in startMillis..endMillis }
+                    .sortedBy { it.timestamp }
 
                 val history = compactHistorySamples(historyRaw)
 

@@ -406,7 +406,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  import { getDatabase, ref, get, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "__FIREBASE_API_KEY__",
@@ -463,9 +463,12 @@
     const initials = `${data.nombre?.[0] || ""}${data.apellidos?.[0] || ""}`.trim().toUpperCase() || "P";
     document.getElementById("avatar").textContent = initials;
     document.getElementById("patient-name").textContent = `${data.nombre || ""} ${data.apellidos || ""}`.trim() || "Paciente";
-    document.getElementById("hr-value").textContent = data.heartRateAtAlert ? `${data.heartRateAtAlert}` : "--";
-    document.getElementById("spo2-value").textContent = data.spo2 !== undefined ? `${data.spo2}%` : "--";
-    document.getElementById("glucose-value").textContent = data.glucose !== undefined ? `${data.glucose} mg/dL` : "--";
+    const hr = toNumber(data.heartRateAtAlert);
+    const spo2 = toNumber(data.spo2);
+    const glucose = toNumber(data.glucose);
+    document.getElementById("hr-value").textContent = hr && hr > 0 ? `${Math.round(hr)}` : "--";
+    document.getElementById("spo2-value").textContent = spo2 && spo2 > 0 ? `${Math.round(spo2)}%` : "--";
+    document.getElementById("glucose-value").textContent = glucose && glucose > 0 ? `${Math.round(glucose)} mg/dL` : "--";
   }
 
   function toText(value) {
@@ -476,6 +479,32 @@
     if (value == null || value === "") return undefined;
     const n = Number(value);
     return Number.isFinite(n) ? n : undefined;
+  }
+
+  function listenToLiveVitals(userId) {
+    if (!userId) return;
+    const vitalsRef = ref(db, `vitals/current/${userId}`);
+    onValue(vitalsRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.val();
+      
+      const hr = toNumber(data.heartRate);
+      const spo2 = toNumber(data.spo2);
+      const glucose = toNumber(data.glucose);
+      
+      if (hr && hr > 0) {
+        document.getElementById("hr-value").textContent = `${Math.round(hr)}`;
+        tokenData.heartRateAtAlert = hr;
+      }
+      if (spo2 && spo2 > 0) {
+        document.getElementById("spo2-value").textContent = `${Math.round(spo2)}%`;
+        tokenData.spo2 = spo2;
+      }
+      if (glucose && glucose > 0) {
+        document.getElementById("glucose-value").textContent = `${Math.round(glucose)} mg/dL`;
+        tokenData.glucose = glucose;
+      }
+    });
   }
 
   function updatePinBoxes() {
@@ -725,13 +754,20 @@
     }
 
     try {
-      const [profile, alert, heartRate, spo2, glucose] = await Promise.all([
+      const [profile, alert, currentVitals, patientNode] = await Promise.all([
         loadPublicProfile(sosUserId),
         safeGet(`alerts/${sosUserId}/${sosId}`),
-        safeGet(`patients/${sosUserId}/heartRate`),
-        safeGet(`patients/${sosUserId}/spo2`),
-        safeGet(`patients/${sosUserId}/glucose`),
+        safeGet(`vitals/current/${sosUserId}`),
+        safeGet(`patients/${sosUserId}`),
       ]);
+
+      const hrFromAlert = toNumber(alert && alert.heartRate);
+      const hrFromCurrent = toNumber(currentVitals && currentVitals.heartRate);
+      const hrFromPatient = toNumber(patientNode && patientNode.heartRate);
+      const spo2FromCurrent = toNumber(currentVitals && currentVitals.spo2);
+      const spo2FromPatient = toNumber(patientNode && patientNode.spo2);
+      const glucoseFromCurrent = toNumber(currentVitals && currentVitals.glucose);
+      const glucoseFromPatient = toNumber(patientNode && patientNode.glucose);
 
       tokenData = {
         userId: sosUserId,
@@ -747,9 +783,9 @@
         contactoEmergencia: toText(profile.contactoEmergencia),
         telefonoEmergencia: toText(profile.telefonoEmergencia),
         anomalyType: toText((alert && alert.type) || "SOS Activo"),
-        heartRateAtAlert: toNumber(alert && alert.heartRate) ?? toNumber(heartRate) ?? 0,
-        spo2: toNumber(spo2),
-        glucose: toNumber(glucose),
+        heartRateAtAlert: hrFromCurrent ?? hrFromAlert ?? hrFromPatient ?? 0,
+        spo2: spo2FromCurrent ?? spo2FromPatient,
+        glucose: glucoseFromCurrent ?? glucoseFromPatient,
         documentos: [],
       };
 
@@ -772,6 +808,7 @@
       }
 
       fillHero(tokenData);
+      listenToLiveVitals(sosUserId);
       showPage();
       document.getElementById("pin-card").style.display = "none";
       document.getElementById("unlocked").style.display = "block";
@@ -838,7 +875,33 @@
       }
 
       tokenData = data;
-      fillHero(data);
+      if (tokenData && tokenData.userId) {
+        const [currentVitals, patientNode] = await Promise.all([
+          safeGet(`vitals/current/${tokenData.userId}`),
+          safeGet(`patients/${tokenData.userId}`),
+        ]);
+        if (!toNumber(tokenData.heartRateAtAlert)) {
+          tokenData.heartRateAtAlert =
+            toNumber(currentVitals && currentVitals.heartRate)
+            ?? toNumber(patientNode && patientNode.heartRate)
+            ?? tokenData.heartRateAtAlert;
+        }else {
+            tokenData.heartRateAtAlert = toNumber(currentVitals && currentVitals.heartRate) ?? tokenData.heartRateAtAlert;
+        }
+        
+        tokenData.spo2 =
+            toNumber(currentVitals && currentVitals.spo2)
+            ?? toNumber(patientNode && patientNode.spo2)
+            ?? tokenData.spo2;
+            
+        tokenData.glucose =
+            toNumber(currentVitals && currentVitals.glucose)
+            ?? toNumber(patientNode && patientNode.glucose)
+            ?? tokenData.glucose;
+      }
+      
+      fillHero(tokenData);
+      if (tokenData && tokenData.userId) listenToLiveVitals(tokenData.userId);
       showPage();
       pinInput.focus();
       updatePinBoxes();

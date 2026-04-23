@@ -53,14 +53,6 @@ private const val KEY_PAIRED = "is_paired"
 private const val KEY_PAIRING_CODE = "pairing_code"
 private const val KEY_USER_ID = "user_id"
 private const val KEY_LAST_CODE_TIME = "last_code_time"
-private val HEALTH_SENSOR_PERMISSIONS = listOf(
-    "android.permission.health.READ_HEART_RATE",
-    "android.permission.health.READ_OXYGEN_SATURATION",
-    "android.permission.health.READ_RESPIRATORY_RATE",
-    "android.permission.health.READ_BODY_TEMPERATURE",
-    "android.permission.health.READ_BLOOD_PRESSURE",
-    "android.permission.health.READ_BLOOD_GLUCOSE",
-)
 
 @Composable
 fun WearApp(
@@ -86,33 +78,6 @@ fun WearApp(
             add(Manifest.permission.ACCESS_FINE_LOCATION)
             add(Manifest.permission.ACTIVITY_RECOGNITION)
         }.toTypedArray()
-    }
-
-    // allPermissionsToRequest: the full set we request on first launch, including
-    // optional background permissions. Not granting these is accepted gracefully.
-    val allPermissionsToRequest = remember(context) {
-        buildList {
-            addAll(criticalPermissions)
-
-            // Background location — must be enabled via Settings ("Allow all the time").
-            // We request it so the system can prompt, but we do NOT block the app on it.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-                add(Manifest.permission.BODY_SENSORS_BACKGROUND)
-            }
-
-            // Health read permissions — only if they exist on this device
-            HEALTH_SENSOR_PERMISSIONS.forEach { permission ->
-                val existsOnDevice = runCatching {
-                    context.packageManager.getPermissionInfo(permission, 0)
-                }.isSuccess
-                if (existsOnDevice) add(permission)
-            }
-        }.distinct().toTypedArray()
     }
 
     // Only check critical permissions for the gate — background perms can't be
@@ -143,26 +108,26 @@ fun WearApp(
             Log.w(TAG, "Permisos denegados: ${denied.joinToString()}")
         }
         hasPermission = allGranted()
-        // If critical perms still denied after dialog, send user to Settings
-        if (!hasPermission) {
-            val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", context.packageName, null)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(settingsIntent)
-        }
     }
 
-    // Auto-launch the full permission request on first open.
+    // Auto-launch only critical runtime permissions on first open.
     LaunchedEffect(Unit) {
         if (!allGranted()) {
-            val missing = allPermissionsToRequest.filter {
+            val missing = criticalPermissions.filter {
                 ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
             }
             if (missing.isNotEmpty()) {
                 launcher.launch(missing.toTypedArray())
             }
         }
+    }
+
+    val openAppSettings = {
+        val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", context.packageName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(settingsIntent)
     }
 
     // --- 2. Estado ---
@@ -237,15 +202,13 @@ fun WearApp(
         }
     }
 
+    // Regenerate pairing code if expired, but do NOT loop infinitely
     LaunchedEffect(isPaired, isAuthenticated) {
         if (!isPaired) {
-            while (true) {
-                kotlinx.coroutines.delay(60_000L) // Verificar cada minuto
-                val currentTime = System.currentTimeMillis()
-                val lastCodeTime = prefs.getLong(KEY_LAST_CODE_TIME, 0L)
-                if (currentTime - lastCodeTime > 5 * 60 * 1000L) {
-                    generateNewPairingCode()
-                }
+            val currentTime = System.currentTimeMillis()
+            val lastCodeTime = prefs.getLong(KEY_LAST_CODE_TIME, 0L)
+            if (pairingCode.isEmpty() || currentTime - lastCodeTime > 5 * 60 * 1000L) {
+                generateNewPairingCode()
             }
         }
     }
@@ -301,29 +264,39 @@ fun WearApp(
     }
 
     // Escuchar emergencias activas desde Firebase para mostrar QR+PIN en el reloj
-    LaunchedEffect(isPaired, isAuthenticated) {
+    DisposableEffect(isPaired, isAuthenticated) {
         val userId = prefs.getString(KEY_USER_ID, null)
-        if (!isPaired || userId.isNullOrEmpty()) return@LaunchedEffect
-
-        val ref = database.getReference("patients/$userId/activeEmergency")
-        ref.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (!snapshot.exists()) {
-                    activeEmergencyTokenId = null
-                    return
+        var listener: ValueEventListener? = null
+        
+        if (isPaired && !userId.isNullOrEmpty()) {
+            val ref = database.getReference("patients/$userId/activeEmergency")
+            listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!snapshot.exists()) {
+                        activeEmergencyTokenId = null
+                        return
+                    }
+                    val expiresAt = snapshot.child("expiresAt").getValue(Long::class.java) ?: 0L
+                    if (System.currentTimeMillis() > expiresAt) {
+                        activeEmergencyTokenId = null
+                        return
+                    }
+                    activeEmergencyTokenId = snapshot.child("tokenId").getValue(String::class.java)
+                    activeEmergencyPin     = snapshot.child("pin").getValue(String::class.java) ?: ""
+                    activeEmergencyType    = snapshot.child("anomalyType").getValue(String::class.java) ?: "Emergencia"
+                    activeEmergencyExpires = expiresAt
                 }
-                val expiresAt = snapshot.child("expiresAt").getValue(Long::class.java) ?: 0L
-                if (System.currentTimeMillis() > expiresAt) {
-                    activeEmergencyTokenId = null
-                    return
-                }
-                activeEmergencyTokenId = snapshot.child("tokenId").getValue(String::class.java)
-                activeEmergencyPin     = snapshot.child("pin").getValue(String::class.java) ?: ""
-                activeEmergencyType    = snapshot.child("anomalyType").getValue(String::class.java) ?: "Emergencia"
-                activeEmergencyExpires = expiresAt
+                override fun onCancelled(error: DatabaseError) {}
             }
-            override fun onCancelled(error: DatabaseError) {}
-        })
+            ref.addValueEventListener(listener)
+        }
+        
+        onDispose {
+            val userId = prefs.getString(KEY_USER_ID, null)
+            if (listener != null && !userId.isNullOrEmpty()) {
+                database.getReference("patients/$userId/activeEmergency").removeEventListener(listener)
+            }
+        }
     }
 
     // Lógica de Servicio
@@ -466,17 +439,22 @@ fun WearApp(
             } else if (!isPaired) {
                 CodeScreen(pairingCode)
             } else if (!hasPermission) {
-                PermissionScreen {
-                    val missing = criticalPermissions.filter {
-                        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
-                    }
+                PermissionScreen(
+                    onClick = {
+                        val missing = criticalPermissions.filter {
+                            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+                        }
 
-                    if (missing.isEmpty()) {
-                        hasPermission = true
-                    } else {
-                        launcher.launch(missing.toTypedArray())
-                    }
-                }
+                        if (missing.isEmpty()) {
+                            hasPermission = true
+                        } else {
+                            launcher.launch(missing.toTypedArray())
+                        }
+                    },
+                    onOpenSettings = {
+                        openAppSettings()
+                    },
+                )
             } else if (activeEmergencyTokenId != null) {
                 // Emergencia crítica detectada por la IA — mostrar QR + PIN en el reloj
                 EmergencyQrWearScreen(
@@ -744,7 +722,7 @@ fun SuccessScreen() {
 }
 
 @Composable
-fun PermissionScreen(onClick: () -> Unit) {
+fun PermissionScreen(onClick: () -> Unit, onOpenSettings: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
         Text("Permisos Requeridos", color = Color(0xFF3B82F6), fontSize = 14.sp)
         Text("Se necesita acceso a los sensores para el monitoreo continuo.", 
@@ -752,6 +730,10 @@ fun PermissionScreen(onClick: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         Button(onClick = onClick, colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF3B82F6))) {
             Text("Conceder")
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onOpenSettings, colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF334155))) {
+            Text("Abrir ajustes")
         }
     }
 }
